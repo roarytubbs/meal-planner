@@ -1,0 +1,393 @@
+:root {
+  --bg: #f7f5ec;
+  --bg-2: #fffdf4;
+  --ink: #18230f;
+  --muted: #4e5e46;
+  --line: #d9d6c9;
+  --accent: #355f2e;
+  --accent-soft: #dbe8c4;
+  --warning: #906f1f;
+  --shadow: rgba(24, 35, 15, 0.13);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(165deg, var(--bg), var(--bg-2));
+  color: var(--ink);
+  font-family: "Avenir Next", "Trebuchet MS", "Gill Sans", sans-serif;
+}
+
+.aurora {
+  position: fixed;
+  inset: -20% -20% auto auto;
+  width: 65vw;
+  height: 55vh;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 15% 20%, #cadf99 0 20%, transparent 65%),
+    radial-gradient(circle at 40% 30%, #ffeb9b 0 15%, transparent 60%),
+    radial-gradient(circle at 65% 50%, #9dc8a5 0 25%, transparent 75%);
+  filter: blur(28px);
+  opacity: 0.8;
+}
+
+.layout {
+  width: min(1040px, 92vw);
+  margin: 2rem auto 4rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.hero {
+  background: rgba(255, 253, 244, 0.85);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.2rem 1.2rem 1.3rem;
+  box-shadow: 0 12px 30px var(--shadow);
+  backdrop-filter: blur(8px);
+}
+
+.eyebrow {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 0.25rem 0 0.5rem;
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+  line-height: 1.1;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+p {
+  margin: 0.2rem 0 0;
+  line-height: 1.45;
+}
+
+.card {
+  background: rgba(255, 253, 244, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 10px 20px var(--shadow);
+}
+
+.card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.85rem;
+}
+
+.heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.inline-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.inline-control input {
+  width: 80px;
+}
+
+.btn {
+  border: 1px solid #556c4b;
+  background: #f3f0de;
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  background: #ece7d0;
+}
+
+.btn-accent {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.week-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.day-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 110px;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.day-name {
+  font-weight: 700;
+}
+
+.day-servings {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.day-servings label {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+select,
+input,
+textarea {
+  width: 100%;
+  border: 1px solid #aab39a;
+  border-radius: 10px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.94rem;
+  background: #fffef7;
+  color: var(--ink);
+}
+
+textarea {
+  resize: vertical;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.week-balance {
+  margin-top: 0.9rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.recipe-form {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.field label {
+  display: block;
+  font-size: 0.86rem;
+  margin-bottom: 0.3rem;
+}
+
+.recipe-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.recipe-chip {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.recipe-chip h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.recipe-chip p {
+  font-size: 0.86rem;
+}
+
+.catalog-form {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 180px) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.catalog-list {
+  margin-top: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.catalog-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.5rem 0.6rem;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.catalog-row + .catalog-row {
+  border-top: 1px solid var(--line);
+}
+
+.catalog-empty {
+  padding: 0.6rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.pantry-row {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.65rem;
+}
+
+.grocery-output {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.store-block {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.store-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: #ece7d0;
+  padding: 0.45rem 0.65rem;
+}
+
+.store-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.btn-small {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.84rem;
+}
+
+.copy-status {
+  margin-top: 0.4rem;
+  min-height: 1.2rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.copy-status.success {
+  color: var(--accent);
+}
+
+.copy-status.error {
+  color: #8b3a23;
+}
+
+.export-store-filters {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.store-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.83rem;
+  color: var(--ink);
+}
+
+.store-filter input {
+  width: auto;
+}
+
+.store-note {
+  margin: 0.2rem 0.65rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.store-items {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.store-items li {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  line-height: 1.3;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: var(--warning);
+}
+
+@media (max-width: 720px) {
+  .layout {
+    width: min(1040px, 95vw);
+    margin-top: 1rem;
+  }
+
+  .day-row {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+
+  .pantry-row {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-form {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-row {
+    grid-template-columns: 1fr;
+  }
+
+  .card-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .heading-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
