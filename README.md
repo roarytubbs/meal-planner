@@ -38,7 +38,10 @@ npm run preview
 ## Current Features
 
 - Weekly meal selection with per-day serving overrides
-- Recipe creation with tags and ingredient parsing
+- Dedicated recipe workflow screen for manual add/import before meal scheduling
+- Full recipe workflow: create, search, duplicate, edit, and delete
+- Recipe details: name, description, servings, ingredients, and step-by-step instructions
+- Website recipe import with editable review before approval and save
 - Ingredient catalog with default store routing
 - Pantry exclusion filtering
 - Grocery grouping and quantity scaling by household servings

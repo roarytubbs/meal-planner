@@ -34,7 +34,7 @@ export default {
         sans: ["Manrope", "Avenir Next", "Trebuchet MS", "Segoe UI", "sans-serif"],
       },
       boxShadow: {
-        glow: "0 0 0 1px hsl(var(--ring) / 0.2), 0 24px 44px hsl(166 42% 16% / 0.22)",
+        glow: "0 0 0 1px hsl(var(--ring) / 0.14), 0 24px 50px hsl(220 20% 10% / 0.16)",
       },
     },
   },
