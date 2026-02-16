@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Meal Planner (Family-Focused)
 
 A private, practical meal planning app designed for a single household.
@@ -9,9 +10,22 @@ Help one person (your wife) plan a week of meals quickly, then automatically gen
 - A consolidated grocery list
 - Store-split lists for Target, Sprouts, Aldi, and Trader Joe's
 - Cart-ready order drafts where integrations are available
+=======
+# Family Meal Planner
+
+Meal planning app rebuilt with React + Tailwind + local `shadcn/ui` components.
+
+## Stack
+
+- React (Vite)
+- Tailwind CSS
+- `shadcn/ui` component primitives (local source in `src/components/ui`)
+- Local persistence with browser `localStorage`
+>>>>>>> 995b589 (Migrate app to shadcn ui)
 
 This project is intentionally **not** optimized for mass-market complexity. It is optimized for real household usage: fast planning, minimal friction, and reliable grocery output.
 
+<<<<<<< HEAD
 ## Product Principles
 
 1. **Weekly planning in under 5 minutes**
@@ -104,3 +118,28 @@ Add a weekly balance summary such as:
 - Should lunches be added immediately, or after dinner flow is smooth?
 - Which store should get first automation effort for order draft creation?
 - Do you want price-awareness in v1 (even rough estimates), or defer?
+=======
+```bash
+npm install
+npm start
+```
+
+Then open the Vite URL shown in terminal (usually `http://127.0.0.1:5173`).
+
+## Build
+
+```bash
+npm run build
+npm run preview
+```
+
+## Features
+
+- Weekly meal selection with per-day serving overrides
+- Recipe creation with tags and ingredient parsing
+- Ingredient catalog for default store routing
+- Pantry exclusion filtering
+- Grocery grouping and quantity scaling by household servings
+- Copy exports per store / all stores / selected stores
+- Printable grocery checklist
+>>>>>>> 995b589 (Migrate app to shadcn ui)
