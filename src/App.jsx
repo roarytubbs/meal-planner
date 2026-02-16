@@ -627,7 +627,7 @@ export default function App() {
 
   function handleOpenPlannerWorkflow() {
     setWorkflowScreen(WORKFLOW_SCREENS.planner);
-    setPlannerStep((prev) => Math.max(2, prev));
+    setPlannerStep(2);
     setShowRecipeSplitMenu(false);
   }
 
@@ -1772,7 +1772,8 @@ export default function App() {
         </Card>
       ) : null}
 
-      <Card ref={recipeListRef}>
+      {isRecipeWorkflow ? (
+        <Card ref={recipeListRef}>
         <CardHeader>
           <CardTitle className="text-2xl">Recipes</CardTitle>
           <CardDescription>
@@ -2240,9 +2241,11 @@ export default function App() {
             </p>
           ) : null}
         </CardContent>
-      </Card>
+        </Card>
+      ) : null}
 
-      <Card ref={storeWorkflowRef}>
+      {isRecipeWorkflow ? (
+        <Card ref={storeWorkflowRef}>
         <CardHeader>
           <CardTitle className="text-2xl">Ingredient Catalog</CardTitle>
           <CardDescription>
@@ -2338,9 +2341,11 @@ export default function App() {
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      ) : null}
 
-      <Card>
+      {isRecipeWorkflow ? (
+        <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Pantry Always-On-Hand</CardTitle>
           <CardDescription>
@@ -2359,7 +2364,8 @@ export default function App() {
             Save Pantry
           </Button>
         </CardContent>
-      </Card>
+        </Card>
+      ) : null}
 
       {isPlannerWorkflow && plannerStep >= 3 ? (
         <Card>
