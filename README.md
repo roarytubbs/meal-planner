@@ -1,130 +1,32 @@
-<<<<<<< HEAD
-# Meal Planner (Family-Focused)
+# Family Meal Planner
 
-A private, practical meal planning app designed for a single household.
+A private, practical meal planning app for one household, rebuilt with React, Tailwind CSS, and local `shadcn/ui` components.
 
 ## Product Vision
 
-Help one person (your wife) plan a week of meals quickly, then automatically generate:
+Plan a week of meals quickly, then generate:
 
-- A consolidated grocery list
-- Store-split lists for Target, Sprouts, Aldi, and Trader Joe's
-- Cart-ready order drafts where integrations are available
-=======
-# Family Meal Planner
+- One consolidated grocery list
+- Store-specific lists (Target, Sprouts, Aldi, Trader Joe's)
+- Copy-friendly exports and printable checklists
 
-Meal planning app rebuilt with React + Tailwind + local `shadcn/ui` components.
+The app is intentionally optimized for real household usage: fast planning, low friction, and reliable grocery output.
 
 ## Stack
 
 - React (Vite)
 - Tailwind CSS
-- `shadcn/ui` component primitives (local source in `src/components/ui`)
-- Local persistence with browser `localStorage`
->>>>>>> 995b589 (Migrate app to shadcn ui)
+- Local `shadcn/ui` primitives in `src/components/ui`
+- Local persistence via browser `localStorage`
 
-This project is intentionally **not** optimized for mass-market complexity. It is optimized for real household usage: fast planning, minimal friction, and reliable grocery output.
+## Development
 
-<<<<<<< HEAD
-## Product Principles
-
-1. **Weekly planning in under 5 minutes**
-2. **Mobile-first interaction** (use while cooking or shopping)
-3. **Health-aware, not calorie-obsessed**
-4. **Integration adapters, not integration lock-in**
-5. **Manual overrides always available**
-
-## Core User Flow
-
-1. Select meals for Mon-Sun (dinner-first MVP)
-2. Review and adjust ingredients
-3. Generate groceries
-4. Split groceries by preferred store
-5. Export:
-   - order draft for supported stores
-   - in-store checklist for Trader Joe's
-
-## MVP Scope (First Build Slice)
-
-### Data model
-
-- `Recipe`
-  - `id`
-  - `title`
-  - `tags[]` (e.g., high-protein, quick, kid-friendly)
-  - `ingredients[]`
-- `Ingredient`
-  - `name`
-  - `quantity`
-  - `unit`
-  - `notes`
-  - `defaultStore` (Target/Sprouts/Aldi/Trader Joe's)
-- `WeekPlan`
-  - `startDate`
-  - `meals[]` (`day`, `recipeId`)
-- `Pantry` (optional early)
-  - ingredients to exclude from grocery generation
-
-### Features
-
-- Build/edit family recipe set (start with 30-50)
-- Assign recipe to each day of the week
-- Merge and normalize ingredient list
-- Split by store using default mapping + manual edits
-- Mobile-friendly "This Week" and "Groceries" screens
-
-## Integration Strategy
-
-Assume uneven API support across grocers.
-
-- Treat each grocer as an adapter with a shared interface
-- Start with robust list generation first
-- Add order-draft automation incrementally
-- Keep Trader Joe's optimized for in-store checklist mode
-
-## Health Layer (Phase 1.5)
-
-Start with lightweight meal metadata instead of full nutrition tracking.
-
-Recommended tags:
-
-- high-protein
-- low-carb
-- high-fiber
-- quick-15
-- freezer-friendly
-- leftovers-friendly
-
-Add a weekly balance summary such as:
-
-- quick meals count
-- leftovers coverage
-- cook-heavy nights
-
-## Initial Backlog
-
-1. Build recipe + ingredient schema
-2. Add weekly planner UI (Mon-Sun)
-3. Implement grocery merge logic
-4. Add unit normalization rules (basic)
-5. Add store split rules and manual override
-6. Build checklist/export views
-7. Add pantry exclusion pass
-8. Add health tag dashboard
-
-## Next Iteration Questions
-
-- Should recipe source of truth be in-app only or include URL imports?
-- Should lunches be added immediately, or after dinner flow is smooth?
-- Which store should get first automation effort for order draft creation?
-- Do you want price-awareness in v1 (even rough estimates), or defer?
-=======
 ```bash
 npm install
 npm start
 ```
 
-Then open the Vite URL shown in terminal (usually `http://127.0.0.1:5173`).
+Open the Vite URL shown in the terminal (usually `http://127.0.0.1:5173`).
 
 ## Build
 
@@ -133,13 +35,20 @@ npm run build
 npm run preview
 ```
 
-## Features
+## Current Features
 
 - Weekly meal selection with per-day serving overrides
 - Recipe creation with tags and ingredient parsing
-- Ingredient catalog for default store routing
+- Ingredient catalog with default store routing
 - Pantry exclusion filtering
 - Grocery grouping and quantity scaling by household servings
-- Copy exports per store / all stores / selected stores
+- Copy exports per store, all stores, or selected stores
 - Printable grocery checklist
->>>>>>> 995b589 (Migrate app to shadcn ui)
+
+## Product Principles
+
+1. Weekly planning in under 5 minutes
+2. Mobile-first interactions
+3. Health-aware, not calorie-obsessed
+4. Adapter-based integrations, not lock-in
+5. Manual override always available
