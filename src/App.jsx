@@ -22,7 +22,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  CATALOG_STORES,
   DAYS,
   DAY_MODE_LABELS,
   DAY_MODES,
@@ -57,6 +56,8 @@ import {
 const NO_RECIPE = "__none__";
 const MENU_HISTORY_KEY = `${STORAGE_KEY}-menu-history-v1`;
 const MAX_PREVIOUS_MENUS = 5;
+const MAX_MEAL_PLAN_NAME = 80;
+const MAX_MEAL_PLAN_DESCRIPTION = 280;
 const WORKFLOW_SCREENS = {
   landing: "landing",
   planner: "planner",
@@ -203,6 +204,14 @@ function recipeSearchBlob(recipe) {
     .toLowerCase();
 }
 
+function normalizePlanName(value) {
+  return String(value || "").trim().slice(0, MAX_MEAL_PLAN_NAME);
+}
+
+function normalizePlanDescription(value) {
+  return String(value || "").trim().slice(0, MAX_MEAL_PLAN_DESCRIPTION);
+}
+
 function formatMenuDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -236,12 +245,16 @@ function normalizeMenuHistoryEntries(entries) {
       }
 
       const createdAt = new Date(entry.createdAt || Date.now()).toISOString();
-      const label = String(entry.label || "").trim() || `Menu ${formatMenuDate(createdAt)}`;
+      const mealPlanName = normalizePlanName(entry.mealPlanName || entry.label);
+      const mealPlanDescription = normalizePlanDescription(entry.mealPlanDescription);
+      const label = mealPlanName || `Menu ${formatMenuDate(createdAt)}`;
       const planningDays = Math.min(7, Math.max(1, normalizeServings(entry.planningDays, 7)));
 
       return {
         id: String(entry.id || makeId("menu")),
         label,
+        mealPlanName,
+        mealPlanDescription,
         createdAt,
         planningDays,
         weekPlan: cloneWeekPlan(entry.weekPlan),
@@ -295,9 +308,13 @@ function hasAnyMenuContent(weekPlan, planningDays) {
 
 function buildMenuSnapshot(state) {
   const createdAt = new Date().toISOString();
+  const mealPlanName = normalizePlanName(state.mealPlanName);
+  const mealPlanDescription = normalizePlanDescription(state.mealPlanDescription);
   return {
     id: makeId("menu"),
-    label: `Menu ${formatMenuDate(createdAt)}`,
+    label: mealPlanName || `Menu ${formatMenuDate(createdAt)}`,
+    mealPlanName,
+    mealPlanDescription,
     createdAt,
     planningDays: Math.min(7, Math.max(1, normalizeServings(state.planningDays, 7))),
     weekPlan: cloneWeekPlan(state.weekPlan),
@@ -333,7 +350,7 @@ export default function App() {
   const [storeNameInput, setStoreNameInput] = useState("");
   const [catalogForm, setCatalogForm] = useState({
     name: "",
-    store: CATALOG_STORES[0],
+    store: "",
   });
   const recipeSplitMenuRef = useRef(null);
   const recipeSplitToggleRef = useRef(null);
@@ -547,6 +564,8 @@ export default function App() {
     setState((prev) => ({
       ...prev,
       planningDays: 7,
+      mealPlanName: "",
+      mealPlanDescription: "",
       weekPlan: createDefaultWeekPlan(prev.recipes),
       exportStoreSelection: buildDefaultExportSelection(prev.stores),
     }));
@@ -575,6 +594,8 @@ export default function App() {
     setState((prev) => ({
       ...prev,
       planningDays: selectedMenu.planningDays,
+      mealPlanName: selectedMenu.mealPlanName || "",
+      mealPlanDescription: selectedMenu.mealPlanDescription || "",
       weekPlan: DAYS.reduce((acc, day, index) => {
         acc[day] = selectedMenu.weekPlan[day] || createDefaultDayPlan(prev.recipes, index);
         return acc;
@@ -705,6 +726,20 @@ export default function App() {
     setState((prev) => ({
       ...prev,
       planningDays: Math.min(7, Math.max(1, normalizeServings(value, prev.planningDays))),
+    }));
+  }
+
+  function setMealPlanName(value) {
+    setState((prev) => ({
+      ...prev,
+      mealPlanName: String(value || "").slice(0, MAX_MEAL_PLAN_NAME),
+    }));
+  }
+
+  function setMealPlanDescription(value) {
+    setState((prev) => ({
+      ...prev,
+      mealPlanDescription: String(value || "").slice(0, MAX_MEAL_PLAN_DESCRIPTION),
     }));
   }
 
@@ -974,7 +1009,12 @@ export default function App() {
       }
 
       const sourceText = await response.text();
-      const extracted = extractRecipeFromWebText(sourceText, normalizedUrl, state.ingredientCatalog);
+      const extracted = extractRecipeFromWebText(
+        sourceText,
+        normalizedUrl,
+        state.ingredientCatalog,
+        stores,
+      );
 
       const draft = {
         sourceUrl: normalizedUrl,
@@ -1250,6 +1290,7 @@ export default function App() {
 
   const isPlannerWorkflow = workflowScreen === WORKFLOW_SCREENS.planner;
   const isRecipeWorkflow = workflowScreen === WORKFLOW_SCREENS.recipes;
+  const activePlanName = normalizePlanName(state.mealPlanName);
 
   if (workflowScreen === WORKFLOW_SCREENS.landing) {
     return (
@@ -1418,12 +1459,12 @@ export default function App() {
             </Badge>
             <h1 className="max-w-3xl text-3xl font-extrabold tracking-tight md:text-5xl">
               {isPlannerWorkflow
-                ? `Build a ${planningDays}-day meal plan and grocery list.`
+                ? activePlanName || `Build and configure your ${planningDays}-day meal plan.`
                 : "Capture, refine, and organize recipes before planning."}
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground md:text-base">
               {isPlannerWorkflow
-                ? "Step through day setup, meal selection, and store-specific grocery output."
+                ? "Set plan basics first, then configure day-level and meal-level overrides."
                 : "Add recipes manually or import from a URL, then keep everything searchable and ready for meal planning."}
             </p>
           </div>
@@ -1456,12 +1497,22 @@ export default function App() {
       {isPlannerWorkflow ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Step 1: Plan Length</CardTitle>
+            <CardTitle className="text-2xl">Step 1: Plan Basics</CardTitle>
             <CardDescription>
-              Choose how many days this meal plan should cover.
+              Name the plan, add an optional description, and choose how many days it should cover.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-[220px_auto] md:items-end">
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="meal-plan-name">Meal Plan Name</Label>
+              <Input
+                id="meal-plan-name"
+                maxLength={MAX_MEAL_PLAN_NAME}
+                placeholder="Weeknight Dinners"
+                value={state.mealPlanName || ""}
+                onChange={(event) => setMealPlanName(event.target.value)}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="planning-days">Days In Plan</Label>
               <Input
@@ -1474,7 +1525,18 @@ export default function App() {
                 onChange={(event) => setPlanningDays(event.target.value)}
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="meal-plan-description">Description (optional)</Label>
+              <Textarea
+                id="meal-plan-description"
+                rows={3}
+                maxLength={MAX_MEAL_PLAN_DESCRIPTION}
+                placeholder="Focus on easy dinners and leftovers for busy nights."
+                value={state.mealPlanDescription || ""}
+                onChange={(event) => setMealPlanDescription(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 md:col-span-2">
               <Button type="button" onClick={() => setPlannerStep(2)}>
                 Continue To Day Setup
               </Button>
@@ -1675,11 +1737,6 @@ export default function App() {
               leftovers slots across {weekBalance.planningDays} days.
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => setPlannerStep(3)}>
-                Continue To Grocery Setup
-              </Button>
-            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -1719,8 +1776,8 @@ export default function App() {
         <CardHeader>
           <CardTitle className="text-2xl">Recipes</CardTitle>
           <CardDescription>
-            Create recipes with full prep details, then search, duplicate, edit, delete, or import
-            from websites.
+            Create recipes with full prep details, then sort, filter, search, add to meal plans,
+            duplicate, edit, delete, or import from websites.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -2185,7 +2242,7 @@ export default function App() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card ref={storeWorkflowRef}>
         <CardHeader>
           <CardTitle className="text-2xl">Ingredient Catalog</CardTitle>
           <CardDescription>
@@ -2193,6 +2250,30 @@ export default function App() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
+          <form className="grid gap-3 rounded-lg border border-border/70 bg-white/80 p-3 md:grid-cols-[1fr_auto]" onSubmit={handleStoreSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="store-name">Add Store</Label>
+              <Input
+                id="store-name"
+                ref={storeInputRef}
+                placeholder="Costco"
+                value={storeNameInput}
+                onChange={(event) => setStoreNameInput(event.target.value)}
+              />
+            </div>
+            <div className="pt-0 md:pt-8">
+              <Button type="submit">Add Store</Button>
+            </div>
+          </form>
+
+          <div className="flex flex-wrap gap-2">
+            {assignableStores.map((store) => (
+              <Badge key={store} variant="secondary">
+                {store}
+              </Badge>
+            ))}
+          </div>
+
           <form className="grid gap-4 md:grid-cols-[1fr_200px_auto]" onSubmit={handleCatalogSubmit}>
             <div className="space-y-2">
               <Label htmlFor="catalog-name">Ingredient Name</Label>
@@ -2217,7 +2298,7 @@ export default function App() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATALOG_STORES.map((store) => (
+                  {assignableStores.map((store) => (
                     <SelectItem key={store} value={store}>
                       {store}
                     </SelectItem>
@@ -2306,7 +2387,7 @@ export default function App() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-wrap gap-4 rounded-lg border border-border/80 bg-white/80 p-3">
-            {STORES.map((store) => {
+            {stores.map((store) => {
               const count = (groupedGroceries[store] || []).length;
               return (
                 <label key={store} className="flex items-center gap-2 text-sm">

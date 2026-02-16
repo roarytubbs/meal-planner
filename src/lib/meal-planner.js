@@ -745,7 +745,7 @@ function parseServingsFromText(text, fallback = 4) {
   return fallback;
 }
 
-export function extractRecipeFromWebText(text, sourceUrl, ingredientCatalog) {
+export function extractRecipeFromWebText(text, sourceUrl, ingredientCatalog, availableStores = STORES) {
   const lines = String(text || "")
     .split("\n")
     .map(cleanRecipeLine)
@@ -779,7 +779,7 @@ export function extractRecipeFromWebText(text, sourceUrl, ingredientCatalog) {
   const description = descriptionFromMeta || descriptionFromBody || "";
 
   const ingredientsLines = getLinesInSection(lines, ingredientsStart, stepsStart);
-  const parsedIngredients = parseIngredients(ingredientsLines.join("\n"), ingredientCatalog);
+  const parsedIngredients = parseIngredients(ingredientsLines.join("\n"), ingredientCatalog, availableStores);
 
   const instructionsLines = getLinesInSection(lines, stepsStart, lines.length);
   const parsedSteps = normalizeImportedInstructions(instructionsLines);
