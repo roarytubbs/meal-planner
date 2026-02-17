@@ -23,12 +23,12 @@ function ensureDirectoryForFile(filePath) {
 }
 
 async function createSqliteStore(sqlitePath) {
-  const Database = (await import("better-sqlite3")).default;
+  const { DatabaseSync } = await import("node:sqlite");
 
   ensureDirectoryForFile(sqlitePath);
 
-  const db = new Database(sqlitePath);
-  db.pragma("journal_mode = WAL");
+  const db = new DatabaseSync(sqlitePath);
+  db.exec("PRAGMA journal_mode = WAL;");
   db.exec(`
     CREATE TABLE IF NOT EXISTS planner_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
