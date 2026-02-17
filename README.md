@@ -37,6 +37,11 @@ Open the Vite URL shown in the terminal (usually `http://127.0.0.1:5173`).
 - Optional custom SQLite path: `SQLITE_PATH=/absolute/path/meal-planner.db`.
 - SQLite runtime requirement: `node:sqlite` support (Node.js 22+).
 
+### Store Metadata Lookup (Optional)
+
+- Set `GOOGLE_MAPS_API_KEY` to enable address-based store autofill metadata (name, hours, phone, website, and place assets).
+- If `GOOGLE_MAPS_API_KEY` is not configured, store CRUD still works with manual entry.
+
 ## Deploying To Vercel
 
 Yes, this app can run fully on Vercel with serverless API routes.

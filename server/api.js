@@ -6,14 +6,21 @@ import {
   normalizeStoreList,
 } from "../src/lib/meal-planner.js";
 import {
+  createStore,
   createRecipe,
+  deleteStore,
   deleteRecipe,
   getOrSeedState,
+  listStores,
   normalizeIncomingState,
+  updateStore as updateManagedStore,
   updateRecipe,
 } from "./state-service.js";
 
 const MAX_REQUEST_BYTES = 1_000_000;
+const STORE_LOOKUP_CACHE_TTL_MS = 5 * 60 * 1000;
+const STORE_LOOKUP_MAX_RESULTS = 5;
+const storeLookupCache = new Map();
 
 function sendJson(res, statusCode, payload) {
   const body = JSON.stringify(payload);
@@ -260,6 +267,213 @@ function sanitizeImportedRecipe(recipe) {
   };
 }
 
+function normalizeLookupQuery(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 200);
+}
+
+function readLookupCache(query) {
+  const key = query.toLowerCase();
+  const cached = storeLookupCache.get(key);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    storeLookupCache.delete(key);
+    return null;
+  }
+
+  return cached.results;
+}
+
+function writeLookupCache(query, results) {
+  const key = query.toLowerCase();
+  storeLookupCache.set(key, {
+    expiresAt: Date.now() + STORE_LOOKUP_CACHE_TTL_MS,
+    results,
+  });
+}
+
+function buildPlacePhotoUrl(photoReference, apiKey) {
+  const reference = String(photoReference || "").trim();
+  if (!reference || !apiKey) {
+    return "";
+  }
+  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${encodeURIComponent(reference)}&key=${encodeURIComponent(apiKey)}`;
+}
+
+function buildWebsiteLogoUrl(websiteUrl) {
+  const normalized = normalizeHttpUrl(websiteUrl);
+  if (!normalized) {
+    return "";
+  }
+
+  try {
+    const hostname = new URL(normalized).hostname;
+    if (!hostname) {
+      return "";
+    }
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=128`;
+  } catch {
+    return "";
+  }
+}
+
+function flattenHours(openingHours) {
+  const weekday = Array.isArray(openingHours?.weekday_text)
+    ? openingHours.weekday_text
+    : [];
+  if (weekday.length > 0) {
+    return weekday.join("; ");
+  }
+
+  if (String(openingHours?.open_now || "") === "true") {
+    return "Open now";
+  }
+
+  return "";
+}
+
+async function fetchGoogleTextSearch(query, apiKey) {
+  const endpoint = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+  endpoint.searchParams.set("query", query);
+  endpoint.searchParams.set("type", "store");
+  endpoint.searchParams.set("key", apiKey);
+
+  const response = await fetch(endpoint, { method: "GET" });
+  if (!response.ok) {
+    const error = new Error(`Store lookup failed with status ${response.status}`);
+    error.statusCode = 502;
+    error.expose = true;
+    throw error;
+  }
+
+  const payload = await response.json();
+  if (!payload || payload.status === "REQUEST_DENIED") {
+    const error = new Error(payload?.error_message || "Store lookup request denied.");
+    error.statusCode = 502;
+    error.expose = true;
+    throw error;
+  }
+
+  if (payload.status === "ZERO_RESULTS") {
+    return [];
+  }
+
+  if (payload.status !== "OK") {
+    const error = new Error(payload?.error_message || "Store lookup failed.");
+    error.statusCode = 502;
+    error.expose = true;
+    throw error;
+  }
+
+  return Array.isArray(payload.results) ? payload.results.slice(0, STORE_LOOKUP_MAX_RESULTS) : [];
+}
+
+async function fetchGooglePlaceDetails(placeId, apiKey) {
+  const endpoint = new URL("https://maps.googleapis.com/maps/api/place/details/json");
+  endpoint.searchParams.set("place_id", placeId);
+  endpoint.searchParams.set(
+    "fields",
+    "place_id,name,formatted_address,formatted_phone_number,opening_hours,website,icon,photos",
+  );
+  endpoint.searchParams.set("key", apiKey);
+
+  const response = await fetch(endpoint, { method: "GET" });
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!payload || payload.status !== "OK" || !payload.result) {
+    return null;
+  }
+
+  return payload.result;
+}
+
+function mapGoogleCandidate(base, details, apiKey) {
+  const placeId = String(details?.place_id || base?.place_id || "").trim();
+  const name = String(details?.name || base?.name || "").trim();
+  const address = String(details?.formatted_address || base?.formatted_address || "").trim();
+  const phone = String(details?.formatted_phone_number || "").trim();
+  const hours = flattenHours(details?.opening_hours || base?.opening_hours);
+  const websiteUrl = normalizeHttpUrl(details?.website || "");
+  const placePhotoReference =
+    details?.photos?.[0]?.photo_reference || base?.photos?.[0]?.photo_reference || "";
+  const placeImageUrl = buildPlacePhotoUrl(placePhotoReference, apiKey);
+  const placeIconUrl = normalizeHttpUrl(details?.icon || base?.icon || "");
+  const logoUrl = buildWebsiteLogoUrl(websiteUrl) || placeIconUrl || placeImageUrl;
+
+  return {
+    storeName: name,
+    displayName: name,
+    chainName: name,
+    address,
+    phone,
+    hours,
+    websiteUrl,
+    logoUrl,
+    imageUrl: placeImageUrl || placeIconUrl,
+    googlePlaceId: placeId,
+    metadataSource: "google-places",
+    metadataUpdatedAt: new Date().toISOString(),
+  };
+}
+
+async function lookupStoresByAddress(query) {
+  const normalizedQuery = normalizeLookupQuery(query);
+  if (!normalizedQuery) {
+    const error = new Error("A non-empty lookup query is required.");
+    error.statusCode = 400;
+    error.expose = true;
+    throw error;
+  }
+
+  const apiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  if (!apiKey) {
+    const error = new Error("Store lookup is unavailable because GOOGLE_MAPS_API_KEY is not configured.");
+    error.statusCode = 503;
+    error.expose = true;
+    throw error;
+  }
+
+  const cached = readLookupCache(normalizedQuery);
+  if (cached) {
+    return cached;
+  }
+
+  const searchResults = await fetchGoogleTextSearch(normalizedQuery, apiKey);
+  const detailedResults = await Promise.all(
+    searchResults.map(async (result) => {
+      const placeId = String(result?.place_id || "").trim();
+      const details = placeId ? await fetchGooglePlaceDetails(placeId, apiKey) : null;
+      return mapGoogleCandidate(result, details, apiKey);
+    }),
+  );
+
+  const unique = [];
+  const seenPlaceIds = new Set();
+  detailedResults.forEach((candidate) => {
+    if (!candidate.storeName || !candidate.address) {
+      return;
+    }
+
+    const placeId = String(candidate.googlePlaceId || "").trim();
+    if (placeId && seenPlaceIds.has(placeId)) {
+      return;
+    }
+
+    if (placeId) {
+      seenPlaceIds.add(placeId);
+    }
+    unique.push(candidate);
+  });
+
+  writeLookupCache(normalizedQuery, unique);
+  return unique;
+}
+
 export function createApiHandler({ store }) {
   return async function apiHandler(req, res) {
     if (req.method === "OPTIONS") {
@@ -301,6 +515,42 @@ export function createApiHandler({ store }) {
 
         await store.setState(normalized);
         sendJson(res, 200, normalized);
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/stores") {
+        const stores = await listStores(store);
+        sendJson(res, 200, stores);
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/api/stores/lookup") {
+        const query = requestUrl.searchParams.get("query");
+        const results = await lookupStoresByAddress(query);
+        sendJson(res, 200, { results });
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/stores") {
+        const body = await readJsonBody(req);
+        const result = await createStore(store, body);
+        sendJson(res, 201, result);
+        return;
+      }
+
+      const storeNameMatch = pathname.match(/^\/api\/stores\/([^/]+)$/);
+      if (storeNameMatch && req.method === "PUT") {
+        const storeName = decodeURIComponent(storeNameMatch[1]);
+        const body = await readJsonBody(req);
+        const result = await updateManagedStore(store, storeName, body);
+        sendJson(res, 200, result);
+        return;
+      }
+
+      if (storeNameMatch && req.method === "DELETE") {
+        const storeName = decodeURIComponent(storeNameMatch[1]);
+        const result = await deleteStore(store, storeName);
+        sendJson(res, 200, result);
         return;
       }
 

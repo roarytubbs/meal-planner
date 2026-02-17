@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Copy, Leaf, ListChecks, MoreVertical, Pencil, Plus, Trash2, UtensilsCrossed, Wand2, X } from "lucide-react";
+import { ChevronDown, Copy, Leaf, ListChecks, MoreVertical, Pencil, Plus, Store, Trash2, UtensilsCrossed, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,7 +55,16 @@ import {
   pickStore,
   upsertCatalogFromIngredients,
 } from "@/lib/meal-planner";
-import { fetchPlannerState, parseRecipeFromUrl, savePlannerState } from "@/lib/api";
+import {
+  createStoreRecord,
+  deleteStoreRecord,
+  fetchPlannerState,
+  fetchStores,
+  lookupStoresByAddress,
+  parseRecipeFromUrl,
+  savePlannerState,
+  updateStoreRecord,
+} from "@/lib/api";
 
 const NO_RECIPE = "__none__";
 const MENU_HISTORY_KEY = `${STORAGE_KEY}-menu-history-v1`;
@@ -66,10 +75,12 @@ const MAX_DAY_NOTE_LENGTH = 240;
 const MAX_INGREDIENT_TAG_LENGTH = 40;
 const MIN_PLAN_NAME_LENGTH = 1;
 const STATE_SYNC_DEBOUNCE_MS = 400;
+const STORE_LOOKUP_DEBOUNCE_MS = 300;
 const WORKFLOW_SCREENS = {
   landing: "landing",
   planner: "planner",
   recipes: "recipes",
+  stores: "stores",
 };
 const LIBRARY_TABS = {
   recipes: "recipes",
@@ -106,6 +117,19 @@ const EMPTY_NEW_INGREDIENT_FORM = {
   unit: "each",
   store: "Unassigned",
 };
+const EMPTY_STORE_FORM = {
+  storeName: "",
+  displayName: "",
+  chainName: "",
+  address: "",
+  phone: "",
+  hours: "",
+  websiteUrl: "",
+  logoUrl: "",
+  googlePlaceId: "",
+  metadataSource: "manual",
+  metadataUpdatedAt: "",
+};
 
 function makeId(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -127,6 +151,112 @@ function makeNewIngredientForm(defaultStore = "") {
     ...EMPTY_NEW_INGREDIENT_FORM,
     store: defaultStore || "Unassigned",
   };
+}
+
+function makeStoreForm(value = {}) {
+  return {
+    ...EMPTY_STORE_FORM,
+    ...value,
+  };
+}
+
+function normalizeStoreNameValue(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
+}
+
+function normalizeStoreProfileEntry(entry, storeName) {
+  const source = entry && typeof entry === "object" ? entry : {};
+  return {
+    storeName,
+    displayName: String(source.displayName || storeName || "").trim(),
+    chainName: String(source.chainName || "").trim(),
+    address: String(source.address || "").trim(),
+    phone: String(source.phone || "").trim(),
+    hours: String(source.hours || "").trim(),
+    websiteUrl: String(source.websiteUrl || "").trim(),
+    logoUrl: String(source.logoUrl || "").trim(),
+    googlePlaceId: String(source.googlePlaceId || "").trim(),
+    metadataSource: String(source.metadataSource || "").trim(),
+    metadataUpdatedAt: String(source.metadataUpdatedAt || "").trim(),
+  };
+}
+
+function storeRecordToForm(store) {
+  return makeStoreForm({
+    storeName: store.storeName || store.displayName || "",
+    displayName: store.displayName || store.storeName || "",
+    chainName: store.chainName || "",
+    address: store.address || "",
+    phone: store.phone || "",
+    hours: store.hours || "",
+    websiteUrl: store.websiteUrl || "",
+    logoUrl: store.logoUrl || "",
+    googlePlaceId: store.googlePlaceId || "",
+    metadataSource: store.metadataSource || "manual",
+    metadataUpdatedAt: store.metadataUpdatedAt || "",
+  });
+}
+
+function storeFormToPayload(form) {
+  return {
+    storeName: normalizeStoreNameValue(form.storeName || form.displayName),
+    displayName: normalizeStoreNameValue(form.displayName || form.storeName),
+    chainName: String(form.chainName || "").trim(),
+    address: String(form.address || "").trim(),
+    phone: String(form.phone || "").trim(),
+    hours: String(form.hours || "").trim(),
+    websiteUrl: String(form.websiteUrl || "").trim(),
+    logoUrl: String(form.logoUrl || "").trim(),
+    googlePlaceId: String(form.googlePlaceId || "").trim(),
+    metadataSource: String(form.metadataSource || "manual").trim(),
+    metadataUpdatedAt: String(form.metadataUpdatedAt || "").trim(),
+  };
+}
+
+function createStoreNameSuggestion(baseName, address, existingStores, editingStoreName = "") {
+  const normalizedBase = normalizeStoreNameValue(baseName);
+  if (!normalizedBase) {
+    return "";
+  }
+
+  const editingKey = normalizeName(editingStoreName);
+  const exists = (candidate) =>
+    existingStores.some((storeName) =>
+      normalizeName(storeName) === normalizeName(candidate)
+      && normalizeName(storeName) !== editingKey,
+    );
+  if (!exists(normalizedBase)) {
+    return normalizedBase;
+  }
+
+  const parts = String(address || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const candidates = [
+    parts[1],
+    parts[0] ? parts[0].replace(/^\d+\s+/, "") : "",
+    parts[2],
+  ].filter(Boolean);
+
+  for (const part of candidates) {
+    const nextName = normalizeStoreNameValue(`${normalizedBase} (${part})`);
+    if (nextName && !exists(nextName)) {
+      return nextName;
+    }
+  }
+
+  for (let index = 2; index <= 50; index += 1) {
+    const nextName = normalizeStoreNameValue(`${normalizedBase} (${index})`);
+    if (!exists(nextName)) {
+      return nextName;
+    }
+  }
+
+  return normalizedBase;
 }
 
 function normalizeIngredientCatalogEntry(entry, availableStores) {
@@ -509,6 +639,15 @@ export default function App() {
   const [receiptDelta, setReceiptDelta] = useState(null);
   const [isMobileReceiptOpen, setIsMobileReceiptOpen] = useState(false);
   const [undoToast, setUndoToast] = useState(null);
+  const [storeSearch, setStoreSearch] = useState("");
+  const [isStoreEditorOpen, setIsStoreEditorOpen] = useState(false);
+  const [isSubmittingStore, setIsSubmittingStore] = useState(false);
+  const [editingStoreName, setEditingStoreName] = useState("");
+  const [storeForm, setStoreForm] = useState(() => makeStoreForm());
+  const [storeLookupQuery, setStoreLookupQuery] = useState("");
+  const [storeLookupResults, setStoreLookupResults] = useState([]);
+  const [isStoreLookupLoading, setIsStoreLookupLoading] = useState(false);
+  const [storeLookupError, setStoreLookupError] = useState("");
   const recipeListRef = useRef(null);
   const ingredientPasteRef = useRef(null);
   const landingAddRecipeMenuRef = useRef(null);
@@ -518,6 +657,7 @@ export default function App() {
   const receiptDeltaTimerRef = useRef(null);
   const undoToastTimerRef = useRef(null);
   const hasShownSyncErrorRef = useRef(false);
+  const storeLookupRequestIdRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -590,6 +730,33 @@ export default function App() {
     () => stores.filter((store) => store !== "Unassigned"),
     [stores],
   );
+  const managedStores = useMemo(
+    () =>
+      stores
+        .filter((storeName) => storeName !== "Unassigned")
+        .map((storeName) =>
+          normalizeStoreProfileEntry(state.storeProfiles?.[storeName], storeName),
+        ),
+    [state.storeProfiles, stores],
+  );
+  const filteredManagedStores = useMemo(() => {
+    const query = normalizeName(storeSearch);
+    if (!query) {
+      return managedStores;
+    }
+    return managedStores.filter((store) =>
+      [
+        store.storeName,
+        store.displayName,
+        store.chainName,
+        store.address,
+        store.phone,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [managedStores, storeSearch]);
 
   const sortedRecipes = useMemo(
     () => [...state.recipes].sort((a, b) => a.title.localeCompare(b.title)),
@@ -928,6 +1095,65 @@ export default function App() {
     };
   }, [recipeDetailsModalRecipeId]);
 
+  useEffect(() => {
+    if (workflowScreen === WORKFLOW_SCREENS.stores) {
+      return;
+    }
+
+    setIsStoreEditorOpen(false);
+    setEditingStoreName("");
+    setStoreLookupQuery("");
+    setStoreLookupResults([]);
+    setStoreLookupError("");
+  }, [workflowScreen]);
+
+  useEffect(() => {
+    if (!isStoreEditorOpen) {
+      setStoreLookupResults([]);
+      setStoreLookupError("");
+      setIsStoreLookupLoading(false);
+      return undefined;
+    }
+
+    const normalizedQuery = String(storeLookupQuery || "").trim();
+    if (normalizedQuery.length < 3) {
+      setStoreLookupResults([]);
+      setStoreLookupError("");
+      setIsStoreLookupLoading(false);
+      return undefined;
+    }
+
+    const requestId = storeLookupRequestIdRef.current + 1;
+    storeLookupRequestIdRef.current = requestId;
+
+    const timeoutId = window.setTimeout(async () => {
+      setIsStoreLookupLoading(true);
+      try {
+        const payload = await lookupStoresByAddress(normalizedQuery);
+        if (storeLookupRequestIdRef.current !== requestId) {
+          return;
+        }
+        const results = Array.isArray(payload?.results) ? payload.results : [];
+        setStoreLookupResults(results);
+        setStoreLookupError("");
+      } catch (error) {
+        if (storeLookupRequestIdRef.current !== requestId) {
+          return;
+        }
+        setStoreLookupResults([]);
+        setStoreLookupError(error instanceof Error ? error.message : "Unable to look up stores.");
+      } finally {
+        if (storeLookupRequestIdRef.current === requestId) {
+          setIsStoreLookupLoading(false);
+        }
+      }
+    }, STORE_LOOKUP_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isStoreEditorOpen, storeLookupQuery]);
+
   function showCopyStatus(message, status = "success") {
     setCopyStatus({ message, status });
   }
@@ -1103,6 +1329,180 @@ export default function App() {
     setRecipePage(RECIPE_PAGES.list);
     setIsLandingAddRecipeMenuOpen(false);
     scrollToRef(recipeListRef);
+  }
+
+  function mergeStoresFromApiResponse(apiStores) {
+    if (!Array.isArray(apiStores)) {
+      return;
+    }
+
+    setState((prev) => {
+      const nextStoreNames = normalizeStoreList(apiStores.map((item) => item.storeName));
+      const nextStoreProfiles = nextStoreNames.reduce((acc, storeName) => {
+        if (storeName === "Unassigned") {
+          return acc;
+        }
+        const match = apiStores.find((item) => normalizeName(item.storeName) === normalizeName(storeName));
+        acc[storeName] = normalizeStoreProfileEntry(match || prev.storeProfiles?.[storeName], storeName);
+        return acc;
+      }, {});
+      const currentStores = normalizeStoreList(prev.stores);
+      const storesUnchanged = JSON.stringify(currentStores) === JSON.stringify(nextStoreNames);
+      const profilesUnchanged = JSON.stringify(prev.storeProfiles || {}) === JSON.stringify(nextStoreProfiles);
+      if (storesUnchanged && profilesUnchanged) {
+        return prev;
+      }
+
+      const nextExportStoreSelection = buildDefaultExportSelection(nextStoreNames);
+      nextStoreNames.forEach((storeName) => {
+        if (Object.prototype.hasOwnProperty.call(prev.exportStoreSelection || {}, storeName)) {
+          nextExportStoreSelection[storeName] = Boolean(prev.exportStoreSelection[storeName]);
+        }
+      });
+
+      return {
+        ...prev,
+        stores: nextStoreNames,
+        storeProfiles: nextStoreProfiles,
+        exportStoreSelection: nextExportStoreSelection,
+      };
+    });
+  }
+
+  async function handleOpenStoreManagement() {
+    setWorkflowScreen(WORKFLOW_SCREENS.stores);
+    setIsLandingAddRecipeMenuOpen(false);
+
+    try {
+      const apiStores = await fetchStores();
+      mergeStoresFromApiResponse(apiStores);
+    } catch {
+      showCopyStatus("Unable to refresh stores from shared storage.", "error");
+    }
+  }
+
+  function handleOpenStoreCreate() {
+    setEditingStoreName("");
+    setStoreForm(makeStoreForm());
+    setStoreLookupQuery("");
+    setStoreLookupResults([]);
+    setStoreLookupError("");
+    setIsStoreEditorOpen(true);
+  }
+
+  function handleEditStore(storeName) {
+    const match = managedStores.find((store) => store.storeName === storeName);
+    if (!match) {
+      showCopyStatus("Store not found.", "error");
+      return;
+    }
+
+    setEditingStoreName(storeName);
+    setStoreForm(storeRecordToForm(match));
+    setStoreLookupQuery(match.address || "");
+    setStoreLookupResults([]);
+    setStoreLookupError("");
+    setIsStoreEditorOpen(true);
+  }
+
+  function handleCloseStoreEditor() {
+    if (isSubmittingStore) {
+      return;
+    }
+    setIsStoreEditorOpen(false);
+    setEditingStoreName("");
+    setStoreForm(makeStoreForm());
+    setStoreLookupQuery("");
+    setStoreLookupResults([]);
+    setStoreLookupError("");
+  }
+
+  function handleStoreLookupPick(candidate) {
+    if (!candidate || typeof candidate !== "object") {
+      return;
+    }
+
+    const suggestedStoreName = createStoreNameSuggestion(
+      candidate.storeName || candidate.displayName,
+      candidate.address,
+      stores,
+      editingStoreName,
+    );
+
+    setStoreForm((prev) => {
+      const fallbackDisplay = candidate.displayName || suggestedStoreName || prev.displayName;
+      return makeStoreForm({
+        ...prev,
+        storeName: suggestedStoreName || prev.storeName,
+        displayName: normalizeStoreNameValue(fallbackDisplay),
+        chainName: candidate.chainName || fallbackDisplay || prev.chainName,
+        address: candidate.address || prev.address,
+        phone: candidate.phone || prev.phone,
+        hours: candidate.hours || prev.hours,
+        websiteUrl: candidate.websiteUrl || prev.websiteUrl,
+        logoUrl: candidate.logoUrl || prev.logoUrl,
+        googlePlaceId: candidate.googlePlaceId || prev.googlePlaceId,
+        metadataSource: candidate.metadataSource || "google-places",
+        metadataUpdatedAt: candidate.metadataUpdatedAt || new Date().toISOString(),
+      });
+    });
+    setStoreLookupError("");
+  }
+
+  async function handleStoreSave(event) {
+    event.preventDefault();
+    if (isSubmittingStore) {
+      return;
+    }
+
+    const payload = storeFormToPayload(storeForm);
+    if (!payload.storeName) {
+      showCopyStatus("Store name is required.", "error");
+      return;
+    }
+
+    setIsSubmittingStore(true);
+    try {
+      const response = editingStoreName
+        ? await updateStoreRecord(editingStoreName, payload)
+        : await createStoreRecord(payload);
+      if (response?.state && typeof response.state === "object") {
+        setState(response.state);
+      }
+      showCopyStatus(
+        editingStoreName ? "Store updated." : "Store added.",
+        "success",
+      );
+      setIsStoreEditorOpen(false);
+      setEditingStoreName("");
+      setStoreForm(makeStoreForm());
+      setStoreLookupQuery("");
+      setStoreLookupResults([]);
+      setStoreLookupError("");
+    } catch (error) {
+      showCopyStatus(error instanceof Error ? error.message : "Unable to save store.", "error");
+    } finally {
+      setIsSubmittingStore(false);
+    }
+  }
+
+  async function handleStoreDelete(storeName) {
+    const confirmed = window.confirm(
+      `Delete "${storeName}"? Ingredients and recipes using this store will be reassigned to Unassigned.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await deleteStoreRecord(storeName);
+      if (response?.state && typeof response.state === "object") {
+        setState(response.state);
+      }
+      showCopyStatus(`Deleted "${storeName}".`, "success");
+    } catch (error) {
+      showCopyStatus(error instanceof Error ? error.message : "Unable to delete store.", "error");
+    }
   }
 
   function openRecipeImportModal() {
@@ -2454,6 +2854,7 @@ export default function App() {
 
   const isPlannerWorkflow = workflowScreen === WORKFLOW_SCREENS.planner;
   const isRecipeWorkflow = workflowScreen === WORKFLOW_SCREENS.recipes;
+  const isStoreWorkflow = workflowScreen === WORKFLOW_SCREENS.stores;
   const isRecipesTab = isRecipeWorkflow && libraryTab === LIBRARY_TABS.recipes;
   const isIngredientsTab = isRecipeWorkflow && libraryTab === LIBRARY_TABS.ingredients;
   const activePlanName = normalizePlanName(state.mealPlanName);
@@ -2467,6 +2868,10 @@ export default function App() {
         return ["Meal plan", "Day setup"];
       }
       return ["Meal plan", "Plan basics"];
+    }
+
+    if (isStoreWorkflow) {
+      return ["Stores", isStoreEditorOpen ? "Edit" : "Management"];
     }
 
     if (isIngredientsTab) {
@@ -2488,6 +2893,8 @@ export default function App() {
     isPlannerWorkflow,
     isRecipeCreatePage,
     isRecipesTab,
+    isStoreEditorOpen,
+    isStoreWorkflow,
     recipeEditorModeLabel,
     plannerStep,
   ]);
@@ -2525,6 +2932,15 @@ export default function App() {
             onClick={handleOpenRecipeLibrary}
           >
             Recipes
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={isStoreWorkflow ? "default" : "ghost"}
+            className={isStoreWorkflow ? "" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"}
+            onClick={handleOpenStoreManagement}
+          >
+            Stores
           </Button>
         </div>
 
@@ -2740,6 +3156,8 @@ export default function App() {
                       ? handleOpenRecipeLibrary
                       : !isLast && crumb === "Ingredients"
                         ? handleOpenIngredientLibrary
+                        : !isLast && crumb === "Stores"
+                          ? handleOpenStoreManagement
                         : null;
 
                 return (
@@ -2762,6 +3180,8 @@ export default function App() {
             <h1 className="max-w-4xl text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
               {isPlannerWorkflow
                 ? activePlanName || "Meal plan setup"
+                : isStoreWorkflow
+                  ? "Store management"
                 : isIngredientsTab
                   ? "Ingredient directory"
                   : isRecipeCreatePage
@@ -2771,6 +3191,8 @@ export default function App() {
             <p className="max-w-2xl text-sm text-muted-foreground">
               {isPlannerWorkflow
                 ? "Start with plan basics, then set up days and meals."
+                : isStoreWorkflow
+                  ? "Manage store locations, metadata, and lookup-assisted autofill."
                 : "Manage recipes and ingredients from one place."}
             </p>
           </section>
@@ -4342,6 +4764,264 @@ export default function App() {
             </Card>
           ) : null}
         </>
+          ) : null}
+          {isStoreWorkflow ? (
+            <>
+              <Card className="border-zinc-200/70 bg-white shadow-sm">
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-zinc-900">
+                      Store management
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Add stores by address lookup, edit metadata, and remove locations.
+                    </p>
+                  </div>
+                  <Button type="button" onClick={handleOpenStoreCreate}>
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Add store
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {isStoreEditorOpen ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      {editingStoreName ? "Edit store" : "Add store"}
+                    </CardTitle>
+                    <CardDescription>
+                      Enter an address to prefill details, then review and save.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form className="space-y-4" onSubmit={handleStoreSave}>
+                      <div className="space-y-2">
+                        <Label htmlFor="store-lookup-address">Address lookup</Label>
+                        <Input
+                          id="store-lookup-address"
+                          placeholder="123 Main St, Austin, TX"
+                          value={storeLookupQuery}
+                          onChange={(event) => setStoreLookupQuery(event.target.value)}
+                        />
+                        {isStoreLookupLoading ? (
+                          <p className="text-xs text-muted-foreground">Searching…</p>
+                        ) : null}
+                        {storeLookupError ? (
+                          <p className="text-xs font-medium text-destructive">{storeLookupError}</p>
+                        ) : null}
+                        {storeLookupResults.length > 0 ? (
+                          <div className="space-y-2 rounded-md border border-zinc-200/80 bg-zinc-50/40 p-2">
+                            {storeLookupResults.map((candidate) => (
+                              <button
+                                key={`${candidate.googlePlaceId || candidate.storeName}-${candidate.address}`}
+                                type="button"
+                                className="block w-full rounded-md border border-transparent bg-white px-3 py-2 text-left text-sm hover:border-zinc-300"
+                                onClick={() => handleStoreLookupPick(candidate)}
+                              >
+                                <p className="font-semibold text-zinc-900">{candidate.displayName || candidate.storeName}</p>
+                                <p className="text-xs text-muted-foreground">{candidate.address}</p>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="store-name">Store label</Label>
+                          <Input
+                            id="store-name"
+                            maxLength={80}
+                            required
+                            value={storeForm.storeName}
+                            onChange={(event) =>
+                              setStoreForm((prev) => ({ ...prev, storeName: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="store-display-name">Display name</Label>
+                          <Input
+                            id="store-display-name"
+                            maxLength={80}
+                            value={storeForm.displayName}
+                            onChange={(event) =>
+                              setStoreForm((prev) => ({ ...prev, displayName: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="store-chain-name">Chain</Label>
+                          <Input
+                            id="store-chain-name"
+                            value={storeForm.chainName}
+                            onChange={(event) =>
+                              setStoreForm((prev) => ({ ...prev, chainName: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="store-phone">Phone</Label>
+                          <Input
+                            id="store-phone"
+                            value={storeForm.phone}
+                            onChange={(event) =>
+                              setStoreForm((prev) => ({ ...prev, phone: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <Label htmlFor="store-address">Address</Label>
+                          <Input
+                            id="store-address"
+                            value={storeForm.address}
+                            onChange={(event) =>
+                              setStoreForm((prev) => ({ ...prev, address: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <Label htmlFor="store-hours">Hours</Label>
+                          <Textarea
+                            id="store-hours"
+                            rows={2}
+                            value={storeForm.hours}
+                            onChange={(event) =>
+                              setStoreForm((prev) => ({ ...prev, hours: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="store-website-url">Website URL</Label>
+                          <Input
+                            id="store-website-url"
+                            type="url"
+                            placeholder="https://"
+                            value={storeForm.websiteUrl}
+                            onChange={(event) =>
+                              setStoreForm((prev) => ({ ...prev, websiteUrl: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="store-logo-url">Logo URL</Label>
+                          <Input
+                            id="store-logo-url"
+                            type="url"
+                            placeholder="https://"
+                            value={storeForm.logoUrl}
+                            onChange={(event) =>
+                              setStoreForm((prev) => ({ ...prev, logoUrl: event.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="submit" disabled={isSubmittingStore}>
+                          {isSubmittingStore ? "Saving..." : "Save store"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCloseStoreEditor}
+                          disabled={isSubmittingStore}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Saved stores</CardTitle>
+                  <CardDescription>
+                    {managedStores.length} managed store{managedStores.length === 1 ? "" : "s"}.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="store-search">Search stores</Label>
+                    <Input
+                      id="store-search"
+                      placeholder="Search by name, chain, address, phone"
+                      value={storeSearch}
+                      onChange={(event) => setStoreSearch(event.target.value)}
+                    />
+                  </div>
+
+                  {filteredManagedStores.length === 0 ? (
+                    <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+                      No stores found.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredManagedStores.map((store) => (
+                        <article
+                          key={store.storeName}
+                          className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-zinc-200/80 bg-white p-3 shadow-sm"
+                        >
+                          <div className="flex min-w-0 items-start gap-3">
+                            <div className="mt-0.5 flex h-11 w-11 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-zinc-50">
+                              {store.logoUrl ? (
+                                <img
+                                  src={store.logoUrl}
+                                  alt={`${store.displayName || store.storeName} logo`}
+                                  className="h-full w-full object-contain"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <Store className="h-4 w-4 text-zinc-500" aria-hidden="true" />
+                              )}
+                            </div>
+                            <div className="min-w-0 space-y-1">
+                              <p className="font-semibold text-zinc-900">{store.displayName || store.storeName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {store.chainName || store.storeName}
+                              </p>
+                              {store.address ? (
+                                <p className="text-sm text-muted-foreground">{store.address}</p>
+                              ) : null}
+                              {store.phone ? (
+                                <p className="text-xs text-muted-foreground">{store.phone}</p>
+                              ) : null}
+                              {store.hours ? (
+                                <p className="text-xs text-muted-foreground">{store.hours}</p>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditStore(store.storeName)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleStoreDelete(store.storeName)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Delete
+                            </Button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
           ) : null}
           {isPlannerWorkflow && plannerStep >= 3 ? (
         <Card>
