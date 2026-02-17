@@ -23,12 +23,19 @@ function ensureDirectoryForFile(filePath) {
 }
 
 async function createSqliteStore(sqlitePath) {
-  const { default: Database } = await import("better-sqlite3");
+  const importedSqlite = await import("node:sqlite").catch(() => null);
+  const DatabaseSync = importedSqlite?.DatabaseSync;
+
+  if (!DatabaseSync) {
+    throw new Error(
+      "SQLite storage requires a Node.js runtime with node:sqlite support (Node.js 22+). Set DATABASE_URL to use Postgres instead.",
+    );
+  }
 
   ensureDirectoryForFile(sqlitePath);
 
-  const db = new Database(sqlitePath);
-  db.pragma("journal_mode = WAL");
+  const db = new DatabaseSync(sqlitePath);
+  db.exec("PRAGMA journal_mode = WAL;");
   db.exec(`
     CREATE TABLE IF NOT EXISTS planner_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
