@@ -29,10 +29,13 @@ export const MEAL_MODE_LABELS = {
   skip: "Skip",
 };
 
-export const STORES = ["Target", "Sprouts", "Aldi", "Trader Joe's", "Unassigned"];
-export const CATALOG_STORES = ["Target", "Sprouts", "Aldi", "Trader Joe's"];
+export const DEFAULT_STORES = ["Target", "Sprouts", "Aldi", "Trader Joe's"];
+export const CATALOG_STORES = DEFAULT_STORES;
+export const STORES = [...DEFAULT_STORES, "Unassigned"];
 export const STORAGE_KEY = "family-meal-planner-v1";
 const MAX_DAY_NOTE_LENGTH = 240;
+const MAX_STORE_FIELD_LENGTH = 240;
+const MAX_STORE_SOURCE_LENGTH = 64;
 
 const UNIT_MAP = {
   tablespoons: "tbsp",
@@ -146,12 +149,6 @@ export function normalizeStoreList(rawStores = []) {
   const stores = [];
   const seen = new Set();
 
-  CATALOG_STORES.forEach((store) => {
-    const key = normalizeName(store);
-    seen.add(key);
-    stores.push(store);
-  });
-
   if (Array.isArray(rawStores)) {
     rawStores.forEach((store) => {
       const label = normalizeStoreLabel(store);
@@ -166,6 +163,114 @@ export function normalizeStoreList(rawStores = []) {
 
   stores.push("Unassigned");
   return stores;
+}
+
+function normalizeStoreField(value, maxLength = MAX_STORE_FIELD_LENGTH) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function normalizeOptionalHttpUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const hasProtocol = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(raw);
+  const candidate = hasProtocol ? raw : `https://${raw}`;
+
+  try {
+    const parsed = new URL(candidate);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return "";
+    }
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
+function normalizeOptionalIsoDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+  return parsed.toISOString();
+}
+
+export function normalizeStoreProfile(storeName, profile = {}) {
+  const displayName = normalizeStoreLabel(profile.displayName || storeName);
+  return {
+    displayName: displayName || normalizeStoreLabel(storeName),
+    chainName: normalizeStoreField(profile.chainName),
+    address: normalizeStoreField(profile.address),
+    phone: normalizeStoreField(profile.phone, 64),
+    hours: normalizeStoreField(profile.hours),
+    websiteUrl: normalizeOptionalHttpUrl(profile.websiteUrl),
+    logoUrl: normalizeOptionalHttpUrl(profile.logoUrl),
+    googlePlaceId: normalizeStoreField(profile.googlePlaceId, 128),
+    metadataSource: normalizeStoreField(profile.metadataSource, MAX_STORE_SOURCE_LENGTH),
+    metadataUpdatedAt: normalizeOptionalIsoDate(profile.metadataUpdatedAt),
+  };
+}
+
+function normalizeStoreProfiles(rawProfiles, stores) {
+  const input = rawProfiles && typeof rawProfiles === "object" ? rawProfiles : {};
+  const inputByKey = new Map();
+
+  Object.entries(input).forEach(([name, profile]) => {
+    const key = normalizeName(name);
+    if (!key || inputByKey.has(key)) {
+      return;
+    }
+    inputByKey.set(key, profile);
+  });
+
+  return stores.reduce((acc, store) => {
+    if (store === "Unassigned") {
+      return acc;
+    }
+
+    const profile = inputByKey.get(normalizeName(store)) || {};
+    acc[store] = normalizeStoreProfile(store, profile);
+    return acc;
+  }, {});
+}
+
+function collectLegacyStores(rawState) {
+  const collected = [];
+
+  if (Array.isArray(rawState?.stores)) {
+    collected.push(...rawState.stores);
+  }
+
+  if (Array.isArray(rawState?.recipes)) {
+    rawState.recipes.forEach((recipe) => {
+      if (!Array.isArray(recipe?.ingredients)) {
+        return;
+      }
+      recipe.ingredients.forEach((ingredient) => {
+        if (ingredient && typeof ingredient === "object") {
+          collected.push(ingredient.store);
+        }
+      });
+    });
+  }
+
+  if (rawState?.ingredientCatalog && typeof rawState.ingredientCatalog === "object") {
+    Object.values(rawState.ingredientCatalog).forEach((entry) => {
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        collected.push(entry.store || entry.preferredStore);
+        return;
+      }
+      collected.push(entry);
+    });
+  }
+
+  return collected;
 }
 
 const seedRecipes = [
@@ -786,7 +891,7 @@ export function hydrateState(rawState) {
     return null;
   }
 
-  const stores = normalizeStoreList(rawState.stores);
+  const stores = normalizeStoreList(collectLegacyStores(rawState));
   if (!Array.isArray(rawState.recipes)) {
     return null;
   }
@@ -799,6 +904,7 @@ export function hydrateState(rawState) {
     ? [...new Set(rawState.pantry.map((item) => normalizeName(item)).filter(Boolean))]
     : [];
   const householdServings = normalizeServings(rawState.householdServings, 4);
+  const storeProfiles = normalizeStoreProfiles(rawState.storeProfiles, stores);
 
   const catalogInput = rawState.ingredientCatalog && typeof rawState.ingredientCatalog === "object"
     ? rawState.ingredientCatalog
@@ -832,6 +938,7 @@ export function hydrateState(rawState) {
   return {
     recipes,
     stores,
+    storeProfiles,
     pantry,
     mealPlanName: normalizeMealPlanName(rawState.mealPlanName),
     mealPlanDescription: normalizeMealPlanDescription(rawState.mealPlanDescription),
@@ -859,11 +966,12 @@ export function loadState() {
 }
 
 export function createInitialState() {
-  const stores = normalizeStoreList();
+  const stores = normalizeStoreList(DEFAULT_STORES);
   const initialRecipes = normalizeRecipes(seedRecipes, stores);
   return hydrateState(loadState()) || {
     recipes: initialRecipes,
     stores,
+    storeProfiles: normalizeStoreProfiles({}, stores),
     weekPlan: createDefaultWeekPlan(initialRecipes),
     planningDays: 7,
     pantry: ["salt", "black pepper", "olive oil"],

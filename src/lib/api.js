@@ -47,6 +47,36 @@ export async function savePlannerState(state) {
   });
 }
 
+export async function fetchStores() {
+  return apiRequest("/api/stores");
+}
+
+export async function lookupStoresByAddress(query) {
+  const normalized = String(query || "").trim();
+  const params = new URLSearchParams({ query: normalized });
+  return apiRequest(`/api/stores/lookup?${params.toString()}`);
+}
+
+export async function createStoreRecord(payload) {
+  return apiRequest("/api/stores", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateStoreRecord(storeName, payload) {
+  return apiRequest(`/api/stores/${encodeURIComponent(storeName)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteStoreRecord(storeName) {
+  return apiRequest(`/api/stores/${encodeURIComponent(storeName)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function parseRecipeFromUrl(url, ingredientCatalog, stores) {
   const payload = {
     url,
