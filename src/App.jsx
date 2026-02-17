@@ -24,13 +24,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { UndoToast } from "@/components/ui/undo-toast";
 import {
   calculateReceiptDelta,
-  findNextIncompleteDay,
-  getDayCompletionModel,
 } from "@/lib/planner-ux";
 import {
   DAYS,
-  DAY_MODE_LABELS,
-  DAY_MODES,
   MEAL_MODE_LABELS,
   MEAL_MODES,
   MEAL_SLOT_LABELS,
@@ -54,6 +50,7 @@ import {
   normalizeSteps,
   normalizeUnit,
   parseIngredients,
+  parseIngredientsWithDiagnostics,
   parseOptionalServings,
   pickStore,
   upsertCatalogFromIngredients,
@@ -500,8 +497,12 @@ export default function App() {
   const [recipeIngredientForm, setRecipeIngredientForm] = useState(() => makeRecipeIngredientForm());
   const [newIngredientForm, setNewIngredientForm] = useState(() => makeNewIngredientForm());
   const [recipeIngredients, setRecipeIngredients] = useState([]);
-  const [editingRecipeIngredientIndex, setEditingRecipeIngredientIndex] = useState(null);
+  const [inlineEditingRecipeIngredientIndex, setInlineEditingRecipeIngredientIndex] = useState(null);
+  const [inlineRecipeIngredientForm, setInlineRecipeIngredientForm] = useState(() => makeRecipeIngredientForm());
+  const [openMealPickerKey, setOpenMealPickerKey] = useState("");
+  const [recipeDetailsModalRecipeId, setRecipeDetailsModalRecipeId] = useState("");
   const [ingredientPasteText, setIngredientPasteText] = useState("");
+  const [ingredientPasteSkippedLines, setIngredientPasteSkippedLines] = useState([]);
   const [recipeDraftBaseline, setRecipeDraftBaseline] = useState(() =>
     buildRecipeDraftSnapshot(makeRecipeForm(), [], ""),
   );
@@ -598,6 +599,9 @@ export default function App() {
     () => Object.fromEntries(state.recipes.map((recipe) => [recipe.id, recipe])),
     [state.recipes],
   );
+  const recipeDetailsModalRecipe = recipeDetailsModalRecipeId
+    ? recipesById[recipeDetailsModalRecipeId] || null
+    : null;
 
   const recipeList = useMemo(() => {
     const query = normalizeName(recipeSearch);
@@ -672,21 +676,14 @@ export default function App() {
   const isDirectoryIngredientMode = recipeIngredientMode === RECIPE_INGREDIENT_MODES.directory;
   const isCustomIngredientMode = recipeIngredientMode === RECIPE_INGREDIENT_MODES.custom;
   const isRecipeCreatePage = recipePage === RECIPE_PAGES.create;
+  const isEditingRecipeDraft = Boolean(editingRecipeId);
+  const recipeEditorModeLabel = isEditingRecipeDraft ? "Edit recipe" : "Add recipe";
+  const recipeDraftModeLabel = isEditingRecipeDraft ? "Edit recipe draft" : "Add recipe draft";
   const recipeDraftSnapshot = useMemo(
     () => buildRecipeDraftSnapshot(recipeForm, recipeIngredients, ingredientPasteText),
     [ingredientPasteText, recipeForm, recipeIngredients],
   );
   const isRecipeDraftDirty = isRecipeCreatePage && recipeDraftBaseline !== recipeDraftSnapshot;
-  const dayCompletionByDay = useMemo(
-    () =>
-      Object.fromEntries(
-        activeDays.map((day, dayIndex) => {
-          const dayPlan = state.weekPlan[day] || createDefaultDayPlan(state.recipes, dayIndex);
-          return [day, getDayCompletionModel(dayPlan)];
-        }),
-      ),
-    [activeDays, state.recipes, state.weekPlan],
-  );
 
   useEffect(() => {
     const fallbackStore = "Unassigned";
@@ -717,7 +714,10 @@ export default function App() {
   }, [activeDays, quickPlanDay]);
 
   useEffect(() => {
-    const fallbackDay = activeDays[0] || DAYS[0];
+    if (!expandedDay) {
+      return;
+    }
+    const fallbackDay = activeDays[0] || "";
     if (!activeDays.includes(expandedDay)) {
       setExpandedDay(fallbackDay);
     }
@@ -735,6 +735,38 @@ export default function App() {
       setNoteDraft("");
     }
   }, [activeDays, noteEditorDay]);
+
+  useEffect(() => {
+    if (workflowScreen !== WORKFLOW_SCREENS.planner || plannerStep < 2) {
+      return;
+    }
+
+    setState((prev) => {
+      let changed = false;
+      const nextWeekPlan = { ...prev.weekPlan };
+
+      activeDays.forEach((day) => {
+        const dayIndex = DAYS.indexOf(day);
+        const dayPlan = nextWeekPlan[day] || createDefaultDayPlan(prev.recipes, dayIndex);
+        if (dayPlan.dayMode !== "planned") {
+          changed = true;
+          nextWeekPlan[day] = {
+            ...dayPlan,
+            dayMode: "planned",
+          };
+        }
+      });
+
+      if (!changed) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        weekPlan: nextWeekPlan,
+      };
+    });
+  }, [activeDays, plannerStep, workflowScreen]);
 
   useEffect(() => {
     if (!isRecipeCreatePage) {
@@ -769,6 +801,7 @@ export default function App() {
 
       event.preventDefault();
       setIngredientPasteText((prev) => (prev ? `${prev}\n${pastedText}` : pastedText));
+      setIngredientPasteSkippedLines([]);
       setRecipeIngredientMode((prev) => prev || RECIPE_INGREDIENT_MODES.directory);
       window.requestAnimationFrame(() => {
         ingredientPasteRef.current?.focus();
@@ -800,7 +833,7 @@ export default function App() {
   }, [plannerStep, workflowScreen]);
 
   useEffect(() => {
-    if (!isLandingAddRecipeMenuOpen || workflowScreen !== WORKFLOW_SCREENS.landing) {
+    if (!isLandingAddRecipeMenuOpen) {
       return undefined;
     }
 
@@ -834,7 +867,66 @@ export default function App() {
       document.removeEventListener("touchstart", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isLandingAddRecipeMenuOpen, workflowScreen]);
+  }, [isLandingAddRecipeMenuOpen]);
+
+  useEffect(() => {
+    if (!openMealPickerKey) {
+      return undefined;
+    }
+
+    function handlePointerDown(event) {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (target.closest("[data-meal-picker='true']")) {
+        return;
+      }
+      setOpenMealPickerKey("");
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setOpenMealPickerKey("");
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMealPickerKey]);
+
+  useEffect(() => {
+    if (!recipeDetailsModalRecipeId) {
+      return;
+    }
+    if (!recipesById[recipeDetailsModalRecipeId]) {
+      setRecipeDetailsModalRecipeId("");
+    }
+  }, [recipeDetailsModalRecipeId, recipesById]);
+
+  useEffect(() => {
+    if (!recipeDetailsModalRecipeId) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setRecipeDetailsModalRecipeId("");
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [recipeDetailsModalRecipeId]);
 
   function showCopyStatus(message, status = "success") {
     setCopyStatus({ message, status });
@@ -1065,6 +1157,9 @@ export default function App() {
       setRecipeIngredients(importedIngredients);
       setRecipeIngredientMode(RECIPE_INGREDIENT_MODES.directory);
       setIngredientPasteText("");
+      setIngredientPasteSkippedLines([]);
+      setInlineEditingRecipeIngredientIndex(null);
+      setInlineRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
       setRecipeDraftBaseline(buildRecipeDraftSnapshot(importedForm, importedIngredients, ""));
       resetNewIngredientForm();
       resetRecipeIngredientForm();
@@ -1092,6 +1187,9 @@ export default function App() {
       setRecipeIngredients([]);
       setRecipeIngredientMode(RECIPE_INGREDIENT_MODES.directory);
       setIngredientPasteText("");
+      setIngredientPasteSkippedLines([]);
+      setInlineEditingRecipeIngredientIndex(null);
+      setInlineRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
       setRecipeDraftBaseline(buildRecipeDraftSnapshot(fallbackForm, [], ""));
       resetNewIngredientForm();
       resetRecipeIngredientForm();
@@ -1135,14 +1233,6 @@ export default function App() {
     }));
   }
 
-  function setDayMode(day, mode) {
-    const nextMode = DAY_MODES.includes(mode) ? mode : "planned";
-    updateDay(day, (dayPlan) => ({
-      ...dayPlan,
-      dayMode: nextMode,
-    }));
-  }
-
   function setDayNotes(day, value) {
     updateDay(day, (dayPlan) => ({
       ...dayPlan,
@@ -1152,6 +1242,51 @@ export default function App() {
 
   function handleOpenDayMenu(day) {
     setOpenDayMenu((prev) => (prev === day ? "" : day));
+  }
+
+  function handleOpenRecipeDetailsModal(recipeId) {
+    if (!recipeId || !recipesById[recipeId]) {
+      return;
+    }
+    setOpenMealPickerKey("");
+    setRecipeDetailsModalRecipeId(recipeId);
+  }
+
+  function handleEditRecipeFromModal(recipeId) {
+    const recipe = recipesById[recipeId];
+    if (!recipe) {
+      showCopyStatus("Recipe not found.", "error");
+      return;
+    }
+
+    const nextIngredients = Array.isArray(recipe.ingredients)
+      ? recipe.ingredients.map((ingredient) => ({ ...ingredient }))
+      : [];
+    const nextForm = recipeToForm(recipe);
+
+    setWorkflowScreen(WORKFLOW_SCREENS.recipes);
+    setLibraryTab(LIBRARY_TABS.recipes);
+    setRecipePage(RECIPE_PAGES.create);
+    setRecipeSearch("");
+    setOpenLibraryMenu("");
+    setInlineEditingRecipeId(null);
+    setInlineRecipeForm(makeRecipeForm());
+    setEditingRecipeId(recipe.id);
+    setRecipeForm(nextForm);
+    setRecipeIngredients(nextIngredients);
+    setRecipeIngredientMode(RECIPE_INGREDIENT_MODES.directory);
+    setIngredientPasteText("");
+    setIngredientPasteSkippedLines([]);
+    setInlineEditingRecipeIngredientIndex(null);
+    setInlineRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
+    setRecipeDraftBaseline(buildRecipeDraftSnapshot(nextForm, nextIngredients, ""));
+    resetNewIngredientForm();
+    resetRecipeIngredientForm();
+    handleCloseRecipeDetailsModal();
+  }
+
+  function handleCloseRecipeDetailsModal() {
+    setRecipeDetailsModalRecipeId("");
   }
 
   function handleOpenDayNoteEditor(day) {
@@ -1185,27 +1320,48 @@ export default function App() {
     showCopyStatus(`Note deleted for ${day}.`, "success");
   }
 
-  function handleCopyDayFrom(targetDay, sourceDay) {
-    if (targetDay === sourceDay) {
-      return;
-    }
+  function handleToggleDayEdit(day) {
+    setExpandedDay((prev) => (prev === day ? "" : day));
+    setOpenMealPickerKey("");
+    setOpenDayMenu("");
+  }
 
-    if (!activeDays.includes(targetDay) || !activeDays.includes(sourceDay)) {
-      return;
-    }
-
-    setState((prev) => {
-      const sourceDayPlan =
-        prev.weekPlan[sourceDay] || createDefaultDayPlan(prev.recipes, DAYS.indexOf(sourceDay));
-      return {
-        ...prev,
-        weekPlan: {
-          ...prev.weekPlan,
-          [targetDay]: cloneWeekPlan({ day: sourceDayPlan }).day,
+  function handleResetDay(day) {
+    updateDay(day, (dayPlan) => ({
+      ...dayPlan,
+      dayMode: "planned",
+      notes: "",
+      meals: {
+        breakfast: {
+          mode: "skip",
+          recipeId: null,
+          servingsOverride: null,
         },
-      };
+        lunch: {
+          mode: "skip",
+          recipeId: null,
+          servingsOverride: null,
+        },
+        dinner: {
+          mode: "skip",
+          recipeId: null,
+          servingsOverride: null,
+        },
+      },
+    }));
+    setMealRecipeSearch((prev) => {
+      const next = { ...prev };
+      MEAL_SLOTS.forEach((mealSlot) => {
+        next[`${day}:${mealSlot}`] = "";
+      });
+      return next;
     });
-    showCopyStatus(`Copied ${sourceDay} into ${targetDay}.`, "success");
+    if (noteEditorDay === day) {
+      handleCloseDayNoteEditor();
+    }
+    setOpenMealPickerKey((prev) => (prev.startsWith(`${day}:`) ? "" : prev));
+    setOpenDayMenu("");
+    showCopyStatus(`${day} reset. Meals and note cleared.`, "success");
   }
 
   function scrollToDayCard(day) {
@@ -1216,18 +1372,6 @@ export default function App() {
     window.requestAnimationFrame(() => {
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-  }
-
-  function handleJumpToNextIncomplete() {
-    const nextDay = findNextIncompleteDay(activeDays, state.weekPlan);
-    if (!nextDay) {
-      showCopyStatus("All active days are complete.", "success");
-      return;
-    }
-
-    setExpandedDay(nextDay);
-    setOpenDayMenu("");
-    scrollToDayCard(nextDay);
   }
 
   function setMealEnabled(day, mealSlot, enabled) {
@@ -1316,6 +1460,19 @@ export default function App() {
       const tagMatch = recipe.tags.some((tag) => normalizeName(tag).includes(query));
       return titleMatch || tagMatch;
     });
+  }
+
+  function handleMealRecipePickerSelect(day, mealSlot, recipeId) {
+    setMealRecipe(day, mealSlot, recipeId);
+    if (recipeId === NO_RECIPE) {
+      setMealRecipeSearchValue(day, mealSlot, "");
+      setOpenMealPickerKey("");
+      return;
+    }
+
+    const selected = sortedRecipes.find((recipe) => recipe.id === recipeId);
+    setMealRecipeSearchValue(day, mealSlot, selected ? selected.title : "");
+    setOpenMealPickerKey("");
   }
 
   function handleHouseholdServings(value) {
@@ -1413,7 +1570,6 @@ export default function App() {
 
   function resetRecipeIngredientForm() {
     setRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
-    setEditingRecipeIngredientIndex(null);
   }
 
   function resetNewIngredientForm() {
@@ -1423,6 +1579,9 @@ export default function App() {
   function handleRecipeIngredientModeChange(mode) {
     setRecipeIngredientMode(mode);
     resetRecipeIngredientForm();
+    setInlineEditingRecipeIngredientIndex(null);
+    setInlineRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
+    setOpenLibraryMenu("");
     if (mode === RECIPE_INGREDIENT_MODES.custom) {
       resetNewIngredientForm();
     }
@@ -1455,12 +1614,6 @@ export default function App() {
     if (event.key === "Enter" && canSaveRecipeIngredient) {
       event.preventDefault();
       handleSaveRecipeIngredient();
-      return;
-    }
-
-    if (event.key === "Escape" && editingRecipeIngredientIndex !== null) {
-      event.preventDefault();
-      resetRecipeIngredientForm();
     }
   }
 
@@ -1482,37 +1635,95 @@ export default function App() {
       return;
     }
 
-    const nextIngredients = [...recipeIngredients];
-    if (editingRecipeIngredientIndex !== null && nextIngredients[editingRecipeIngredientIndex]) {
-      nextIngredients[editingRecipeIngredientIndex] = normalized;
-      showCopyStatus("Ingredient updated.", "success");
-    } else {
-      nextIngredients.push(normalized);
-      showCopyStatus("Ingredient added to recipe.", "success");
-    }
-
-    setRecipeIngredientsAndMirror(nextIngredients);
+    setRecipeIngredientsAndMirror([...recipeIngredients, normalized]);
     saveIngredientToCatalog(normalized.name, normalized.store, {
       allowUnassigned: true,
       overwriteWithUnassigned: true,
     });
+    setInlineEditingRecipeIngredientIndex(null);
+    setInlineRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
+    setOpenLibraryMenu("");
+    showCopyStatus("Ingredient added to recipe.", "success");
     resetRecipeIngredientForm();
   }
 
-  function handleEditRecipeIngredient(index) {
+  function handleStartInlineRecipeIngredientEdit(index) {
     const ingredient = recipeIngredients[index];
     if (!ingredient) {
       return;
     }
 
-    setRecipeIngredientMode(RECIPE_INGREDIENT_MODES.directory);
-    setEditingRecipeIngredientIndex(index);
-    setRecipeIngredientForm({
+    setOpenLibraryMenu("");
+    setInlineEditingRecipeIngredientIndex(index);
+    setInlineRecipeIngredientForm({
       name: displayName(ingredient.name),
       qty: String(ingredient.qty ?? 1),
       unit: String(ingredient.unit || "each"),
       store: pickStore(ingredient.store, stores),
     });
+  }
+
+  function handleInlineRecipeIngredientFormChange(field, value) {
+    if (field === "name") {
+      const normalizedName = normalizeName(value);
+      const entry = normalizeIngredientCatalogEntry(state.ingredientCatalog?.[normalizedName], stores);
+      setInlineRecipeIngredientForm((prev) => ({
+        ...prev,
+        name: value,
+        store: entry.store !== "Unassigned" ? entry.store : (prev.store || assignableStores[0] || "Unassigned"),
+      }));
+      return;
+    }
+
+    setInlineRecipeIngredientForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }
+
+  function handleCancelInlineRecipeIngredientEdit() {
+    setInlineEditingRecipeIngredientIndex(null);
+    setInlineRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
+  }
+
+  function handleSaveInlineRecipeIngredient(index) {
+    if (inlineEditingRecipeIngredientIndex !== index) {
+      return;
+    }
+
+    const normalized = buildRecipeIngredientFromForm(inlineRecipeIngredientForm);
+    if (!normalized) {
+      showCopyStatus("Add a valid ingredient name before saving.", "error");
+      return;
+    }
+
+    setRecipeIngredientsAndMirror((prevIngredients) => {
+      if (!prevIngredients[index]) {
+        return prevIngredients;
+      }
+      const next = [...prevIngredients];
+      next[index] = normalized;
+      return next;
+    });
+    saveIngredientToCatalog(normalized.name, normalized.store, {
+      allowUnassigned: true,
+      overwriteWithUnassigned: true,
+    });
+    handleCancelInlineRecipeIngredientEdit();
+    showCopyStatus("Ingredient updated.", "success");
+  }
+
+  function handleInlineRecipeIngredientKeyDown(event, index) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleSaveInlineRecipeIngredient(index);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleCancelInlineRecipeIngredientEdit();
+    }
   }
 
   function handleRemoveRecipeIngredient(index) {
@@ -1521,16 +1732,19 @@ export default function App() {
       return;
     }
 
+    const confirmed = window.confirm(`Delete ingredient "${displayName(removedIngredient.name)}"?`);
+    if (!confirmed) {
+      return;
+    }
+    setOpenLibraryMenu("");
+
     const nextIngredients = recipeIngredients.filter((_, currentIndex) => currentIndex !== index);
     setRecipeIngredientsAndMirror(nextIngredients);
 
-    if (editingRecipeIngredientIndex === index) {
-      resetRecipeIngredientForm();
-    } else if (
-      editingRecipeIngredientIndex !== null
-      && editingRecipeIngredientIndex > index
-    ) {
-      setEditingRecipeIngredientIndex((prev) => (prev === null ? null : prev - 1));
+    if (inlineEditingRecipeIngredientIndex === index) {
+      handleCancelInlineRecipeIngredientEdit();
+    } else if (inlineEditingRecipeIngredientIndex !== null && inlineEditingRecipeIngredientIndex > index) {
+      setInlineEditingRecipeIngredientIndex((prev) => (prev === null ? null : prev - 1));
     }
 
     showUndoToast("Ingredient removed from recipe.", 6000, () => {
@@ -1543,6 +1757,15 @@ export default function App() {
       showCopyStatus("Ingredient restored.", "success");
     });
     showCopyStatus("Ingredient removed from recipe.", "success");
+  }
+
+  async function handleCopyRecipeIngredientName(index) {
+    const ingredient = recipeIngredients[index];
+    if (!ingredient) {
+      return;
+    }
+    setOpenLibraryMenu("");
+    await copyTextAndReport(displayName(ingredient.name), "Ingredient name copied.");
   }
 
   function handleCreateNewIngredient() {
@@ -1558,12 +1781,20 @@ export default function App() {
     });
 
     setRecipeIngredientsAndMirror([...recipeIngredients, normalized]);
+    setInlineEditingRecipeIngredientIndex(null);
+    setInlineRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
+    setOpenLibraryMenu("");
     showCopyStatus("Created ingredient and added it to the recipe.", "success");
     resetNewIngredientForm();
   }
 
   function handleGenerateIngredients() {
-    const parsed = parseIngredients(ingredientPasteText, state.ingredientCatalog, stores);
+    const { ingredients: parsed, skippedLines } = parseIngredientsWithDiagnostics(
+      ingredientPasteText,
+      state.ingredientCatalog,
+      stores,
+    );
+    setIngredientPasteSkippedLines(skippedLines);
     if (!Array.isArray(parsed) || parsed.length === 0) {
       showCopyStatus("Paste ingredient lines first, then generate.", "error");
       return;
@@ -1588,6 +1819,10 @@ export default function App() {
     setRecipeIngredients([]);
     setRecipeIngredientMode(RECIPE_INGREDIENT_MODES.directory);
     setIngredientPasteText("");
+    setIngredientPasteSkippedLines([]);
+    setOpenLibraryMenu("");
+    setInlineEditingRecipeIngredientIndex(null);
+    setInlineRecipeIngredientForm(makeRecipeIngredientForm(assignableStores[0] || "Unassigned"));
     setRecipeDraftBaseline(buildRecipeDraftSnapshot(nextForm, [], ""));
     resetNewIngredientForm();
     resetRecipeIngredientForm();
@@ -2065,10 +2300,6 @@ export default function App() {
 
     activeDays.forEach((day, dayIndex) => {
       const dayPlan = state.weekPlan[day] || createDefaultDayPlan(state.recipes, dayIndex);
-      if (dayPlan.dayMode !== "planned") {
-        return;
-      }
-
       MEAL_SLOTS.forEach((mealSlot) => {
         const mealPlan = dayPlan.meals?.[mealSlot];
         if (!mealPlan || mealPlan.mode !== "recipe" || !mealPlan.recipeId) {
@@ -2146,7 +2377,7 @@ export default function App() {
   const liveReceiptPanelContent = (
     <>
       <div className="mb-3 border-b border-emerald-200 pb-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
+        <p className="text-xs font-medium text-emerald-900/70">
           Live Grocery Receipt
         </p>
         <div className="mt-1 flex items-center gap-2">
@@ -2173,8 +2404,8 @@ export default function App() {
       ) : (
         <div className="space-y-3">
           {liveReceiptStores.map((store) => (
-            <section key={`receipt-${store}`} className="space-y-1 rounded-md border border-border/70 bg-white/80 p-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <section key={`receipt-${store}`} className="space-y-1 rounded-md border border-border/70 bg-white p-2">
+              <p className="text-xs font-medium text-muted-foreground">
                 {store}
               </p>
               <ul className="space-y-1">
@@ -2182,7 +2413,7 @@ export default function App() {
                   const sources =
                     receiptSourceMap.get(getReceiptItemKey(store, item.name, item.unit)) || [];
                   return (
-                    <li key={`receipt-${store}-${item.name}-${item.unit}`} className="rounded-md bg-emerald-50/40 p-1.5 text-xs">
+                    <li key={`receipt-${store}-${item.name}-${item.unit}`} className="rounded-md bg-zinc-50/30 p-1.5 text-xs">
                       <p>{formatItem(item)}</p>
                       {sources.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1">
@@ -2230,21 +2461,21 @@ export default function App() {
   const breadcrumbs = useMemo(() => {
     if (isPlannerWorkflow) {
       if (plannerStep >= 3) {
-        return ["Meal Plan", "Grocery List"];
+        return ["Meal plan", "Grocery list"];
       }
       if (plannerStep >= 2) {
-        return ["Meal Plan", "Day Setup"];
+        return ["Meal plan", "Day setup"];
       }
-      return ["Meal Plan", "Plan Basics"];
+      return ["Meal plan", "Plan basics"];
     }
 
     if (isIngredientsTab) {
-      return ["Ingredients", editingIngredientName ? "Edit Ingredient" : "Directory"];
+      return ["Ingredients", editingIngredientName ? "Edit ingredient" : "Directory"];
     }
 
     if (isRecipesTab) {
       if (isRecipeCreatePage) {
-        return ["Recipes", editingRecipeId ? "Edit Recipe" : "Add Recipe"];
+        return ["Recipes", recipeEditorModeLabel];
       }
       return ["Recipes", "List"];
     }
@@ -2257,81 +2488,123 @@ export default function App() {
     isPlannerWorkflow,
     isRecipeCreatePage,
     isRecipesTab,
+    recipeEditorModeLabel,
     plannerStep,
   ]);
 
+  const topNav = (
+    <section className="rounded-md border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 text-zinc-700"
+          onClick={handleOpenHome}
+          aria-label="Go to home"
+        >
+          <div className="relative h-5 w-5">
+            <Leaf className="absolute -left-0.5 -top-0.5 h-3.5 w-3.5" aria-hidden="true" />
+            <UtensilsCrossed className="absolute bottom-0 right-0 h-3.5 w-3.5" aria-hidden="true" />
+          </div>
+        </button>
+
+        <div className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50/60 p-0.5">
+          <Button
+            type="button"
+            size="sm"
+            variant={isPlannerWorkflow ? "default" : "ghost"}
+            className={isPlannerWorkflow ? "" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"}
+            onClick={handleOpenPlannerWorkflow}
+          >
+            Meal plan
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={isRecipeWorkflow ? "default" : "ghost"}
+            className={isRecipeWorkflow ? "" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"}
+            onClick={handleOpenRecipeLibrary}
+          >
+            Recipes
+          </Button>
+        </div>
+
+        <div ref={landingAddRecipeMenuRef} className="relative flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={handleStartNewMealPlan}>
+            New plan
+          </Button>
+          <div className="relative inline-flex">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="rounded-r-none border-r-0"
+              onClick={handleCreateRecipeFlow}
+            >
+              Add recipe
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              ref={landingAddRecipeTriggerRef}
+              className="h-9 w-9 rounded-l-none border-zinc-200 p-0"
+              aria-haspopup="menu"
+              aria-expanded={isLandingAddRecipeMenuOpen}
+              aria-label="Open add recipe options"
+              onClick={() => setIsLandingAddRecipeMenuOpen((prev) => !prev)}
+            >
+              <ChevronDown
+                className={
+                  isLandingAddRecipeMenuOpen
+                    ? "h-4 w-4 rotate-180 transition-transform"
+                    : "h-4 w-4 transition-transform"
+                }
+                aria-hidden="true"
+              />
+            </Button>
+            {isLandingAddRecipeMenuOpen ? (
+              <div
+                className="absolute right-0 top-11 z-20 w-48 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md"
+                role="menu"
+                aria-label="Add recipe options"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                  onClick={handleCreateRecipeFlow}
+                >
+                  Manual
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                  onClick={openRecipeImportModal}
+                >
+                  Import from URL
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+
   if (workflowScreen === WORKFLOW_SCREENS.landing) {
     return (
-      <main className="mx-auto min-h-screen max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-10">
-        <section className="border-b border-border/80 pb-6">
+      <main className="mx-auto min-h-screen max-w-6xl space-y-4 px-4 py-6 md:px-8 md:py-10">
+        {topNav}
+        <section className="rounded-md border border-zinc-200/80 bg-white p-5 shadow-sm md:p-6">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4">
-              <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 md:text-4xl">
-                Meal Planner
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 md:text-3xl">
+                Meal planner
               </h1>
-              <p className="max-w-2xl text-sm text-muted-foreground md:text-base">
+              <p className="max-w-2xl text-sm text-muted-foreground">
                 Build your weekly plan, organize recipes, and generate grocery lists.
               </p>
-
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleStartNewMealPlan}>
-                  Start New Meal Plan
-                </Button>
-                <div ref={landingAddRecipeMenuRef} className="relative inline-flex">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-r-none border-r-0"
-                    onClick={handleCreateRecipeFlow}
-                  >
-                    Add Recipe
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    ref={landingAddRecipeTriggerRef}
-                    className="rounded-l-none"
-                    aria-haspopup="menu"
-                    aria-expanded={isLandingAddRecipeMenuOpen}
-                    aria-label="Open add recipe options"
-                    onClick={() => setIsLandingAddRecipeMenuOpen((prev) => !prev)}
-                  >
-                    <ChevronDown
-                      className={
-                        isLandingAddRecipeMenuOpen
-                          ? "h-4 w-4 rotate-180 transition-transform"
-                          : "h-4 w-4 transition-transform"
-                      }
-                      aria-hidden="true"
-                    />
-                  </Button>
-                  {isLandingAddRecipeMenuOpen ? (
-                    <div
-                      className="absolute right-0 top-11 z-20 w-48 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg"
-                      role="menu"
-                      aria-label="Add recipe options"
-                    >
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 transition hover:bg-zinc-100"
-                        onClick={handleCreateRecipeFlow}
-                      >
-                        Manual
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 transition hover:bg-zinc-100"
-                        onClick={openRecipeImportModal}
-                      >
-                        Import from URL
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
 
               <div className="flex max-w-md flex-wrap items-center gap-4">
                 <button
@@ -2339,8 +2612,8 @@ export default function App() {
                   className="inline-flex items-end gap-2 text-left transition hover:text-zinc-950"
                   onClick={handleOpenRecipeLibrary}
                 >
-                  <p className="text-2xl font-semibold leading-none text-zinc-900">{sortedRecipes.length}</p>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recipes</p>
+                  <p className="text-xl font-semibold leading-none text-zinc-900">{sortedRecipes.length}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Recipes</p>
                 </button>
                 <span className="h-5 w-px bg-border/80" aria-hidden="true" />
                 <button
@@ -2348,22 +2621,22 @@ export default function App() {
                   className="inline-flex items-end gap-2 text-left transition hover:text-zinc-950"
                   onClick={handleOpenIngredientLibrary}
                 >
-                  <p className="text-2xl font-semibold leading-none text-zinc-900">{ingredientDirectory.length}</p>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ingredients</p>
+                  <p className="text-xl font-semibold leading-none text-zinc-900">{ingredientDirectory.length}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Ingredients</p>
                 </button>
               </div>
             </div>
 
-            <aside className="rounded-lg border border-border/70 bg-zinc-50/40 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                This Week&apos;s Menu
+            <aside className="rounded-md border border-zinc-200/70 bg-zinc-50/40 p-4">
+              <p className="text-xs font-medium text-muted-foreground">
+                This week&apos;s menu
               </p>
               <div className="mt-3 space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Menu</p>
+                  <p className="text-xs font-medium text-muted-foreground">Current menu</p>
                   <button
                     type="button"
-                    className="mt-1 text-sm font-semibold text-zinc-700 underline decoration-zinc-400 underline-offset-4 transition hover:text-zinc-950"
+                    className="mt-1 text-sm font-medium text-zinc-700 underline decoration-zinc-400 underline-offset-4 transition hover:text-zinc-950"
                     onClick={handleOpenCurrentMenu}
                   >
                     Open this week&apos;s menu
@@ -2371,7 +2644,7 @@ export default function App() {
                 </div>
                 <div className="h-px bg-border/80" aria-hidden="true" />
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Previous Menus</p>
+                  <p className="text-xs font-medium text-muted-foreground">Previous menus</p>
                   {previousMenus.length === 0 ? (
                     <p className="mt-2 text-sm text-muted-foreground">
                       No previous menus yet.
@@ -2382,7 +2655,7 @@ export default function App() {
                         <li key={menu.id}>
                           <button
                             type="button"
-                            className="text-sm font-semibold text-zinc-700 underline decoration-zinc-400 underline-offset-4 transition hover:text-zinc-950"
+                            className="text-sm font-medium text-zinc-700 underline decoration-zinc-400 underline-offset-4 transition hover:text-zinc-950"
                             onClick={() => handleOpenPreviousMenu(menu.id)}
                           >
                             {menu.label}
@@ -2406,9 +2679,9 @@ export default function App() {
               className="absolute inset-0 bg-zinc-950/35"
               onClick={closeRecipeImportModal}
             />
-            <Card className="relative z-10 w-full max-w-lg border-emerald-200/80 bg-white shadow-xl">
+            <Card className="relative z-10 w-full max-w-lg border-zinc-200/80 bg-white shadow-lg">
               <CardHeader className="space-y-1">
-                <CardTitle className="text-xl text-emerald-950">Import Recipe From URL</CardTitle>
+                <CardTitle className="text-xl text-emerald-950">Import recipe from URL</CardTitle>
                 <CardDescription>
                   Paste a recipe URL and we&apos;ll prefill the recipe editor.
                 </CardDescription>
@@ -2445,53 +2718,23 @@ export default function App() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl space-y-5 px-4 py-6 md:px-8 md:py-10">
-      <section className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700"
-            onClick={handleOpenHome}
-            aria-label="Go to home"
-          >
-            <div className="relative h-5 w-5">
-              <Leaf className="absolute -left-0.5 -top-0.5 h-3.5 w-3.5" aria-hidden="true" />
-              <UtensilsCrossed className="absolute bottom-0 right-0 h-3.5 w-3.5" aria-hidden="true" />
-            </div>
-          </button>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={isPlannerWorkflow ? "default" : "outline"}
-              onClick={handleOpenPlannerWorkflow}
-            >
-              Meal Plan
-            </Button>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" onClick={handleCreateRecipeFlow}>
-            Add Recipe
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={openRecipeImportModal}>
-            Import Recipe
-          </Button>
-        </div>
-      </section>
+    <main className="mx-auto min-h-screen max-w-6xl space-y-4 px-4 py-6 md:px-8 md:py-10">
+      {topNav}
 
-      <section className="rounded-2xl border border-zinc-200/80 bg-white px-4 py-5 shadow-[0_8px_24px_rgba(15,23,42,0.08)] md:px-6 md:py-6">
+      <section className="rounded-md border border-zinc-200/80 bg-white px-4 py-5 shadow-sm md:px-6 md:py-6">
         <div className="space-y-5">
-          <nav aria-label="Breadcrumb" className="text-sm">
+          <nav aria-label="Breadcrumb" className="text-xs">
             <ol className="flex flex-wrap items-center gap-1 text-muted-foreground">
               {breadcrumbs.map((crumb, index) => {
                 const isLast = index === breadcrumbs.length - 1;
                 const key = `${crumb}-${index}`;
-                const crumbClass = isLast ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground";
-                const separator = index > 0 ? <span className="px-1 text-muted-foreground">/</span> : null;
+                const crumbClass = isLast
+                  ? "font-medium text-foreground"
+                  : "font-medium text-muted-foreground transition hover:text-foreground";
+                const separator = index > 0 ? <span className="px-0.5 text-muted-foreground">/</span> : null;
 
                 const action =
-                  !isLast && crumb === "Meal Plan"
+                  !isLast && crumb === "Meal plan"
                     ? handleOpenPlannerWorkflow
                     : !isLast && crumb === "Recipes"
                       ? handleOpenRecipeLibrary
@@ -2516,16 +2759,16 @@ export default function App() {
           </nav>
 
           <section className="space-y-1">
-            <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+            <h1 className="max-w-4xl text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
               {isPlannerWorkflow
                 ? activePlanName || "Meal plan setup"
                 : isIngredientsTab
-                  ? "Ingredient Directory"
+                  ? "Ingredient directory"
                   : isRecipeCreatePage
-                    ? "Add Recipe"
-                    : "Recipe Library"}
+                    ? recipeEditorModeLabel
+                    : "Recipe library"}
             </h1>
-            <p className="max-w-2xl text-sm text-muted-foreground md:text-base">
+            <p className="max-w-2xl text-sm text-muted-foreground">
               {isPlannerWorkflow
                 ? "Start with plan basics, then set up days and meals."
                 : "Manage recipes and ingredients from one place."}
@@ -2546,28 +2789,28 @@ export default function App() {
           ) : null}
 
           {isPlannerWorkflow ? (
-        <Card className="border-0 bg-transparent shadow-none">
-          <CardHeader className="gap-2 px-0">
+        <Card className="rounded-md border border-zinc-200/80 bg-white shadow-sm">
+          <CardHeader className="gap-2">
             <div>
-              <CardTitle className="text-2xl text-emerald-950">Plan basics</CardTitle>
+              <CardTitle className="text-lg text-emerald-950">Plan basics</CardTitle>
               <CardDescription className="mt-1 text-emerald-900/70">
                 Name the plan and day count before day setup.
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="px-0 pt-4">
+          <CardContent className="pt-4">
             {isStep1ReadOnly ? (
               <div className="grid gap-4 md:grid-cols-2">
-                <article className="rounded-lg border border-border/60 bg-white/70 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meal Plan Name</p>
+                <article className="rounded-sm border border-border/60 bg-white/70 p-3">
+                  <p className="text-xs font-medium text-muted-foreground">Meal plan name</p>
                   <p className="mt-1 text-sm font-semibold">{state.mealPlanName || "-"}</p>
                 </article>
-                <article className="rounded-lg border border-border/60 bg-white/70 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Days In Plan</p>
+                <article className="rounded-sm border border-border/60 bg-white/70 p-3">
+                  <p className="text-xs font-medium text-muted-foreground">Days in plan</p>
                   <p className="mt-1 text-sm font-semibold">{planningDays}</p>
                 </article>
-                <article className="rounded-lg border border-border/60 bg-white/70 p-3 md:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</p>
+                <article className="rounded-sm border border-border/60 bg-white/70 p-3 md:col-span-2">
+                  <p className="text-xs font-medium text-muted-foreground">Description</p>
                   <p className="mt-1 text-sm">{state.mealPlanDescription || "No description."}</p>
                 </article>
                 <div className="flex flex-wrap gap-2 md:col-span-2">
@@ -2582,7 +2825,7 @@ export default function App() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="meal-plan-name">Meal Plan Name</Label>
+                  <Label htmlFor="meal-plan-name">Meal plan name</Label>
                   <Input
                     id="meal-plan-name"
                     maxLength={MAX_MEAL_PLAN_NAME}
@@ -2597,7 +2840,7 @@ export default function App() {
                   ) : null}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="planning-days">Days In Plan</Label>
+                  <Label htmlFor="planning-days">Days in plan</Label>
                   <Input
                     id="planning-days"
                     type="number"
@@ -2639,17 +2882,17 @@ export default function App() {
           ) : null}
 
           {isPlannerWorkflow && plannerStep >= 2 ? (
-        <Card className="border-0 bg-transparent shadow-none">
-          <CardHeader className="gap-5 px-0 pb-4 md:flex-row md:items-end md:justify-between">
+        <Card className="rounded-md border border-zinc-200/80 bg-white shadow-sm">
+          <CardHeader className="gap-3 pb-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <CardTitle className="text-2xl text-emerald-950">Day setup</CardTitle>
+              <CardTitle className="text-lg text-emerald-950">Day setup</CardTitle>
               <CardDescription className="text-emerald-900/70">
                 Set meals by day with quick day actions and live grocery feedback.
               </CardDescription>
             </div>
-            <div className="grid gap-2 sm:max-w-md sm:grid-cols-[1fr_auto] sm:items-end">
+            <div className="grid gap-2 sm:max-w-md sm:grid-cols-1 sm:items-end">
               <div className="space-y-2">
-                <Label htmlFor="household-servings">Household Servings</Label>
+                <Label htmlFor="household-servings">Household servings</Label>
                 <Input
                   id="household-servings"
                   type="number"
@@ -2659,19 +2902,13 @@ export default function App() {
                   onChange={(event) => handleHouseholdServings(event.target.value)}
                 />
               </div>
-              <Button type="button" variant="outline" onClick={handleJumpToNextIncomplete}>
-                Jump To Next Incomplete
-              </Button>
             </div>
           </CardHeader>
-          <CardContent className="px-0 pt-2">
-            <div className="grid gap-6 xl:grid-cols-[3fr_1fr]">
-              <section className="space-y-4">
+          <CardContent className="pt-2">
+            <div className="grid gap-4 xl:grid-cols-[3fr_1fr]">
+              <section className="space-y-3">
                 {activeDays.map((day, dayIndex) => {
                   const dayPlan = state.weekPlan[day] || createDefaultDayPlan(state.recipes, dayIndex);
-                  const dayMode = dayPlan.dayMode || "planned";
-                  const completion = dayCompletionByDay[day] || getDayCompletionModel(dayPlan);
-                  const dayLocked = dayMode !== "planned";
                   const isExpanded = expandedDay === day;
                   const noteText = String(dayPlan.notes || "").trim();
                   const plannedRecipeMeals = MEAL_SLOTS.reduce((count, mealSlot) => {
@@ -2700,17 +2937,11 @@ export default function App() {
                           delete dayCardRefs.current[day];
                         }
                       }}
-                      className="rounded-lg border border-emerald-200/80 bg-white/95 p-3 shadow-sm"
+                      className="rounded-md border border-zinc-200/80 bg-white p-3 shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-xl font-semibold tracking-tight text-emerald-950">{day}</p>
-                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                              {completion.label}
-                            </span>
-                          </div>
-                          <p className="text-xs font-medium text-emerald-900/70">{DAY_MODE_LABELS[dayMode]}</p>
+                          <p className="text-xl font-semibold tracking-tight text-emerald-950">{day}</p>
                           <p className="mt-1 text-xs text-emerald-900/75">
                             {plannedRecipeMeals} recipe meal{plannedRecipeMeals === 1 ? "" : "s"} planned •{" "}
                             {dayIngredientCount} ingredient{dayIngredientCount === 1 ? "" : "s"} selected
@@ -2723,42 +2954,22 @@ export default function App() {
                         </div>
 
                         <div className="relative flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={isExpanded ? "default" : "outline"}
-                            onClick={() => {
-                              setExpandedDay(isExpanded ? "" : day);
-                              setOpenDayMenu("");
-                            }}
-                          >
-                            {isExpanded ? "Save" : "Edit"}
-                          </Button>
                           <DayActionMenu
-                            activeDays={activeDays}
                             day={day}
-                            dayMode={dayMode}
+                            isEditing={isExpanded}
                             isOpen={openDayMenu === day}
                             noteText={noteText}
                             onToggle={() => handleOpenDayMenu(day)}
                             onClose={() => setOpenDayMenu("")}
-                            onSetDayMode={(mode) => setDayMode(day, mode)}
-                            onCopyFrom={(sourceDay) => handleCopyDayFrom(day, sourceDay)}
+                            onToggleEdit={() => handleToggleDayEdit(day)}
+                            onResetDay={() => handleResetDay(day)}
                             onOpenNoteEditor={() => handleOpenDayNoteEditor(day)}
-                            onDeleteNote={() => handleDeleteDayNote(day)}
                           />
                         </div>
                       </div>
 
                       {isExpanded ? (
                         <div className="mt-3 space-y-2">
-                          {dayLocked ? (
-                            <p className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-                              {day} is set to {DAY_MODE_LABELS[dayMode].toLowerCase()}. Meal choices are
-                              paused for this day.
-                            </p>
-                          ) : null}
-
                           <div className="grid gap-3">
                             {MEAL_SLOTS.map((mealSlot) => {
                               const mealPlan = dayPlan.meals?.[mealSlot] || {
@@ -2771,18 +2982,19 @@ export default function App() {
                               const mealSearchValue = mealRecipeSearch[mealKey] || "";
                               const recipeOptions = getRecipesForMeal(day, mealSlot);
                               const selectedRecipe = mealPlan.recipeId ? recipesById[mealPlan.recipeId] : null;
+                              const mealPickerOpen = openMealPickerKey === mealKey;
+                              const mealPickerValue = mealSearchValue || (selectedRecipe ? selectedRecipe.title : "");
 
                               return (
                                 <div
                                   key={`${day}-${mealSlot}`}
-                                  className="grid gap-2 rounded-md border border-emerald-200/70 bg-white p-2 md:grid-cols-[120px_120px_1fr_96px]"
+                                  className="grid gap-2 rounded-md border border-zinc-200/70 bg-white p-2 md:grid-cols-[120px_120px_1fr_96px]"
                                 >
                                   <div className="space-y-1">
                                     <p className="text-sm font-semibold">{MEAL_SLOT_LABELS[mealSlot]}</p>
                                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                       <Checkbox
                                         checked={enabled}
-                                        disabled={dayLocked}
                                         onCheckedChange={(value) =>
                                           setMealEnabled(day, mealSlot, Boolean(value))
                                         }
@@ -2795,7 +3007,7 @@ export default function App() {
                                     <Label htmlFor={`meal-mode-${day}-${mealSlot}`}>Type</Label>
                                     <Select
                                       value={mealPlan.mode || "skip"}
-                                      disabled={!enabled || dayLocked}
+                                      disabled={!enabled}
                                       onValueChange={(value) => setMealMode(day, mealSlot, value)}
                                     >
                                       <SelectTrigger id={`meal-mode-${day}-${mealSlot}`}>
@@ -2812,42 +3024,91 @@ export default function App() {
                                   </div>
 
                                   {enabled && mealPlan.mode === "recipe" ? (
-                                    <div className="space-y-1">
-                                      <Label htmlFor={`meal-search-${day}-${mealSlot}`}>Search + Recipe</Label>
-                                      <Input
-                                        id={`meal-search-${day}-${mealSlot}`}
-                                        placeholder="Search by recipe or tag"
-                                        disabled={dayLocked}
-                                        value={mealSearchValue}
-                                        onChange={(event) =>
-                                          setMealRecipeSearchValue(day, mealSlot, event.target.value)
-                                        }
-                                      />
-                                      <Select
-                                        value={mealPlan.recipeId || NO_RECIPE}
-                                        disabled={dayLocked}
-                                        onValueChange={(value) => setMealRecipe(day, mealSlot, value)}
-                                      >
-                                        <SelectTrigger id={`meal-recipe-${day}-${mealSlot}`}>
-                                          <SelectValue placeholder="No recipe selected" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value={NO_RECIPE}>No recipe selected</SelectItem>
-                                          {(recipeOptions.length > 0 ? recipeOptions : sortedRecipes).map((recipe) => (
-                                            <SelectItem key={recipe.id} value={recipe.id}>
-                                              {recipe.title} ({recipe.servings} servings)
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      {recipeOptions.length === 0 && mealSearchValue ? (
-                                        <p className="text-xs text-muted-foreground">No matching recipes.</p>
-                                      ) : null}
+                                    <div className="space-y-1" data-meal-picker="true">
+                                      <Label htmlFor={`meal-search-${day}-${mealSlot}`}>Recipe</Label>
+                                      <div className="relative">
+                                        <Input
+                                          id={`meal-search-${day}-${mealSlot}`}
+                                          placeholder="Search by recipe or tag"
+                                          role="combobox"
+                                          aria-expanded={mealPickerOpen}
+                                          aria-controls={`meal-picker-options-${day}-${mealSlot}`}
+                                          value={mealPickerValue}
+                                          onFocus={() => {
+                                            if (!mealSearchValue && selectedRecipe) {
+                                              setMealRecipeSearchValue(day, mealSlot, selectedRecipe.title);
+                                            }
+                                            setOpenMealPickerKey(mealKey);
+                                          }}
+                                          onClick={() => setOpenMealPickerKey(mealKey)}
+                                          onChange={(event) => {
+                                            setMealRecipeSearchValue(day, mealSlot, event.target.value);
+                                            setOpenMealPickerKey(mealKey);
+                                          }}
+                                          onKeyDown={(event) => {
+                                            if (event.key === "Escape") {
+                                              setOpenMealPickerKey("");
+                                              return;
+                                            }
+                                            if (event.key === "Enter" && mealPickerOpen && recipeOptions.length > 0) {
+                                              event.preventDefault();
+                                              handleMealRecipePickerSelect(day, mealSlot, recipeOptions[0].id);
+                                            }
+                                          }}
+                                        />
+                                        {mealPickerOpen ? (
+                                          <div
+                                            id={`meal-picker-options-${day}-${mealSlot}`}
+                                            role="listbox"
+                                            className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 max-h-56 overflow-y-auto rounded-md border border-zinc-200 bg-white p-1.5 shadow-md"
+                                          >
+                                            <button
+                                              type="button"
+                                              role="option"
+                                              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                              onClick={() => handleMealRecipePickerSelect(day, mealSlot, NO_RECIPE)}
+                                            >
+                                              <span>No recipe selected</span>
+                                            </button>
+                                            {recipeOptions.length > 0 ? (
+                                              recipeOptions.map((recipe) => (
+                                                <button
+                                                  key={recipe.id}
+                                                  type="button"
+                                                  role="option"
+                                                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                                  onClick={() =>
+                                                    handleMealRecipePickerSelect(day, mealSlot, recipe.id)
+                                                  }
+                                                >
+                                                  <span className="truncate pr-2">{recipe.title}</span>
+                                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                                    {recipe.servings} servings
+                                                  </span>
+                                                </button>
+                                              ))
+                                            ) : (
+                                              <p className="px-2 py-2 text-xs text-muted-foreground">
+                                                No matching recipes.
+                                              </p>
+                                            )}
+                                          </div>
+                                        ) : null}
+                                      </div>
                                       {selectedRecipe ? (
-                                        <p className="text-xs text-emerald-800/80">
-                                          {(selectedRecipe.ingredients || []).length} ingredients •{" "}
-                                          {(selectedRecipe.steps || []).length} steps
-                                        </p>
+                                        <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-800/80">
+                                          <p>
+                                            {(selectedRecipe.ingredients || []).length} ingredients •{" "}
+                                            {(selectedRecipe.steps || []).length} steps
+                                          </p>
+                                          <button
+                                            type="button"
+                                            className="font-semibold underline decoration-emerald-500 underline-offset-4 transition hover:text-emerald-950"
+                                            onClick={() => handleOpenRecipeDetailsModal(selectedRecipe.id)}
+                                          >
+                                            View full recipe
+                                          </button>
+                                        </div>
                                       ) : null}
                                     </div>
                                   ) : (
@@ -2867,7 +3128,7 @@ export default function App() {
                                       type="number"
                                       min="1"
                                       step="1"
-                                      disabled={!enabled || dayLocked || mealPlan.mode !== "recipe"}
+                                      disabled={!enabled || mealPlan.mode !== "recipe"}
                                       value={mealPlan.servingsOverride ?? ""}
                                       placeholder={String(state.householdServings)}
                                       onChange={(event) =>
@@ -2885,29 +3146,29 @@ export default function App() {
                   );
                 })}
 
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary/90">
+                <div className="rounded-sm border border-primary/20 bg-primary/5 p-3 text-sm text-primary/90">
                   Balance: {weekBalance.plannedMeals} recipe meals, {weekBalance.quickMeals} quick
                   meals, {weekBalance.proteinMeals} high-protein meals, and {weekBalance.leftoversMeals}{" "}
                   leftovers slots across {weekBalance.planningDays} days.
                 </div>
               </section>
 
-              <aside className="hidden rounded-xl border border-emerald-200/70 bg-emerald-50/50 p-4 shadow-sm xl:sticky xl:top-4 xl:block xl:h-fit">
+              <aside className="hidden rounded-md border border-zinc-200/70 bg-zinc-50/40 p-4 shadow-sm xl:sticky xl:top-4 xl:block xl:h-fit">
                 {liveReceiptPanelContent}
               </aside>
             </div>
             <div className="xl:hidden">
               <Button
                 type="button"
-                className="fixed bottom-4 right-4 z-30 rounded-full bg-emerald-700 px-4 py-2 text-white shadow-lg hover:bg-emerald-700/90"
+                className="fixed bottom-4 right-4 z-30 rounded-full bg-emerald-700 px-4 py-2 text-white shadow-md hover:bg-emerald-700/90"
                 onClick={() => setIsMobileReceiptOpen(true)}
               >
-                Shopping List ({liveReceiptItemCount})
+                Shopping list ({liveReceiptItemCount})
               </Button>
               <MobileSheet
                 open={isMobileReceiptOpen}
                 onClose={() => setIsMobileReceiptOpen(false)}
-                title="Shopping List"
+                title="Shopping list"
               >
                 {liveReceiptPanelContent}
               </MobileSheet>
@@ -2919,7 +3180,7 @@ export default function App() {
           {isRecipeWorkflow ? (
         <>
           {!isRecipeCreatePage ? (
-            <Card className="border-emerald-200/70 bg-white/90 shadow-sm">
+            <Card className="border-zinc-200/70 bg-white shadow-sm">
             <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -2997,8 +3258,8 @@ export default function App() {
           {isRecipesTab ? (
             <Card ref={recipeListRef}>
               <CardHeader>
-                <CardTitle className="text-2xl">
-                  {isRecipeCreatePage ? "Create Recipe" : "Recipe Library"}
+                <CardTitle className="text-lg">
+                  {isRecipeCreatePage ? recipeEditorModeLabel : "Recipe library"}
                 </CardTitle>
                 <CardDescription>
                   Manage recipes in a list with inline edit, copy, and delete actions.
@@ -3007,10 +3268,10 @@ export default function App() {
               <CardContent className="space-y-5">
                 {isRecipeCreatePage ? (
                   <form className="grid gap-4 pb-28 md:grid-cols-2 md:pb-4" onSubmit={handleRecipeSubmit}>
-                    <div className="order-first hidden md:sticky md:top-3 md:z-20 md:col-span-2 md:flex md:items-center md:justify-between md:rounded-xl md:border md:border-emerald-200 md:bg-white/95 md:p-3 md:shadow-sm md:backdrop-blur">
+                    <div className="order-first hidden md:sticky md:top-3 md:z-20 md:col-span-2 md:flex md:items-center md:justify-between md:rounded-md md:border md:border-emerald-200 md:bg-white md:p-3 md:shadow-sm md:backdrop-blur">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-emerald-950">
-                          {editingRecipeId ? "Editing recipe draft" : "New recipe draft"}
+                          {recipeDraftModeLabel}
                         </p>
                         {isRecipeDraftDirty ? (
                           <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
@@ -3028,7 +3289,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-200 bg-white/95 p-3 backdrop-blur md:hidden">
+                    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-200 bg-white p-3 backdrop-blur md:hidden">
                       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 pb-[env(safe-area-inset-bottom)]">
                         <div className="min-w-0">
                           <p className="truncate text-xs font-semibold text-emerald-950">
@@ -3047,7 +3308,7 @@ export default function App() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="recipe-title">Recipe Name</Label>
+                      <Label htmlFor="recipe-title">Recipe name</Label>
                       <Input
                         id="recipe-title"
                         maxLength={80}
@@ -3072,7 +3333,7 @@ export default function App() {
                     </div>
 
                     <div className="space-y-2 md:max-w-xs">
-                      <Label htmlFor="recipe-meal-type">Meal Type</Label>
+                      <Label htmlFor="recipe-meal-type">Meal type</Label>
                       <Select
                         value={recipeForm.mealType}
                         onValueChange={(value) =>
@@ -3106,7 +3367,7 @@ export default function App() {
                     </div>
 
                     <div className="space-y-2 md:max-w-xs">
-                      <Label htmlFor="recipe-servings">Recipe Servings</Label>
+                      <Label htmlFor="recipe-servings">Recipe servings</Label>
                       <Input
                         id="recipe-servings"
                         type="number"
@@ -3133,27 +3394,27 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="space-y-3 rounded-2xl border border-emerald-200/80 bg-white p-4 md:col-span-2 md:p-5">
+                    <div className="space-y-3 rounded-md border border-zinc-200/80 bg-white p-4 md:col-span-2 md:p-5">
                       <div className="flex items-start gap-2">
-                        <div className="mt-0.5 rounded-md border border-emerald-200 bg-emerald-100/70 p-1.5 text-emerald-700">
+                        <div className="mt-0.5 rounded-md border border-emerald-200 bg-zinc-100/70 p-1.5 text-emerald-700">
                           <ListChecks className="h-4 w-4" aria-hidden="true" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-base font-semibold text-emerald-950">Add Ingredients</Label>
+                          <Label className="text-base font-semibold text-emerald-950">Add ingredients</Label>
                           <p className="text-sm text-emerald-900/75">
                             Choose how you want to add each ingredient.
                           </p>
                         </div>
                       </div>
 
-                      <div className="grid gap-2 rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-1 md:grid-cols-2">
+                      <div className="grid gap-2 rounded-md border border-zinc-200/80 bg-zinc-50/40 p-1 md:grid-cols-2">
                         <Button
                           type="button"
                           variant="ghost"
                           className={
                             isDirectoryIngredientMode
-                              ? "h-11 rounded-lg bg-emerald-700 text-white shadow-sm hover:bg-emerald-700/95"
-                              : "h-11 rounded-lg bg-transparent text-emerald-900 hover:bg-white/80"
+                              ? "h-11 rounded-sm bg-emerald-700 text-white shadow-sm hover:bg-emerald-700/95"
+                              : "h-11 rounded-sm bg-transparent text-emerald-900 hover:bg-white"
                           }
                           onClick={() => handleRecipeIngredientModeChange(RECIPE_INGREDIENT_MODES.directory)}
                         >
@@ -3165,8 +3426,8 @@ export default function App() {
                           variant="ghost"
                           className={
                             isCustomIngredientMode
-                              ? "h-11 rounded-lg bg-emerald-700 text-white shadow-sm hover:bg-emerald-700/95"
-                              : "h-11 rounded-lg bg-transparent text-emerald-900 hover:bg-white/80"
+                              ? "h-11 rounded-sm bg-emerald-700 text-white shadow-sm hover:bg-emerald-700/95"
+                              : "h-11 rounded-sm bg-transparent text-emerald-900 hover:bg-white"
                           }
                           onClick={() => handleRecipeIngredientModeChange(RECIPE_INGREDIENT_MODES.custom)}
                         >
@@ -3183,7 +3444,7 @@ export default function App() {
                         }
                       >
                         <div
-                          className="space-y-3 rounded-xl border border-emerald-200/90 bg-white p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.8)]"
+                          className="space-y-3 rounded-md border border-zinc-200/80 bg-white p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.8)]"
                           onKeyDown={handleDirectoryIngredientKeyDown}
                         >
                           <p className="text-sm text-emerald-900/75">
@@ -3191,7 +3452,7 @@ export default function App() {
                           </p>
                           <div className="grid gap-3 md:grid-cols-[1.3fr_120px_140px_220px]">
                             <div className="space-y-2">
-                              <Label htmlFor="recipe-ingredient-name" className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
+                              <Label htmlFor="recipe-ingredient-name" className="text-xs font-medium text-emerald-900/70">
                                 Name
                               </Label>
                               <Input
@@ -3209,7 +3470,7 @@ export default function App() {
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="recipe-ingredient-qty" className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
+                              <Label htmlFor="recipe-ingredient-qty" className="text-xs font-medium text-emerald-900/70">
                                 Qty
                               </Label>
                               <Input
@@ -3225,7 +3486,7 @@ export default function App() {
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="recipe-ingredient-unit" className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
+                              <Label htmlFor="recipe-ingredient-unit" className="text-xs font-medium text-emerald-900/70">
                                 Unit
                               </Label>
                               <Input
@@ -3239,8 +3500,8 @@ export default function App() {
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="recipe-ingredient-store" className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
-                                Preferred Store
+                              <Label htmlFor="recipe-ingredient-store" className="text-xs font-medium text-emerald-900/70">
+                                Preferred store
                               </Label>
                               <Select
                                 value={recipeIngredientForm.store}
@@ -3270,13 +3531,8 @@ export default function App() {
                               disabled={!canSaveRecipeIngredient}
                             >
                               <Plus className="h-4 w-4" aria-hidden="true" />
-                              {editingRecipeIngredientIndex !== null ? "Update Ingredient" : "Add Ingredient"}
+                              Add Ingredient
                             </Button>
-                            {editingRecipeIngredientIndex !== null ? (
-                              <Button type="button" variant="ghost" onClick={resetRecipeIngredientForm}>
-                                Cancel Edit
-                              </Button>
-                            ) : null}
                           </div>
                           {!canSaveRecipeIngredient ? (
                             <p className="text-xs font-medium text-emerald-800/75">
@@ -3294,7 +3550,7 @@ export default function App() {
                         }
                       >
                         <div
-                          className="space-y-3 rounded-xl border border-dashed border-emerald-300/90 bg-emerald-50/40 p-4"
+                          className="space-y-3 rounded-md border border-dashed border-zinc-200/80 bg-zinc-50/30 p-4"
                           onKeyDown={handleCustomIngredientKeyDown}
                         >
                           <p className="text-sm text-emerald-900/75">
@@ -3302,7 +3558,7 @@ export default function App() {
                           </p>
                           <div className="grid gap-3 md:grid-cols-[1.3fr_120px_140px_220px]">
                             <div className="space-y-2">
-                              <Label htmlFor="new-ingredient-name" className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
+                              <Label htmlFor="new-ingredient-name" className="text-xs font-medium text-emerald-900/70">
                                 Name
                               </Label>
                               <Input
@@ -3315,7 +3571,7 @@ export default function App() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="new-ingredient-qty" className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
+                              <Label htmlFor="new-ingredient-qty" className="text-xs font-medium text-emerald-900/70">
                                 Qty
                               </Label>
                               <Input
@@ -3330,7 +3586,7 @@ export default function App() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="new-ingredient-unit" className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
+                              <Label htmlFor="new-ingredient-unit" className="text-xs font-medium text-emerald-900/70">
                                 Unit
                               </Label>
                               <Input
@@ -3343,8 +3599,8 @@ export default function App() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="new-ingredient-store" className="text-xs font-semibold uppercase tracking-wide text-emerald-900/70">
-                                Preferred Store
+                              <Label htmlFor="new-ingredient-store" className="text-xs font-medium text-emerald-900/70">
+                                Preferred store
                               </Label>
                               <Select
                                 value={newIngredientForm.store}
@@ -3387,63 +3643,187 @@ export default function App() {
                     <div className="space-y-2 md:col-span-2">
                       <Label className="flex items-center gap-2 text-base font-semibold text-emerald-950">
                         <ListChecks className="h-4 w-4 text-emerald-700" aria-hidden="true" />
-                        Recipe Ingredient List
+                        Ingredients
                       </Label>
                       {recipeIngredients.length === 0 ? (
-                        <p className="rounded-xl border border-dashed border-emerald-300/90 bg-white/80 p-4 text-sm text-emerald-900/70">
+                        <p className="rounded-md border border-dashed border-zinc-200/80 bg-white p-4 text-sm text-emerald-900/70">
                           No ingredients added yet. Choose a method above, or generate from pasted text.
                         </p>
                       ) : (
-                        <div className="overflow-hidden rounded-xl border border-emerald-200/90 bg-white shadow-sm">
-                          <div className="hidden bg-emerald-50/85 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900/70 md:grid md:grid-cols-[1fr_110px_120px_180px_auto_auto]">
-                            <span>Name</span>
-                            <span>Qty</span>
-                            <span>Unit</span>
-                            <span>Store</span>
-                            <span className="text-center">Edit</span>
-                            <span className="text-center">Remove</span>
+                        <div className="overflow-hidden rounded-md border border-zinc-200/80 bg-white shadow-sm">
+                          <div className="hidden bg-zinc-50/60 px-3 py-2 text-xs font-medium text-emerald-900/70 md:grid md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]">
+                            <span className="text-left">Name</span>
+                            <span className="text-left">Qty</span>
+                            <span className="text-left">Unit</span>
+                            <span className="text-left">Store</span>
+                            <span className="justify-self-end" aria-hidden="true" />
                           </div>
                           <div className="divide-y divide-emerald-100">
-                            {recipeIngredients.map((ingredient, index) => (
-                              <article
-                                key={`${ingredient.name}-${index}`}
-                                className="grid items-center gap-2 bg-white px-3 py-2.5 transition-colors hover:bg-emerald-50/40 md:grid-cols-[1fr_110px_120px_180px_auto_auto]"
-                              >
-                                <p className="font-semibold text-emerald-950">{displayName(ingredient.name)}</p>
-                                <p className="text-sm text-emerald-900/75">{ingredient.qty}</p>
-                                <p className="text-sm text-emerald-900/75">{ingredient.unit}</p>
-                                <p className="text-sm text-emerald-900/75">
-                                  {ingredient.store === "Unassigned" ? "No preferred store" : ingredient.store}
-                                </p>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="justify-self-start md:justify-self-center"
-                                  onClick={() => handleEditRecipeIngredient(index)}
+                            {recipeIngredients.map((ingredient, index) => {
+                              const menuKey = `recipe-ingredient-menu-${index}`;
+                              const isInlineEditing = inlineEditingRecipeIngredientIndex === index;
+
+                              return (
+                                <article
+                                  key={`${ingredient.name}-${index}`}
+                                  className={
+                                    isInlineEditing
+                                      ? "grid items-center gap-2 bg-zinc-50/40 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]"
+                                      : "grid items-center gap-2 bg-white px-3 py-2.5 transition-colors hover:bg-zinc-50/30 md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]"
+                                  }
+                                  onKeyDown={
+                                    isInlineEditing
+                                      ? (event) => handleInlineRecipeIngredientKeyDown(event, index)
+                                      : undefined
+                                  }
                                 >
-                                  Edit
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="destructive"
-                                  className="justify-self-start md:justify-self-center"
-                                  onClick={() => handleRemoveRecipeIngredient(index)}
-                                >
-                                  Remove
-                                </Button>
-                              </article>
-                            ))}
+                                  {isInlineEditing ? (
+                                    <>
+                                      <div className="space-y-1">
+                                        <Label htmlFor={`inline-recipe-ingredient-name-${index}`} className="text-xs font-medium text-emerald-900/70 md:hidden">
+                                          Name
+                                        </Label>
+                                        <Input
+                                          id={`inline-recipe-ingredient-name-${index}`}
+                                          list="ingredient-name-options"
+                                          value={inlineRecipeIngredientForm.name}
+                                          onChange={(event) =>
+                                            handleInlineRecipeIngredientFormChange("name", event.target.value)
+                                          }
+                                          autoFocus
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label htmlFor={`inline-recipe-ingredient-qty-${index}`} className="text-xs font-medium text-emerald-900/70 md:hidden">
+                                          Qty
+                                        </Label>
+                                        <Input
+                                          id={`inline-recipe-ingredient-qty-${index}`}
+                                          type="number"
+                                          min="0.01"
+                                          step="0.01"
+                                          value={inlineRecipeIngredientForm.qty}
+                                          onChange={(event) =>
+                                            handleInlineRecipeIngredientFormChange("qty", event.target.value)
+                                          }
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label htmlFor={`inline-recipe-ingredient-unit-${index}`} className="text-xs font-medium text-emerald-900/70 md:hidden">
+                                          Unit
+                                        </Label>
+                                        <Input
+                                          id={`inline-recipe-ingredient-unit-${index}`}
+                                          value={inlineRecipeIngredientForm.unit}
+                                          onChange={(event) =>
+                                            handleInlineRecipeIngredientFormChange("unit", event.target.value)
+                                          }
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label htmlFor={`inline-recipe-ingredient-store-${index}`} className="text-xs font-medium text-emerald-900/70 md:hidden">
+                                          Store
+                                        </Label>
+                                        <Select
+                                          value={inlineRecipeIngredientForm.store}
+                                          onValueChange={(value) =>
+                                            handleInlineRecipeIngredientFormChange("store", value)
+                                          }
+                                        >
+                                          <SelectTrigger id={`inline-recipe-ingredient-store-${index}`}>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {stores.map((store) => (
+                                              <SelectItem key={store} value={store}>
+                                                {store === "Unassigned" ? "No preferred store" : store}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="flex items-center gap-2 justify-self-end">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          className="bg-emerald-700 text-white hover:bg-emerald-700/90"
+                                          onClick={() => handleSaveInlineRecipeIngredient(index)}
+                                        >
+                                          Save
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={handleCancelInlineRecipeIngredientEdit}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="font-semibold text-emerald-950">{displayName(ingredient.name)}</p>
+                                      <p className="text-sm text-emerald-900/75">{ingredient.qty}</p>
+                                      <p className="text-sm text-emerald-900/75">{ingredient.unit}</p>
+                                      <p className="text-sm text-emerald-900/75">
+                                        {ingredient.store === "Unassigned" ? "No preferred store" : ingredient.store}
+                                      </p>
+                                      <div className="relative justify-self-end">
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="ghost"
+                                          aria-label={`Open actions for ${displayName(ingredient.name)}`}
+                                          onClick={() =>
+                                            setOpenLibraryMenu((prev) => (prev === menuKey ? "" : menuKey))
+                                          }
+                                        >
+                                          <MoreVertical className="h-4 w-4" aria-hidden="true" />
+                                        </Button>
+                                        {openLibraryMenu === menuKey ? (
+                                          <div className="absolute right-0 top-10 z-20 w-44 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md">
+                                            <button
+                                              type="button"
+                                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                              onClick={() => handleStartInlineRecipeIngredientEdit(index)}
+                                            >
+                                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                                              Edit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                              onClick={() => handleCopyRecipeIngredientName(index)}
+                                            >
+                                              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                                              Copy name
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-destructive hover:bg-destructive/10"
+                                              onClick={() => handleRemoveRecipeIngredient(index)}
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                              Delete
+                                            </button>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    </>
+                                  )}
+                                </article>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="space-y-3 rounded-xl border border-emerald-200/90 bg-emerald-50/30 p-4 md:col-span-2">
+                    <div className="space-y-3 rounded-md border border-zinc-200/80 bg-zinc-50/20 p-4 md:col-span-2">
                       <Label htmlFor="recipe-ingredients-paste" className="flex items-center gap-2 text-base font-semibold text-emerald-950">
                         <Wand2 className="h-4 w-4 text-emerald-700" aria-hidden="true" />
-                        Paste Ingredients (Bulk)
+                        Paste ingredients (bulk)
                       </Label>
                       <Textarea
                         id="recipe-ingredients-paste"
@@ -3452,7 +3832,10 @@ export default function App() {
                         className="bg-white"
                         placeholder={"Chicken breast, 1.5, lb, Sprouts\nGreek yogurt, 32, oz\n1 can black beans"}
                         value={ingredientPasteText}
-                        onChange={(event) => setIngredientPasteText(event.target.value)}
+                        onChange={(event) => {
+                          setIngredientPasteText(event.target.value);
+                          setIngredientPasteSkippedLines([]);
+                        }}
                       />
                       <div className="flex flex-wrap gap-2 pt-1">
                         <Button
@@ -3463,17 +3846,26 @@ export default function App() {
                           disabled={!hasIngredientPasteText}
                         >
                           <Wand2 className="h-4 w-4" aria-hidden="true" />
-                          Generate Ingredients
+                          Generate ingredients
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => setIngredientPasteText("")}
+                          onClick={() => {
+                            setIngredientPasteText("");
+                            setIngredientPasteSkippedLines([]);
+                          }}
                           disabled={!hasIngredientPasteText}
                         >
-                          Clear Paste
+                          Clear paste
                         </Button>
                       </div>
+                      {ingredientPasteSkippedLines.length > 0 ? (
+                        <p className="rounded-md border border-amber-300/90 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                          Skipped {ingredientPasteSkippedLines.length} non-ingredient{" "}
+                          {ingredientPasteSkippedLines.length === 1 ? "line" : "lines"} from paste.
+                        </p>
+                      ) : null}
                       {!hasIngredientPasteText ? (
                         <p className="text-xs font-medium text-emerald-800/75">
                           Paste one or more ingredient lines first.
@@ -3482,7 +3874,7 @@ export default function App() {
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="recipe-steps">How To Make</Label>
+                      <Label htmlFor="recipe-steps">How to make</Label>
                       <Textarea
                         id="recipe-steps"
                         rows={6}
@@ -3500,7 +3892,7 @@ export default function App() {
                   <section className="space-y-4">
                     <div className="grid gap-3 md:grid-cols-3">
                       <div className="space-y-2 md:col-span-1">
-                        <Label htmlFor="recipe-search">Search Recipes</Label>
+                        <Label htmlFor="recipe-search">Search recipes</Label>
                         <Input
                           id="recipe-search"
                           placeholder="Search name, tag, ingredient, steps"
@@ -3509,7 +3901,7 @@ export default function App() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="quick-plan-day">Add To Plan Day</Label>
+                        <Label htmlFor="quick-plan-day">Add to plan day</Label>
                         <Select value={quickPlanDay} onValueChange={setQuickPlanDay}>
                           <SelectTrigger id="quick-plan-day">
                             <SelectValue />
@@ -3524,7 +3916,7 @@ export default function App() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="quick-plan-slot">Meal Slot</Label>
+                        <Label htmlFor="quick-plan-slot">Meal slot</Label>
                         <Select value={quickPlanMealSlot} onValueChange={setQuickPlanMealSlot}>
                           <SelectTrigger id="quick-plan-slot">
                             <SelectValue />
@@ -3541,7 +3933,7 @@ export default function App() {
                     </div>
 
                     {recipeList.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+                      <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
                         No recipes found.
                       </p>
                     ) : (
@@ -3552,7 +3944,7 @@ export default function App() {
                           return (
                             <article
                               key={recipe.id}
-                              className="rounded-xl border border-border/80 bg-white/95 p-4 shadow-sm"
+                              className="rounded-md border border-zinc-200/80 bg-white p-4 shadow-sm"
                             >
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 space-y-1">
@@ -3575,7 +3967,7 @@ export default function App() {
                                     variant="outline"
                                     onClick={() => handleAddRecipeToMealPlan(recipe.id)}
                                   >
-                                    Add To Plan
+                                    Add to plan
                                   </Button>
                                   <div className="relative">
                                     <Button
@@ -3590,10 +3982,10 @@ export default function App() {
                                       <MoreVertical className="h-4 w-4" aria-hidden="true" />
                                     </Button>
                                     {openLibraryMenu === menuKey ? (
-                                      <div className="absolute right-0 top-10 z-20 w-44 rounded-lg border border-border bg-white p-1.5 shadow-lg">
+                                      <div className="absolute right-0 top-10 z-20 w-44 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md">
                                         <button
                                           type="button"
-                                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
                                           onClick={() => handleInlineRecipeEdit(recipe.id)}
                                         >
                                           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3601,7 +3993,7 @@ export default function App() {
                                         </button>
                                         <button
                                           type="button"
-                                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
                                           onClick={() => handleRecipeDuplicate(recipe.id)}
                                         >
                                           <Copy className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3609,7 +4001,7 @@ export default function App() {
                                         </button>
                                         <button
                                           type="button"
-                                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+                                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-destructive hover:bg-destructive/10"
                                           onClick={() => handleRecipeDelete(recipe.id)}
                                         >
                                           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3623,7 +4015,7 @@ export default function App() {
 
                               {isInlineEditing ? (
                                 <form
-                                  className="mt-4 grid gap-3 rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-3 md:grid-cols-2"
+                                  className="mt-4 grid gap-3 rounded-sm border border-zinc-200/80 bg-zinc-50/30 p-3 md:grid-cols-2"
                                   onSubmit={(event) => {
                                     event.preventDefault();
                                     handleInlineRecipeSave(recipe.id);
@@ -3650,7 +4042,7 @@ export default function App() {
                                     />
                                   </div>
                                   <div className="space-y-1">
-                                    <Label htmlFor={`inline-recipe-meal-${recipe.id}`}>Meal Type</Label>
+                                    <Label htmlFor={`inline-recipe-meal-${recipe.id}`}>Meal type</Label>
                                     <Select
                                       value={inlineRecipeForm.mealType}
                                       onValueChange={(value) =>
@@ -3729,7 +4121,7 @@ export default function App() {
                                     />
                                   </div>
                                   <div className="flex flex-wrap gap-2 md:col-span-2">
-                                    <Button type="submit">Save Changes</Button>
+                                    <Button type="submit">Save changes</Button>
                                     <Button type="button" variant="outline" onClick={handleInlineRecipeCancel}>
                                       Cancel
                                     </Button>
@@ -3750,14 +4142,14 @@ export default function App() {
           {isIngredientsTab ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-2xl">Ingredient Directory</CardTitle>
+                <CardTitle className="text-lg">Ingredient directory</CardTitle>
                 <CardDescription>
                   Ingredients stay in list view with inline edit, copy, and delete actions.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="ingredient-search">Search Ingredients</Label>
+                  <Label htmlFor="ingredient-search">Search ingredients</Label>
                   <Input
                     id="ingredient-search"
                     placeholder="Search by name, tag, or store"
@@ -3767,7 +4159,7 @@ export default function App() {
                 </div>
 
                 {isAddingIngredient ? (
-                  <article className="grid items-end gap-3 rounded-lg border border-emerald-300/80 bg-emerald-50/60 p-3 md:grid-cols-[1fr_1fr_220px_auto]">
+                  <article className="grid items-end gap-3 rounded-sm border border-zinc-200/80 bg-zinc-50/40 p-3 md:grid-cols-[1fr_1fr_220px_auto]">
                     <div className="space-y-1">
                       <Label htmlFor="new-inline-ingredient-name">Name</Label>
                       <Input
@@ -3792,7 +4184,7 @@ export default function App() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="new-inline-ingredient-store">Preferred Store</Label>
+                      <Label htmlFor="new-inline-ingredient-store">Preferred store</Label>
                       <Select
                         value={ingredientForm.store}
                         onValueChange={(value) =>
@@ -3823,7 +4215,7 @@ export default function App() {
                 ) : null}
 
                 {filteredIngredientDirectory.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+                  <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
                     No ingredients found.
                   </p>
                 ) : (
@@ -3834,7 +4226,7 @@ export default function App() {
                       return isEditingIngredient ? (
                         <article
                           key={ingredient.name}
-                          className="grid items-end gap-3 rounded-lg border border-emerald-300/80 bg-emerald-50/60 p-3 md:grid-cols-[1fr_1fr_220px_auto]"
+                          className="grid items-end gap-3 rounded-sm border border-zinc-200/80 bg-zinc-50/40 p-3 md:grid-cols-[1fr_1fr_220px_auto]"
                         >
                           <div className="space-y-1">
                             <Label htmlFor={`ingredient-edit-name-${ingredient.name}`}>Name</Label>
@@ -3858,7 +4250,7 @@ export default function App() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label htmlFor={`ingredient-edit-store-${ingredient.name}`}>Preferred Store</Label>
+                            <Label htmlFor={`ingredient-edit-store-${ingredient.name}`}>Preferred store</Label>
                             <Select
                               value={ingredientForm.store}
                               onValueChange={(value) =>
@@ -3889,7 +4281,7 @@ export default function App() {
                       ) : (
                         <article
                           key={ingredient.name}
-                          className="grid items-center gap-2 rounded-lg border border-border/80 bg-white/95 px-3 py-2.5 md:grid-cols-[1fr_180px_auto]"
+                          className="grid items-center gap-2 rounded-md border border-zinc-200/80 bg-white px-3 py-2.5 md:grid-cols-[1fr_180px_auto]"
                         >
                           <div>
                             <p className="font-medium">{displayName(ingredient.name)}</p>
@@ -3913,10 +4305,10 @@ export default function App() {
                               <MoreVertical className="h-4 w-4" aria-hidden="true" />
                             </Button>
                             {openLibraryMenu === menuKey ? (
-                              <div className="absolute right-0 top-10 z-20 w-44 rounded-lg border border-border bg-white p-1.5 shadow-lg">
+                              <div className="absolute right-0 top-10 z-20 w-44 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md">
                                 <button
                                   type="button"
-                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
                                   onClick={() => handleIngredientEdit(ingredient.name)}
                                 >
                                   <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3924,7 +4316,7 @@ export default function App() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
                                   onClick={() => handleIngredientCopy(ingredient.name)}
                                 >
                                   <Copy className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3932,7 +4324,7 @@ export default function App() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-destructive hover:bg-destructive/10"
                                   onClick={() => handleIngredientDelete(ingredient.name)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3955,14 +4347,14 @@ export default function App() {
         <Card>
         <CardHeader className="gap-4">
           <div>
-            <CardTitle className="text-2xl">Step 3: Build Grocery List</CardTitle>
+            <CardTitle className="text-lg">Step 3: Build grocery list</CardTitle>
             <CardDescription>
               Select pickup stores and generate store-ready lists.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={handleBuildGroceryList}>
-              Build Grocery List
+              Build grocery list
             </Button>
             <Button type="button" variant="secondary" onClick={handleCopyAllStores}>
               Copy All Stores
@@ -3976,7 +4368,7 @@ export default function App() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex flex-wrap gap-4 rounded-lg border border-border/80 bg-white/80 p-3">
+          <div className="flex flex-wrap gap-4 rounded-sm border border-border/80 bg-white p-3">
             {stores.map((store) => {
               const count = (groupedGroceries[store] || []).length;
               return (
@@ -4004,7 +4396,7 @@ export default function App() {
                 return (
                   <section
                     key={store}
-                    className="rounded-lg border border-border/80 bg-white/90 p-4 shadow-sm"
+                    className="rounded-md border border-zinc-200/80 bg-white p-4 shadow-sm"
                   >
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <h3 className="font-semibold">{store}</h3>
@@ -4037,13 +4429,13 @@ export default function App() {
               })}
             </div>
           ) : (
-            <p className="rounded-lg border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
-              Select your stores, then click "Build Grocery List".
+            <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+              Select your stores, then click "Build grocery list".
             </p>
           )}
 
           {showGroceries && !hasVisibleGroceries ? (
-            <p className="rounded-lg border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+            <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
               No groceries yet for selected stores. Add recipe meals or adjust day overrides.
             </p>
           ) : null}
@@ -4061,9 +4453,9 @@ export default function App() {
             className="absolute inset-0 bg-zinc-950/35"
             onClick={closeRecipeImportModal}
           />
-          <Card className="relative z-10 w-full max-w-lg border-emerald-200/80 bg-white shadow-xl">
+          <Card className="relative z-10 w-full max-w-lg border-zinc-200/80 bg-white shadow-lg">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-xl text-emerald-950">Import Recipe From URL</CardTitle>
+              <CardTitle className="text-xl text-emerald-950">Import recipe from URL</CardTitle>
               <CardDescription>
                 Paste a recipe URL and we&apos;ll prefill the recipe editor.
               </CardDescription>
@@ -4096,6 +4488,80 @@ export default function App() {
         </div>
       ) : null}
 
+      {recipeDetailsModalRecipe ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close recipe details"
+            className="absolute inset-0 bg-zinc-950/35"
+            onClick={handleCloseRecipeDetailsModal}
+          />
+          <Card className="relative z-10 w-full max-w-2xl border-zinc-200/80 bg-white shadow-lg">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl text-emerald-950">{recipeDetailsModalRecipe.title}</CardTitle>
+              <CardDescription>
+                {MEAL_SLOT_LABELS[normalizeRecipeMealType(recipeDetailsModalRecipe.mealType, "dinner")]} •{" "}
+                {recipeDetailsModalRecipe.servings} servings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="max-h-[70vh] space-y-4 overflow-y-auto">
+              {recipeDetailsModalRecipe.description ? (
+                <p className="text-sm text-muted-foreground">{recipeDetailsModalRecipe.description}</p>
+              ) : null}
+              {recipeDetailsModalRecipe.sourceUrl ? (
+                <p className="text-sm">
+                  <a
+                    href={recipeDetailsModalRecipe.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-emerald-800 underline decoration-emerald-500 underline-offset-4 hover:text-emerald-950"
+                  >
+                    Open source URL
+                  </a>
+                </p>
+              ) : null}
+              <section className="space-y-2">
+                <h3 className="text-sm font-medium text-emerald-900/75">Ingredients</h3>
+                {Array.isArray(recipeDetailsModalRecipe.ingredients) && recipeDetailsModalRecipe.ingredients.length > 0 ? (
+                  <ul className="space-y-1 text-sm">
+                    {recipeDetailsModalRecipe.ingredients.map((ingredient, index) => (
+                      <li key={`${recipeDetailsModalRecipe.id}-ingredient-${index}`}>
+                        {formatItem(ingredient)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No ingredients listed.</p>
+                )}
+              </section>
+              <section className="space-y-2">
+                <h3 className="text-sm font-medium text-emerald-900/75">How to make</h3>
+                {Array.isArray(recipeDetailsModalRecipe.steps) && recipeDetailsModalRecipe.steps.length > 0 ? (
+                  <ol className="list-inside list-decimal space-y-1 text-sm">
+                    {recipeDetailsModalRecipe.steps.map((step, index) => (
+                      <li key={`${recipeDetailsModalRecipe.id}-step-${index}`}>{step}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No steps listed.</p>
+                )}
+              </section>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  onClick={() => handleEditRecipeFromModal(recipeDetailsModalRecipe.id)}
+                >
+                  Edit
+                </Button>
+                <Button type="button" variant="outline" onClick={handleCloseRecipeDetailsModal}>
+                  Close
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
       {noteEditorDay ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <button
@@ -4104,10 +4570,10 @@ export default function App() {
             className="absolute inset-0 bg-zinc-950/35"
             onClick={handleCloseDayNoteEditor}
           />
-          <Card className="relative z-10 w-full max-w-lg border-emerald-200/80 bg-white shadow-xl">
+          <Card className="relative z-10 w-full max-w-lg border-zinc-200/80 bg-white shadow-lg">
             <CardHeader className="space-y-1">
               <CardTitle className="text-xl text-emerald-950">
-                {noteEditorSavedText ? "Edit Note" : "Add Note"}: {noteEditorDay}
+                {noteEditorSavedText ? "Edit note" : "Add note"}: {noteEditorDay}
               </CardTitle>
               <CardDescription>
                 Add context for this day, like schedule constraints or meal preferences.

@@ -51,6 +51,88 @@ const UNIT_MAP = {
   cups: "cup",
 };
 const MAX_INGREDIENT_TAG_LENGTH = 40;
+const UNICODE_FRACTION_MAP = {
+  "¼": "1/4",
+  "½": "1/2",
+  "¾": "3/4",
+  "⅐": "1/7",
+  "⅑": "1/9",
+  "⅒": "1/10",
+  "⅓": "1/3",
+  "⅔": "2/3",
+  "⅕": "1/5",
+  "⅖": "2/5",
+  "⅗": "3/5",
+  "⅘": "4/5",
+  "⅙": "1/6",
+  "⅚": "5/6",
+  "⅛": "1/8",
+  "⅜": "3/8",
+  "⅝": "5/8",
+  "⅞": "7/8",
+};
+const NON_INGREDIENT_LINE_PATTERNS = [
+  /^(add\s+to\s+cart|add\s+all\s+to\s+cart)$/i,
+  /^shop(\s+now)?$/i,
+  /^sold\s*out$/i,
+  /^(select|choose)\s+(size|option|quantity)$/i,
+  /^buy\s+now$/i,
+  /^quick\s*view$/i,
+  /^deselect\s+all$/i,
+  /^view\s+(details|product)$/i,
+];
+const KNOWN_MEASUREMENT_UNITS = new Set([
+  "each",
+  "ea",
+  "cup",
+  "cups",
+  "tbsp",
+  "tablespoon",
+  "tablespoons",
+  "tsp",
+  "teaspoon",
+  "teaspoons",
+  "oz",
+  "ounce",
+  "ounces",
+  "lb",
+  "lbs",
+  "pound",
+  "pounds",
+  "g",
+  "gram",
+  "grams",
+  "kg",
+  "ml",
+  "l",
+  "liter",
+  "liters",
+  "can",
+  "cans",
+  "jar",
+  "jars",
+  "package",
+  "packages",
+  "pack",
+  "packs",
+  "clove",
+  "cloves",
+  "pinch",
+  "pinches",
+  "stick",
+  "sticks",
+  "slice",
+  "slices",
+  "sprig",
+  "sprigs",
+  "bunch",
+  "bunches",
+  "head",
+  "heads",
+  "whole",
+  ...Object.keys(UNIT_MAP),
+  ...Object.values(UNIT_MAP),
+]);
 
 function id(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -314,13 +396,25 @@ export function normalizeRecipes(recipes, availableStores = STORES) {
 }
 
 function parseFractionalNumber(value) {
-  const raw = String(value || "").trim();
+  const raw = String(value || "")
+    .trim()
+    .replace(/\u2044/g, "/")
+    .replace(/(\d)-(\d+\s*\/\s*\d+)/g, "$1 $2");
   if (!raw) {
     return NaN;
   }
 
-  if (/^\d+\s+\d+\/\d+$/.test(raw)) {
-    const [whole, fraction] = raw.split(/\s+/);
+  let normalized = raw;
+  Object.entries(UNICODE_FRACTION_MAP).forEach(([unicode, asciiFraction]) => {
+    normalized = normalized.replaceAll(unicode, ` ${asciiFraction} `);
+  });
+  normalized = normalized
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\s*\/\s*/g, "/");
+
+  if (/^\d+\s+\d+\/\d+$/.test(normalized)) {
+    const [whole, fraction] = normalized.split(/\s+/);
     const [numerator, denominator] = fraction.split("/").map(Number);
     if (!denominator) {
       return NaN;
@@ -328,16 +422,133 @@ function parseFractionalNumber(value) {
     return Number(whole) + numerator / denominator;
   }
 
-  if (/^\d+\/\d+$/.test(raw)) {
-    const [numerator, denominator] = raw.split("/").map(Number);
+  if (/^\d+\/\d+$/.test(normalized)) {
+    const [numerator, denominator] = normalized.split("/").map(Number);
     if (!denominator) {
       return NaN;
     }
     return numerator / denominator;
   }
 
-  const normalized = Number(raw);
-  return Number.isFinite(normalized) ? normalized : NaN;
+  const numeric = Number(normalized.replace(",", "."));
+  return Number.isFinite(numeric) ? numeric : NaN;
+}
+
+function isLikelyNonIngredientLine(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  if (!normalized) {
+    return false;
+  }
+  return NON_INGREDIENT_LINE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function normalizeMeasurementToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[(){}[\],.;:]+/g, "");
+}
+
+function parseLeadingMeasurementTokens(sourceLine, options = {}) {
+  const allowStandaloneUnit = Boolean(options.allowStandaloneUnit);
+  const tokens = String(sourceLine || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  const qtyTokenOptions = [2, 1];
+  for (const qtyTokenLength of qtyTokenOptions) {
+    if (tokens.length < qtyTokenLength) {
+      continue;
+    }
+
+    const qtyToken = tokens.slice(0, qtyTokenLength).join(" ");
+    const parsedQty = parseFractionalNumber(qtyToken);
+    if (!Number.isFinite(parsedQty) || parsedQty <= 0) {
+      continue;
+    }
+
+    const remainderTokens = tokens.slice(qtyTokenLength);
+    if (remainderTokens.length === 0) {
+      return {
+        qty: parsedQty,
+        unit: "each",
+        name: "",
+      };
+    }
+
+    const unitCandidate = normalizeMeasurementToken(remainderTokens[0]);
+    if (KNOWN_MEASUREMENT_UNITS.has(unitCandidate) && (allowStandaloneUnit || remainderTokens.length > 1)) {
+      return {
+        qty: parsedQty,
+        unit: normalizeUnit(unitCandidate || "each"),
+        name: remainderTokens.slice(1).join(" ").trim(),
+      };
+    }
+
+    return {
+      qty: parsedQty,
+      unit: "each",
+      name: remainderTokens.join(" "),
+    };
+  }
+
+  return null;
+}
+
+function stripLeadingParenthesizedMeasurement(value) {
+  let remaining = String(value || "").trim();
+  while (remaining.startsWith("(")) {
+    const match = remaining.match(/^\(\s*([^)]+?)\s*\)\s*(.+)$/);
+    if (!match) {
+      break;
+    }
+    const [, candidateMeasurement, candidateRemainder] = match;
+    if (!parseLeadingMeasurementTokens(candidateMeasurement)) {
+      break;
+    }
+    remaining = candidateRemainder.trim();
+  }
+  return remaining;
+}
+
+function parseLeadingMeasurement(line) {
+  const cleaned = String(line || "").trim();
+  if (!cleaned) {
+    return null;
+  }
+
+  const parenthesizedMatch = cleaned.match(/^\(\s*([^)]+?)\s*\)\s*(.+)$/);
+  if (parenthesizedMatch) {
+    const [, parenthesizedTokens, remainder] = parenthesizedMatch;
+    const parsedParenthesized = parseLeadingMeasurementTokens(parenthesizedTokens, {
+      allowStandaloneUnit: true,
+    });
+    if (parsedParenthesized) {
+      return {
+        qty: parsedParenthesized.qty,
+        unit: parsedParenthesized.unit,
+        name: stripLeadingParenthesizedMeasurement(remainder),
+      };
+    }
+  }
+
+  const parsed = parseLeadingMeasurementTokens(cleaned);
+  if (!parsed) {
+    return null;
+  }
+
+  return {
+    qty: parsed.qty,
+    unit: parsed.unit,
+    name: stripLeadingParenthesizedMeasurement(parsed.name),
+  };
 }
 
 export function normalizeSteps(rawSteps) {
@@ -382,6 +593,9 @@ function isMeaningfulRecipeText(value) {
   if (/^(ingredients?|instructions?|directions?|steps?|method|preparation)$/i.test(normalized)) {
     return false;
   }
+  if (isLikelyNonIngredientLine(normalized)) {
+    return false;
+  }
   return /[a-zA-Z]/.test(normalized);
 }
 
@@ -393,43 +607,27 @@ function parseFreeformIngredient(line, ingredientCatalog, availableStores = STOR
     return null;
   }
 
-  const withUnitMatch = cleaned.match(
-    /^(\d+(?:\.\d+)?|\d+\/\d+|\d+\s+\d+\/\d+)\s+([a-zA-Z]+)\s+(.+)$/,
-  );
-  if (withUnitMatch) {
-    const [, qtyToken, rawUnit, rawName] = withUnitMatch;
-    const parsedQty = parseFractionalNumber(qtyToken);
-    const qty = Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 1;
-    const name = normalizeName(rawName);
+  const leadingMeasurement = parseLeadingMeasurement(cleaned);
+  if (leadingMeasurement) {
+    if (
+      leadingMeasurement.unit === "each"
+      && KNOWN_MEASUREMENT_UNITS.has(normalizeMeasurementToken(leadingMeasurement.name))
+    ) {
+      return null;
+    }
+    const name = normalizeName(leadingMeasurement.name);
     if (!name) {
       return null;
     }
     return {
       name,
-      qty,
-      unit: normalizeUnit(rawUnit || "each"),
+      qty: leadingMeasurement.qty,
+      unit: normalizeUnit(leadingMeasurement.unit || "each"),
       store: resolveIngredientStore(name, "", ingredientCatalog, availableStores),
     };
   }
 
-  const qtyOnlyMatch = cleaned.match(/^(\d+(?:\.\d+)?|\d+\/\d+|\d+\s+\d+\/\d+)\s+(.+)$/);
-  if (qtyOnlyMatch) {
-    const [, qtyToken, rawName] = qtyOnlyMatch;
-    const parsedQty = parseFractionalNumber(qtyToken);
-    const qty = Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 1;
-    const name = normalizeName(rawName);
-    if (!name) {
-      return null;
-    }
-    return {
-      name,
-      qty,
-      unit: "each",
-      store: resolveIngredientStore(name, "", ingredientCatalog, availableStores),
-    };
-  }
-
-  const name = normalizeName(cleaned);
+  const name = normalizeName(stripLeadingParenthesizedMeasurement(cleaned));
   if (!name) {
     return null;
   }
@@ -692,46 +890,68 @@ function resolveIngredientStore(name, rawStore, ingredientCatalog, availableStor
 }
 
 export function parseIngredients(text, ingredientCatalog, availableStores = STORES) {
-  const lines = String(text || "")
+  return parseIngredientsWithDiagnostics(text, ingredientCatalog, availableStores).ingredients;
+}
+
+function toIngredientLines(text) {
+  return String(text || "")
     .replace(/<br\s*\/?>/gi, "\n")
     .split("\n")
     .map((line) => line.replace(/<[^>]+>/g, " "))
     .map((line) => decodeHtmlEntities(line))
     .map((line) => line.trim())
     .filter(Boolean);
+}
 
-  return lines
-    .map((line) => {
-      if (!line.includes(",")) {
-        return parseFreeformIngredient(line, ingredientCatalog, availableStores);
-      }
+function parseCsvIngredient(line, ingredientCatalog, availableStores) {
+  const [rawName = "", rawQty = "", rawUnit = "", rawStore = ""] = line
+    .split(",")
+    .map((part) => decodeHtmlEntities(part).trim());
 
-      const [rawName = "", rawQty = "", rawUnit = "", rawStore = ""] = line
-        .split(",")
-        .map((part) => decodeHtmlEntities(part).trim());
+  if (!isMeaningfulRecipeText(rawName) || isLikelyNonIngredientLine(rawName)) {
+    return null;
+  }
 
-      if (!isMeaningfulRecipeText(rawName)) {
-        return null;
-      }
+  const name = normalizeName(rawName);
+  if (!name) {
+    return null;
+  }
 
-      const name = normalizeName(rawName);
-      if (!name) {
-        return null;
-      }
+  const parsedQty = parseFractionalNumber(rawQty);
+  const qty = Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 1;
+  const unit = normalizeUnit(rawUnit || "each");
+  const store = resolveIngredientStore(name, rawStore, ingredientCatalog, availableStores);
 
-      const parsedQty = parseFractionalNumber(rawQty);
-      const qty = Number.isFinite(parsedQty) && parsedQty > 0 ? parsedQty : 1;
-      const unit = normalizeUnit(rawUnit || "each");
-      const store = resolveIngredientStore(name, rawStore, ingredientCatalog, availableStores);
+  return {
+    name,
+    qty,
+    unit,
+    store,
+  };
+}
 
-      return {
-        name,
-        qty,
-        unit,
-        store,
-      };
-    })
-    .filter(Boolean);
+function parseIngredientLine(line, ingredientCatalog, availableStores) {
+  if (!line.includes(",")) {
+    return parseFreeformIngredient(line, ingredientCatalog, availableStores);
+  }
+  return parseCsvIngredient(line, ingredientCatalog, availableStores);
+}
+
+export function parseIngredientsWithDiagnostics(text, ingredientCatalog, availableStores = STORES) {
+  const lines = toIngredientLines(text);
+  const ingredients = [];
+  const skippedLines = [];
+
+  lines.forEach((line) => {
+    const parsed = parseIngredientLine(line, ingredientCatalog, availableStores);
+    if (parsed) {
+      ingredients.push(parsed);
+      return;
+    }
+    skippedLines.push(line);
+  });
+
+  return { ingredients, skippedLines };
 }
 
 function cleanRecipeLine(line) {

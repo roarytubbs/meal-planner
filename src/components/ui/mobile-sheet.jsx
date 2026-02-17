@@ -38,7 +38,7 @@ export function MobileSheet({ children, open, onClose, title }) {
         className="absolute inset-0 bg-zinc-950/45"
         onClick={onClose}
       />
-      <section className="absolute inset-x-0 bottom-0 max-h-[82vh] rounded-t-2xl border border-emerald-200 bg-white shadow-2xl">
+      <section className="absolute inset-x-0 bottom-0 max-h-[82vh] rounded-t-md border border-emerald-200 bg-white shadow-2xl">
         <header className="flex items-center justify-between border-b border-emerald-100 px-4 py-3">
           <h3 className="text-sm font-semibold text-emerald-950">{title}</h3>
           <Button type="button" size="icon" variant="ghost" onClick={onClose} aria-label="Close sheet">
