@@ -35,12 +35,12 @@ export function MobileSheet({ children, open, onClose, title }) {
       <button
         type="button"
         aria-label="Close shopping list"
-        className="absolute inset-0 bg-zinc-950/45"
+        className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
-      <section className="absolute inset-x-0 bottom-0 max-h-[82vh] rounded-t-md border border-emerald-200 bg-white shadow-2xl">
-        <header className="flex items-center justify-between border-b border-emerald-100 px-4 py-3">
-          <h3 className="text-sm font-semibold text-emerald-950">{title}</h3>
+      <section className="absolute inset-x-0 bottom-0 max-h-[82vh] rounded-t-md border border-border bg-card shadow-2xl">
+        <header className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
           <Button type="button" size="icon" variant="ghost" onClick={onClose} aria-label="Close sheet">
             <X className="h-4 w-4" aria-hidden="true" />
           </Button>

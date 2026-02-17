@@ -5,33 +5,58 @@
 @tailwind utilities;
 
 :root {
-  --background: 126 28% 96%;
-  --foreground: 148 26% 14%;
+  --background: 42 24% 97%;
+  --foreground: 28 14% 14%;
   --card: 0 0% 100%;
-  --card-foreground: 148 26% 14%;
+  --card-foreground: 28 14% 14%;
   --popover: 0 0% 100%;
-  --popover-foreground: 148 26% 14%;
-  --primary: 148 56% 34%;
-  --primary-foreground: 120 30% 98%;
-  --secondary: 125 35% 90%;
-  --secondary-foreground: 146 38% 20%;
-  --muted: 128 27% 92%;
-  --muted-foreground: 144 17% 36%;
-  --accent: 128 33% 84%;
-  --accent-foreground: 146 33% 18%;
+  --popover-foreground: 28 14% 14%;
+  --primary: 26 10% 22%;
+  --primary-foreground: 42 24% 97%;
+  --secondary: 34 20% 93%;
+  --secondary-foreground: 28 14% 22%;
+  --muted: 34 18% 92%;
+  --muted-foreground: 32 10% 42%;
+  --accent: 34 24% 89%;
+  --accent-foreground: 28 14% 22%;
   --destructive: 3 72% 47%;
   --destructive-foreground: 0 0% 100%;
-  --border: 130 24% 80%;
-  --input: 130 24% 80%;
-  --ring: 148 46% 38%;
-  --radius: 0.25rem;
+  --border: 34 16% 83%;
+  --input: 34 16% 83%;
+  --ring: 26 12% 45%;
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: 24 10% 12%;
+  --foreground: 40 18% 93%;
+  --card: 24 10% 14%;
+  --card-foreground: 40 18% 93%;
+  --popover: 24 10% 14%;
+  --popover-foreground: 40 18% 93%;
+  --primary: 40 20% 93%;
+  --primary-foreground: 24 10% 14%;
+  --secondary: 24 10% 22%;
+  --secondary-foreground: 40 18% 93%;
+  --muted: 24 10% 20%;
+  --muted-foreground: 35 10% 72%;
+  --accent: 24 10% 24%;
+  --accent-foreground: 40 18% 93%;
+  --destructive: 0 62% 36%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 24 10% 28%;
+  --input: 24 10% 28%;
+  --ring: 34 16% 64%;
 }
 
 * {
-  @apply border-border;
+  @apply border-border/80;
 }
 
 body {
   @apply bg-background text-foreground font-sans antialiased;
+  background-image:
+    radial-gradient(1200px 560px at 0% -10%, hsl(var(--accent) / 0.35), transparent 60%),
+    radial-gradient(920px 460px at 100% -20%, hsl(var(--secondary) / 0.28), transparent 58%);
   min-height: 100vh;
 }

@@ -51,7 +51,7 @@ export function DayActionMenu({
         type="button"
         size="sm"
         variant="outline"
-        className="h-9 w-9 border-zinc-200 p-0"
+        className="h-9 w-9 border-border p-0"
         aria-label={`Open actions for ${day}`}
         aria-haspopup="menu"
         aria-expanded={isOpen}
@@ -62,14 +62,14 @@ export function DayActionMenu({
 
       {isOpen ? (
         <div
-          className="absolute right-0 top-11 z-20 w-48 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md"
+          className="absolute right-0 top-11 z-20 w-48 rounded-md border border-border bg-card p-1.5 shadow-md"
           role="menu"
           aria-label={`${day} actions`}
         >
           <button
             type="button"
             role="menuitem"
-            className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 transition hover:bg-zinc-100"
+            className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-accent"
             onClick={() => {
               onToggleEdit();
               onClose();
@@ -80,7 +80,7 @@ export function DayActionMenu({
           <button
             type="button"
             role="menuitem"
-            className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 transition hover:bg-zinc-100"
+            className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-accent"
             onClick={() => {
               onResetDay();
               onClose();
@@ -91,7 +91,7 @@ export function DayActionMenu({
           <button
             type="button"
             role="menuitem"
-            className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 transition hover:bg-zinc-100"
+            className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-accent"
             onClick={() => {
               onOpenNoteEditor();
               onClose();
