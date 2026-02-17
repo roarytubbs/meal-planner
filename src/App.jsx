@@ -2776,20 +2776,20 @@ export default function App() {
 
   const liveReceiptPanelContent = (
     <>
-      <div className="mb-3 border-b border-emerald-200 pb-3">
-        <p className="text-xs font-medium text-emerald-900/70">
+      <div className="mb-3 border-b border-border pb-3">
+        <p className="text-xs font-medium text-muted-foreground">
           Live Grocery Receipt
         </p>
         <div className="mt-1 flex items-center gap-2">
-          <p className="text-sm font-semibold text-emerald-950">
+          <p className="text-sm font-semibold text-foreground">
             {liveReceiptItemCount} item{liveReceiptItemCount === 1 ? "" : "s"} so far
           </p>
           {receiptDelta ? (
             <span
               className={
                 receiptDelta.value > 0
-                  ? "rounded-full border border-emerald-400 bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800"
-                  : "rounded-full border border-zinc-300 bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700"
+                  ? "rounded-full border border-ring/40 bg-accent px-2 py-0.5 text-xs font-semibold text-foreground"
+                  : "rounded-full border border-border bg-accent px-2 py-0.5 text-xs font-semibold text-muted-foreground"
               }
             >
               {receiptDelta.label}
@@ -2804,7 +2804,7 @@ export default function App() {
       ) : (
         <div className="space-y-3">
           {liveReceiptStores.map((store) => (
-            <section key={`receipt-${store}`} className="space-y-1 rounded-md border border-border/70 bg-white p-2">
+            <section key={`receipt-${store}`} className="space-y-1 rounded-md border border-border/70 bg-card p-2">
               <p className="text-xs font-medium text-muted-foreground">
                 {store}
               </p>
@@ -2813,7 +2813,7 @@ export default function App() {
                   const sources =
                     receiptSourceMap.get(getReceiptItemKey(store, item.name, item.unit)) || [];
                   return (
-                    <li key={`receipt-${store}-${item.name}-${item.unit}`} className="rounded-md bg-zinc-50/30 p-1.5 text-xs">
+                    <li key={`receipt-${store}-${item.name}-${item.unit}`} className="rounded-md bg-muted/30 p-1.5 text-xs">
                       <p>{formatItem(item)}</p>
                       {sources.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1">
@@ -2821,7 +2821,7 @@ export default function App() {
                             <button
                               key={`${store}-${item.name}-${item.unit}-${source.sourceKey}`}
                               type="button"
-                              className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-800 hover:border-emerald-400"
+                              className="rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-semibold text-foreground hover:border-ring/40"
                               onClick={() => handleReceiptSourceClick(source.day)}
                             >
                               {source.label}
@@ -2900,11 +2900,11 @@ export default function App() {
   ]);
 
   const topNav = (
-    <section className="rounded-md border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+    <section className="rounded-xl border border-border bg-card px-4 py-3 shadow-soft">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 text-zinc-700"
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground"
           onClick={handleOpenHome}
           aria-label="Go to home"
         >
@@ -2914,12 +2914,12 @@ export default function App() {
           </div>
         </button>
 
-        <div className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50/60 p-0.5">
+        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/60 p-0.5">
           <Button
             type="button"
             size="sm"
             variant={isPlannerWorkflow ? "default" : "ghost"}
-            className={isPlannerWorkflow ? "" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"}
+            className={isPlannerWorkflow ? "" : "text-muted-foreground hover:bg-accent hover:text-foreground"}
             onClick={handleOpenPlannerWorkflow}
           >
             Meal plan
@@ -2928,7 +2928,7 @@ export default function App() {
             type="button"
             size="sm"
             variant={isRecipeWorkflow ? "default" : "ghost"}
-            className={isRecipeWorkflow ? "" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"}
+            className={isRecipeWorkflow ? "" : "text-muted-foreground hover:bg-accent hover:text-foreground"}
             onClick={handleOpenRecipeLibrary}
           >
             Recipes
@@ -2937,7 +2937,7 @@ export default function App() {
             type="button"
             size="sm"
             variant={isStoreWorkflow ? "default" : "ghost"}
-            className={isStoreWorkflow ? "" : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"}
+            className={isStoreWorkflow ? "" : "text-muted-foreground hover:bg-accent hover:text-foreground"}
             onClick={handleOpenStoreManagement}
           >
             Stores
@@ -2963,7 +2963,7 @@ export default function App() {
               size="icon"
               variant="outline"
               ref={landingAddRecipeTriggerRef}
-              className="h-9 w-9 rounded-l-none border-zinc-200 p-0"
+              className="h-9 w-9 rounded-l-none border-border p-0"
               aria-haspopup="menu"
               aria-expanded={isLandingAddRecipeMenuOpen}
               aria-label="Open add recipe options"
@@ -2980,14 +2980,14 @@ export default function App() {
             </Button>
             {isLandingAddRecipeMenuOpen ? (
               <div
-                className="absolute right-0 top-11 z-20 w-48 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md"
+                className="absolute right-0 top-11 z-20 w-48 rounded-xl border border-border bg-card p-1.5 shadow-md"
                 role="menu"
                 aria-label="Add recipe options"
               >
                 <button
                   type="button"
                   role="menuitem"
-                  className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                  className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                   onClick={handleCreateRecipeFlow}
                 >
                   Manual
@@ -2995,7 +2995,7 @@ export default function App() {
                 <button
                   type="button"
                   role="menuitem"
-                  className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                  className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                   onClick={openRecipeImportModal}
                 >
                   Import from URL
@@ -3010,12 +3010,12 @@ export default function App() {
 
   if (workflowScreen === WORKFLOW_SCREENS.landing) {
     return (
-      <main className="mx-auto min-h-screen max-w-6xl space-y-4 px-4 py-6 md:px-8 md:py-10">
+      <main className="mx-auto min-h-screen max-w-7xl space-y-4 px-4 py-6 md:px-8 md:py-10">
         {topNav}
-        <section className="rounded-md border border-zinc-200/80 bg-white p-5 shadow-sm md:p-6">
+        <section className="rounded-xl border border-border bg-card p-5 shadow-soft md:p-6">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4">
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 md:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
                 Meal planner
               </h1>
               <p className="max-w-2xl text-sm text-muted-foreground">
@@ -3025,25 +3025,25 @@ export default function App() {
               <div className="flex max-w-md flex-wrap items-center gap-4">
                 <button
                   type="button"
-                  className="inline-flex items-end gap-2 text-left transition hover:text-zinc-950"
+                  className="inline-flex items-end gap-2 text-left transition hover:text-foreground"
                   onClick={handleOpenRecipeLibrary}
                 >
-                  <p className="text-xl font-semibold leading-none text-zinc-900">{sortedRecipes.length}</p>
+                  <p className="text-xl font-semibold leading-none text-foreground">{sortedRecipes.length}</p>
                   <p className="text-xs font-medium text-muted-foreground">Recipes</p>
                 </button>
                 <span className="h-5 w-px bg-border/80" aria-hidden="true" />
                 <button
                   type="button"
-                  className="inline-flex items-end gap-2 text-left transition hover:text-zinc-950"
+                  className="inline-flex items-end gap-2 text-left transition hover:text-foreground"
                   onClick={handleOpenIngredientLibrary}
                 >
-                  <p className="text-xl font-semibold leading-none text-zinc-900">{ingredientDirectory.length}</p>
+                  <p className="text-xl font-semibold leading-none text-foreground">{ingredientDirectory.length}</p>
                   <p className="text-xs font-medium text-muted-foreground">Ingredients</p>
                 </button>
               </div>
             </div>
 
-            <aside className="rounded-md border border-zinc-200/70 bg-zinc-50/40 p-4">
+            <aside className="rounded-md border border-border/80 bg-muted/40 p-4">
               <p className="text-xs font-medium text-muted-foreground">
                 This week&apos;s menu
               </p>
@@ -3052,7 +3052,7 @@ export default function App() {
                   <p className="text-xs font-medium text-muted-foreground">Current menu</p>
                   <button
                     type="button"
-                    className="mt-1 text-sm font-medium text-zinc-700 underline decoration-zinc-400 underline-offset-4 transition hover:text-zinc-950"
+                    className="mt-1 text-sm font-medium text-muted-foreground underline decoration-border underline-offset-4 transition hover:text-foreground"
                     onClick={handleOpenCurrentMenu}
                   >
                     Open this week&apos;s menu
@@ -3071,7 +3071,7 @@ export default function App() {
                         <li key={menu.id}>
                           <button
                             type="button"
-                            className="text-sm font-medium text-zinc-700 underline decoration-zinc-400 underline-offset-4 transition hover:text-zinc-950"
+                            className="text-sm font-medium text-muted-foreground underline decoration-border underline-offset-4 transition hover:text-foreground"
                             onClick={() => handleOpenPreviousMenu(menu.id)}
                           >
                             {menu.label}
@@ -3092,12 +3092,12 @@ export default function App() {
             <button
               type="button"
               aria-label="Close import modal"
-              className="absolute inset-0 bg-zinc-950/35"
+              className="absolute inset-0 bg-black/45"
               onClick={closeRecipeImportModal}
             />
-            <Card className="relative z-10 w-full max-w-lg border-zinc-200/80 bg-white shadow-lg">
+            <Card className="relative z-10 w-full max-w-lg border-border bg-card shadow-lg">
               <CardHeader className="space-y-1">
-                <CardTitle className="text-xl text-emerald-950">Import recipe from URL</CardTitle>
+                <CardTitle className="text-xl text-foreground">Import recipe from URL</CardTitle>
                 <CardDescription>
                   Paste a recipe URL and we&apos;ll prefill the recipe editor.
                 </CardDescription>
@@ -3134,10 +3134,10 @@ export default function App() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl space-y-4 px-4 py-6 md:px-8 md:py-10">
+    <main className="mx-auto min-h-screen max-w-7xl space-y-4 px-4 py-6 md:px-8 md:py-10">
       {topNav}
 
-      <section className="rounded-md border border-zinc-200/80 bg-white px-4 py-5 shadow-sm md:px-6 md:py-6">
+      <section className="rounded-xl border border-border bg-card px-4 py-5 shadow-soft md:px-6 md:py-6">
         <div className="space-y-5">
           <nav aria-label="Breadcrumb" className="text-xs">
             <ol className="flex flex-wrap items-center gap-1 text-muted-foreground">
@@ -3211,11 +3211,11 @@ export default function App() {
           ) : null}
 
           {isPlannerWorkflow ? (
-        <Card className="rounded-md border border-zinc-200/80 bg-white shadow-sm">
+        <Card className="rounded-xl border border-border bg-card shadow-soft">
           <CardHeader className="gap-2">
             <div>
-              <CardTitle className="text-lg text-emerald-950">Plan basics</CardTitle>
-              <CardDescription className="mt-1 text-emerald-900/70">
+              <CardTitle className="text-lg text-foreground">Plan basics</CardTitle>
+              <CardDescription className="mt-1 text-muted-foreground">
                 Name the plan and day count before day setup.
               </CardDescription>
             </div>
@@ -3223,15 +3223,15 @@ export default function App() {
           <CardContent className="pt-4">
             {isStep1ReadOnly ? (
               <div className="grid gap-4 md:grid-cols-2">
-                <article className="rounded-sm border border-border/60 bg-white/70 p-3">
+                <article className="rounded-sm border border-border/60 bg-card/70 p-3">
                   <p className="text-xs font-medium text-muted-foreground">Meal plan name</p>
                   <p className="mt-1 text-sm font-semibold">{state.mealPlanName || "-"}</p>
                 </article>
-                <article className="rounded-sm border border-border/60 bg-white/70 p-3">
+                <article className="rounded-sm border border-border/60 bg-card/70 p-3">
                   <p className="text-xs font-medium text-muted-foreground">Days in plan</p>
                   <p className="mt-1 text-sm font-semibold">{planningDays}</p>
                 </article>
-                <article className="rounded-sm border border-border/60 bg-white/70 p-3 md:col-span-2">
+                <article className="rounded-sm border border-border/60 bg-card/70 p-3 md:col-span-2">
                   <p className="text-xs font-medium text-muted-foreground">Description</p>
                   <p className="mt-1 text-sm">{state.mealPlanDescription || "No description."}</p>
                 </article>
@@ -3304,11 +3304,11 @@ export default function App() {
           ) : null}
 
           {isPlannerWorkflow && plannerStep >= 2 ? (
-        <Card className="rounded-md border border-zinc-200/80 bg-white shadow-sm">
+        <Card className="rounded-xl border border-border bg-card shadow-soft">
           <CardHeader className="gap-3 pb-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <CardTitle className="text-lg text-emerald-950">Day setup</CardTitle>
-              <CardDescription className="text-emerald-900/70">
+              <CardTitle className="text-lg text-foreground">Day setup</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Set meals by day with quick day actions and live grocery feedback.
               </CardDescription>
             </div>
@@ -3359,12 +3359,12 @@ export default function App() {
                           delete dayCardRefs.current[day];
                         }
                       }}
-                      className="rounded-md border border-zinc-200/80 bg-white p-3 shadow-sm"
+                      className="rounded-xl border border-border bg-card p-3 shadow-soft"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-xl font-semibold tracking-tight text-emerald-950">{day}</p>
-                          <p className="mt-1 text-xs text-emerald-900/75">
+                          <p className="text-xl font-semibold tracking-tight text-foreground">{day}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
                             {plannedRecipeMeals} recipe meal{plannedRecipeMeals === 1 ? "" : "s"} planned •{" "}
                             {dayIngredientCount} ingredient{dayIngredientCount === 1 ? "" : "s"} selected
                           </p>
@@ -3410,7 +3410,7 @@ export default function App() {
                               return (
                                 <div
                                   key={`${day}-${mealSlot}`}
-                                  className="grid gap-2 rounded-md border border-zinc-200/70 bg-white p-2 md:grid-cols-[120px_120px_1fr_96px]"
+                                  className="grid gap-2 rounded-xl border border-border/80 bg-card p-2 md:grid-cols-[120px_120px_1fr_96px]"
                                 >
                                   <div className="space-y-1">
                                     <p className="text-sm font-semibold">{MEAL_SLOT_LABELS[mealSlot]}</p>
@@ -3482,12 +3482,12 @@ export default function App() {
                                           <div
                                             id={`meal-picker-options-${day}-${mealSlot}`}
                                             role="listbox"
-                                            className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 max-h-56 overflow-y-auto rounded-md border border-zinc-200 bg-white p-1.5 shadow-md"
+                                            className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 max-h-56 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-md"
                                           >
                                             <button
                                               type="button"
                                               role="option"
-                                              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                                               onClick={() => handleMealRecipePickerSelect(day, mealSlot, NO_RECIPE)}
                                             >
                                               <span>No recipe selected</span>
@@ -3498,7 +3498,7 @@ export default function App() {
                                                   key={recipe.id}
                                                   type="button"
                                                   role="option"
-                                                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                                                   onClick={() =>
                                                     handleMealRecipePickerSelect(day, mealSlot, recipe.id)
                                                   }
@@ -3518,14 +3518,14 @@ export default function App() {
                                         ) : null}
                                       </div>
                                       {selectedRecipe ? (
-                                        <div className="flex flex-wrap items-center gap-3 text-xs text-emerald-800/80">
+                                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                                           <p>
                                             {(selectedRecipe.ingredients || []).length} ingredients •{" "}
                                             {(selectedRecipe.steps || []).length} steps
                                           </p>
                                           <button
                                             type="button"
-                                            className="font-semibold underline decoration-emerald-500 underline-offset-4 transition hover:text-emerald-950"
+                                            className="font-semibold underline decoration-primary/60 underline-offset-4 transition hover:text-foreground"
                                             onClick={() => handleOpenRecipeDetailsModal(selectedRecipe.id)}
                                           >
                                             View full recipe
@@ -3575,14 +3575,14 @@ export default function App() {
                 </div>
               </section>
 
-              <aside className="hidden rounded-md border border-zinc-200/70 bg-zinc-50/40 p-4 shadow-sm xl:sticky xl:top-4 xl:block xl:h-fit">
+              <aside className="hidden rounded-md border border-border/80 bg-muted/40 p-4 shadow-soft xl:sticky xl:top-4 xl:block xl:h-fit">
                 {liveReceiptPanelContent}
               </aside>
             </div>
             <div className="xl:hidden">
               <Button
                 type="button"
-                className="fixed bottom-4 right-4 z-30 rounded-full bg-emerald-700 px-4 py-2 text-white shadow-md hover:bg-emerald-700/90"
+                className="fixed bottom-4 right-4 z-30 rounded-full bg-primary px-4 py-2 text-white shadow-md hover:bg-primary/90"
                 onClick={() => setIsMobileReceiptOpen(true)}
               >
                 Shopping list ({liveReceiptItemCount})
@@ -3602,7 +3602,7 @@ export default function App() {
           {isRecipeWorkflow ? (
         <>
           {!isRecipeCreatePage ? (
-            <Card className="border-zinc-200/70 bg-white shadow-sm">
+            <Card className="border-border/80 bg-card shadow-soft">
             <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -3690,9 +3690,9 @@ export default function App() {
               <CardContent className="space-y-5">
                 {isRecipeCreatePage ? (
                   <form className="grid gap-4 pb-28 md:grid-cols-2 md:pb-4" onSubmit={handleRecipeSubmit}>
-                    <div className="order-first hidden md:sticky md:top-3 md:z-20 md:col-span-2 md:flex md:items-center md:justify-between md:rounded-md md:border md:border-emerald-200 md:bg-white md:p-3 md:shadow-sm md:backdrop-blur">
+                    <div className="order-first hidden md:sticky md:top-3 md:z-20 md:col-span-2 md:flex md:items-center md:justify-between md:rounded-md md:border md:border-border md:bg-card md:p-3 md:shadow-soft md:backdrop-blur">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-emerald-950">
+                        <p className="text-sm font-semibold text-foreground">
                           {recipeDraftModeLabel}
                         </p>
                         {isRecipeDraftDirty ? (
@@ -3711,10 +3711,10 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-200 bg-white p-3 backdrop-blur md:hidden">
-                      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 pb-[env(safe-area-inset-bottom)]">
+                    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card p-3 backdrop-blur md:hidden">
+                      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 pb-[env(safe-area-inset-bottom)]">
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold text-emerald-950">
+                          <p className="truncate text-xs font-semibold text-foreground">
                             {isRecipeDraftDirty ? "Unsaved changes" : "Draft saved"}
                           </p>
                         </div>
@@ -3816,27 +3816,27 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="space-y-3 rounded-md border border-zinc-200/80 bg-white p-4 md:col-span-2 md:p-5">
+                    <div className="space-y-3 rounded-xl border border-border bg-card p-4 md:col-span-2 md:p-5">
                       <div className="flex items-start gap-2">
-                        <div className="mt-0.5 rounded-md border border-emerald-200 bg-zinc-100/70 p-1.5 text-emerald-700">
+                        <div className="mt-0.5 rounded-md border border-border bg-accent/40 p-1.5 text-primary">
                           <ListChecks className="h-4 w-4" aria-hidden="true" />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-base font-semibold text-emerald-950">Add ingredients</Label>
-                          <p className="text-sm text-emerald-900/75">
+                          <Label className="text-base font-semibold text-foreground">Add ingredients</Label>
+                          <p className="text-sm text-muted-foreground">
                             Choose how you want to add each ingredient.
                           </p>
                         </div>
                       </div>
 
-                      <div className="grid gap-2 rounded-md border border-zinc-200/80 bg-zinc-50/40 p-1 md:grid-cols-2">
+                      <div className="grid gap-2 rounded-md border border-border bg-muted/40 p-1 md:grid-cols-2">
                         <Button
                           type="button"
                           variant="ghost"
                           className={
                             isDirectoryIngredientMode
-                              ? "h-11 rounded-sm bg-emerald-700 text-white shadow-sm hover:bg-emerald-700/95"
-                              : "h-11 rounded-sm bg-transparent text-emerald-900 hover:bg-white"
+                              ? "h-11 rounded-sm bg-primary text-white shadow-soft hover:bg-primary/95"
+                              : "h-11 rounded-sm bg-transparent text-foreground hover:bg-card"
                           }
                           onClick={() => handleRecipeIngredientModeChange(RECIPE_INGREDIENT_MODES.directory)}
                         >
@@ -3848,8 +3848,8 @@ export default function App() {
                           variant="ghost"
                           className={
                             isCustomIngredientMode
-                              ? "h-11 rounded-sm bg-emerald-700 text-white shadow-sm hover:bg-emerald-700/95"
-                              : "h-11 rounded-sm bg-transparent text-emerald-900 hover:bg-white"
+                              ? "h-11 rounded-sm bg-primary text-white shadow-soft hover:bg-primary/95"
+                              : "h-11 rounded-sm bg-transparent text-foreground hover:bg-card"
                           }
                           onClick={() => handleRecipeIngredientModeChange(RECIPE_INGREDIENT_MODES.custom)}
                         >
@@ -3866,15 +3866,15 @@ export default function App() {
                         }
                       >
                         <div
-                          className="space-y-3 rounded-md border border-zinc-200/80 bg-white p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.8)]"
+                          className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.8)]"
                           onKeyDown={handleDirectoryIngredientKeyDown}
                         >
-                          <p className="text-sm text-emerald-900/75">
+                          <p className="text-sm text-muted-foreground">
                             Pick an ingredient from your directory, then set quantity, unit, and store.
                           </p>
                           <div className="grid gap-3 md:grid-cols-[1.3fr_120px_140px_220px]">
                             <div className="space-y-2">
-                              <Label htmlFor="recipe-ingredient-name" className="text-xs font-medium text-emerald-900/70">
+                              <Label htmlFor="recipe-ingredient-name" className="text-xs font-medium text-muted-foreground">
                                 Name
                               </Label>
                               <Input
@@ -3892,7 +3892,7 @@ export default function App() {
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="recipe-ingredient-qty" className="text-xs font-medium text-emerald-900/70">
+                              <Label htmlFor="recipe-ingredient-qty" className="text-xs font-medium text-muted-foreground">
                                 Qty
                               </Label>
                               <Input
@@ -3908,7 +3908,7 @@ export default function App() {
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="recipe-ingredient-unit" className="text-xs font-medium text-emerald-900/70">
+                              <Label htmlFor="recipe-ingredient-unit" className="text-xs font-medium text-muted-foreground">
                                 Unit
                               </Label>
                               <Input
@@ -3922,7 +3922,7 @@ export default function App() {
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="recipe-ingredient-store" className="text-xs font-medium text-emerald-900/70">
+                              <Label htmlFor="recipe-ingredient-store" className="text-xs font-medium text-muted-foreground">
                                 Preferred store
                               </Label>
                               <Select
@@ -3948,7 +3948,7 @@ export default function App() {
                           <div className="flex flex-wrap gap-2 pt-1">
                             <Button
                               type="button"
-                              className="min-w-[150px] bg-emerald-700 text-white hover:bg-emerald-700/90"
+                              className="min-w-[150px] bg-primary text-white hover:bg-primary/90"
                               onClick={handleSaveRecipeIngredient}
                               disabled={!canSaveRecipeIngredient}
                             >
@@ -3957,7 +3957,7 @@ export default function App() {
                             </Button>
                           </div>
                           {!canSaveRecipeIngredient ? (
-                            <p className="text-xs font-medium text-emerald-800/75">
+                            <p className="text-xs font-medium text-muted-foreground">
                               Select an ingredient from your directory to enable add.
                             </p>
                           ) : null}
@@ -3972,15 +3972,15 @@ export default function App() {
                         }
                       >
                         <div
-                          className="space-y-3 rounded-md border border-dashed border-zinc-200/80 bg-zinc-50/30 p-4"
+                          className="space-y-3 rounded-md border border-dashed border-border bg-muted/30 p-4"
                           onKeyDown={handleCustomIngredientKeyDown}
                         >
-                          <p className="text-sm text-emerald-900/75">
+                          <p className="text-sm text-muted-foreground">
                             Create a custom ingredient. It will be saved to your directory and added to this recipe.
                           </p>
                           <div className="grid gap-3 md:grid-cols-[1.3fr_120px_140px_220px]">
                             <div className="space-y-2">
-                              <Label htmlFor="new-ingredient-name" className="text-xs font-medium text-emerald-900/70">
+                              <Label htmlFor="new-ingredient-name" className="text-xs font-medium text-muted-foreground">
                                 Name
                               </Label>
                               <Input
@@ -3993,7 +3993,7 @@ export default function App() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="new-ingredient-qty" className="text-xs font-medium text-emerald-900/70">
+                              <Label htmlFor="new-ingredient-qty" className="text-xs font-medium text-muted-foreground">
                                 Qty
                               </Label>
                               <Input
@@ -4008,7 +4008,7 @@ export default function App() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="new-ingredient-unit" className="text-xs font-medium text-emerald-900/70">
+                              <Label htmlFor="new-ingredient-unit" className="text-xs font-medium text-muted-foreground">
                                 Unit
                               </Label>
                               <Input
@@ -4021,7 +4021,7 @@ export default function App() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="new-ingredient-store" className="text-xs font-medium text-emerald-900/70">
+                              <Label htmlFor="new-ingredient-store" className="text-xs font-medium text-muted-foreground">
                                 Preferred store
                               </Label>
                               <Select
@@ -4046,7 +4046,7 @@ export default function App() {
 
                           <Button
                             type="button"
-                            className="min-w-[220px] bg-emerald-700 text-white hover:bg-emerald-700/90"
+                            className="min-w-[220px] bg-primary text-white hover:bg-primary/90"
                             onClick={handleCreateNewIngredient}
                             disabled={!canCreateRecipeIngredient}
                           >
@@ -4054,7 +4054,7 @@ export default function App() {
                             Create Ingredient + Add To Recipe
                           </Button>
                           {!canCreateRecipeIngredient ? (
-                            <p className="text-xs font-medium text-emerald-800/75">
+                            <p className="text-xs font-medium text-muted-foreground">
                               Enter a custom ingredient name to continue.
                             </p>
                           ) : null}
@@ -4063,24 +4063,24 @@ export default function App() {
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <Label className="flex items-center gap-2 text-base font-semibold text-emerald-950">
-                        <ListChecks className="h-4 w-4 text-emerald-700" aria-hidden="true" />
+                      <Label className="flex items-center gap-2 text-base font-semibold text-foreground">
+                        <ListChecks className="h-4 w-4 text-primary" aria-hidden="true" />
                         Ingredients
                       </Label>
                       {recipeIngredients.length === 0 ? (
-                        <p className="rounded-md border border-dashed border-zinc-200/80 bg-white p-4 text-sm text-emerald-900/70">
+                        <p className="rounded-md border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
                           No ingredients added yet. Choose a method above, or generate from pasted text.
                         </p>
                       ) : (
-                        <div className="overflow-hidden rounded-md border border-zinc-200/80 bg-white shadow-sm">
-                          <div className="hidden bg-zinc-50/60 px-3 py-2 text-xs font-medium text-emerald-900/70 md:grid md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]">
+                        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
+                          <div className="hidden bg-muted/60 px-3 py-2 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]">
                             <span className="text-left">Name</span>
                             <span className="text-left">Qty</span>
                             <span className="text-left">Unit</span>
                             <span className="text-left">Store</span>
                             <span className="justify-self-end" aria-hidden="true" />
                           </div>
-                          <div className="divide-y divide-emerald-100">
+                          <div className="divide-y divide-border/70">
                             {recipeIngredients.map((ingredient, index) => {
                               const menuKey = `recipe-ingredient-menu-${index}`;
                               const isInlineEditing = inlineEditingRecipeIngredientIndex === index;
@@ -4090,8 +4090,8 @@ export default function App() {
                                   key={`${ingredient.name}-${index}`}
                                   className={
                                     isInlineEditing
-                                      ? "grid items-center gap-2 bg-zinc-50/40 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]"
-                                      : "grid items-center gap-2 bg-white px-3 py-2.5 transition-colors hover:bg-zinc-50/30 md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]"
+                                      ? "grid items-center gap-2 bg-muted/40 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]"
+                                      : "grid items-center gap-2 bg-card px-3 py-2.5 transition-colors hover:bg-muted/30 md:grid-cols-[minmax(0,1fr)_110px_120px_220px_120px]"
                                   }
                                   onKeyDown={
                                     isInlineEditing
@@ -4102,7 +4102,7 @@ export default function App() {
                                   {isInlineEditing ? (
                                     <>
                                       <div className="space-y-1">
-                                        <Label htmlFor={`inline-recipe-ingredient-name-${index}`} className="text-xs font-medium text-emerald-900/70 md:hidden">
+                                        <Label htmlFor={`inline-recipe-ingredient-name-${index}`} className="text-xs font-medium text-muted-foreground md:hidden">
                                           Name
                                         </Label>
                                         <Input
@@ -4116,7 +4116,7 @@ export default function App() {
                                         />
                                       </div>
                                       <div className="space-y-1">
-                                        <Label htmlFor={`inline-recipe-ingredient-qty-${index}`} className="text-xs font-medium text-emerald-900/70 md:hidden">
+                                        <Label htmlFor={`inline-recipe-ingredient-qty-${index}`} className="text-xs font-medium text-muted-foreground md:hidden">
                                           Qty
                                         </Label>
                                         <Input
@@ -4131,7 +4131,7 @@ export default function App() {
                                         />
                                       </div>
                                       <div className="space-y-1">
-                                        <Label htmlFor={`inline-recipe-ingredient-unit-${index}`} className="text-xs font-medium text-emerald-900/70 md:hidden">
+                                        <Label htmlFor={`inline-recipe-ingredient-unit-${index}`} className="text-xs font-medium text-muted-foreground md:hidden">
                                           Unit
                                         </Label>
                                         <Input
@@ -4143,7 +4143,7 @@ export default function App() {
                                         />
                                       </div>
                                       <div className="space-y-1">
-                                        <Label htmlFor={`inline-recipe-ingredient-store-${index}`} className="text-xs font-medium text-emerald-900/70 md:hidden">
+                                        <Label htmlFor={`inline-recipe-ingredient-store-${index}`} className="text-xs font-medium text-muted-foreground md:hidden">
                                           Store
                                         </Label>
                                         <Select
@@ -4168,7 +4168,7 @@ export default function App() {
                                         <Button
                                           type="button"
                                           size="sm"
-                                          className="bg-emerald-700 text-white hover:bg-emerald-700/90"
+                                          className="bg-primary text-white hover:bg-primary/90"
                                           onClick={() => handleSaveInlineRecipeIngredient(index)}
                                         >
                                           Save
@@ -4185,10 +4185,10 @@ export default function App() {
                                     </>
                                   ) : (
                                     <>
-                                      <p className="font-semibold text-emerald-950">{displayName(ingredient.name)}</p>
-                                      <p className="text-sm text-emerald-900/75">{ingredient.qty}</p>
-                                      <p className="text-sm text-emerald-900/75">{ingredient.unit}</p>
-                                      <p className="text-sm text-emerald-900/75">
+                                      <p className="font-semibold text-foreground">{displayName(ingredient.name)}</p>
+                                      <p className="text-sm text-muted-foreground">{ingredient.qty}</p>
+                                      <p className="text-sm text-muted-foreground">{ingredient.unit}</p>
+                                      <p className="text-sm text-muted-foreground">
                                         {ingredient.store === "Unassigned" ? "No preferred store" : ingredient.store}
                                       </p>
                                       <div className="relative justify-self-end">
@@ -4204,10 +4204,10 @@ export default function App() {
                                           <MoreVertical className="h-4 w-4" aria-hidden="true" />
                                         </Button>
                                         {openLibraryMenu === menuKey ? (
-                                          <div className="absolute right-0 top-10 z-20 w-44 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md">
+                                          <div className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-border bg-card p-1.5 shadow-md">
                                             <button
                                               type="button"
-                                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                                               onClick={() => handleStartInlineRecipeIngredientEdit(index)}
                                             >
                                               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -4215,7 +4215,7 @@ export default function App() {
                                             </button>
                                             <button
                                               type="button"
-                                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                                               onClick={() => handleCopyRecipeIngredientName(index)}
                                             >
                                               <Copy className="h-3.5 w-3.5" aria-hidden="true" />
@@ -4242,16 +4242,16 @@ export default function App() {
                       )}
                     </div>
 
-                    <div className="space-y-3 rounded-md border border-zinc-200/80 bg-zinc-50/20 p-4 md:col-span-2">
-                      <Label htmlFor="recipe-ingredients-paste" className="flex items-center gap-2 text-base font-semibold text-emerald-950">
-                        <Wand2 className="h-4 w-4 text-emerald-700" aria-hidden="true" />
+                    <div className="space-y-3 rounded-md border border-border bg-muted/20 p-4 md:col-span-2">
+                      <Label htmlFor="recipe-ingredients-paste" className="flex items-center gap-2 text-base font-semibold text-foreground">
+                        <Wand2 className="h-4 w-4 text-primary" aria-hidden="true" />
                         Paste ingredients (bulk)
                       </Label>
                       <Textarea
                         id="recipe-ingredients-paste"
                         ref={ingredientPasteRef}
                         rows={5}
-                        className="bg-white"
+                        className="bg-card"
                         placeholder={"Chicken breast, 1.5, lb, Sprouts\nGreek yogurt, 32, oz\n1 can black beans"}
                         value={ingredientPasteText}
                         onChange={(event) => {
@@ -4263,7 +4263,7 @@ export default function App() {
                         <Button
                           type="button"
                           variant="secondary"
-                          className="bg-emerald-700 text-white hover:bg-emerald-700/90"
+                          className="bg-primary text-white hover:bg-primary/90"
                           onClick={handleGenerateIngredients}
                           disabled={!hasIngredientPasteText}
                         >
@@ -4289,7 +4289,7 @@ export default function App() {
                         </p>
                       ) : null}
                       {!hasIngredientPasteText ? (
-                        <p className="text-xs font-medium text-emerald-800/75">
+                        <p className="text-xs font-medium text-muted-foreground">
                           Paste one or more ingredient lines first.
                         </p>
                       ) : null}
@@ -4355,7 +4355,7 @@ export default function App() {
                     </div>
 
                     {recipeList.length === 0 ? (
-                      <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+                      <p className="rounded-sm border border-dashed border-border bg-card/70 p-4 text-sm text-muted-foreground">
                         No recipes found.
                       </p>
                     ) : (
@@ -4366,7 +4366,7 @@ export default function App() {
                           return (
                             <article
                               key={recipe.id}
-                              className="rounded-md border border-zinc-200/80 bg-white p-4 shadow-sm"
+                              className="rounded-xl border border-border bg-card p-4 shadow-soft"
                             >
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 space-y-1">
@@ -4404,10 +4404,10 @@ export default function App() {
                                       <MoreVertical className="h-4 w-4" aria-hidden="true" />
                                     </Button>
                                     {openLibraryMenu === menuKey ? (
-                                      <div className="absolute right-0 top-10 z-20 w-44 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md">
+                                      <div className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-border bg-card p-1.5 shadow-md">
                                         <button
                                           type="button"
-                                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                                           onClick={() => handleInlineRecipeEdit(recipe.id)}
                                         >
                                           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -4415,7 +4415,7 @@ export default function App() {
                                         </button>
                                         <button
                                           type="button"
-                                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                                           onClick={() => handleRecipeDuplicate(recipe.id)}
                                         >
                                           <Copy className="h-3.5 w-3.5" aria-hidden="true" />
@@ -4437,7 +4437,7 @@ export default function App() {
 
                               {isInlineEditing ? (
                                 <form
-                                  className="mt-4 grid gap-3 rounded-sm border border-zinc-200/80 bg-zinc-50/30 p-3 md:grid-cols-2"
+                                  className="mt-4 grid gap-3 rounded-sm border border-border bg-muted/30 p-3 md:grid-cols-2"
                                   onSubmit={(event) => {
                                     event.preventDefault();
                                     handleInlineRecipeSave(recipe.id);
@@ -4581,7 +4581,7 @@ export default function App() {
                 </div>
 
                 {isAddingIngredient ? (
-                  <article className="grid items-end gap-3 rounded-sm border border-zinc-200/80 bg-zinc-50/40 p-3 md:grid-cols-[1fr_1fr_220px_auto]">
+                  <article className="grid items-end gap-3 rounded-sm border border-border bg-muted/40 p-3 md:grid-cols-[1fr_1fr_220px_auto]">
                     <div className="space-y-1">
                       <Label htmlFor="new-inline-ingredient-name">Name</Label>
                       <Input
@@ -4637,7 +4637,7 @@ export default function App() {
                 ) : null}
 
                 {filteredIngredientDirectory.length === 0 ? (
-                  <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+                  <p className="rounded-sm border border-dashed border-border bg-card/70 p-4 text-sm text-muted-foreground">
                     No ingredients found.
                   </p>
                 ) : (
@@ -4648,7 +4648,7 @@ export default function App() {
                       return isEditingIngredient ? (
                         <article
                           key={ingredient.name}
-                          className="grid items-end gap-3 rounded-sm border border-zinc-200/80 bg-zinc-50/40 p-3 md:grid-cols-[1fr_1fr_220px_auto]"
+                          className="grid items-end gap-3 rounded-sm border border-border bg-muted/40 p-3 md:grid-cols-[1fr_1fr_220px_auto]"
                         >
                           <div className="space-y-1">
                             <Label htmlFor={`ingredient-edit-name-${ingredient.name}`}>Name</Label>
@@ -4703,7 +4703,7 @@ export default function App() {
                       ) : (
                         <article
                           key={ingredient.name}
-                          className="grid items-center gap-2 rounded-md border border-zinc-200/80 bg-white px-3 py-2.5 md:grid-cols-[1fr_180px_auto]"
+                          className="grid items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 md:grid-cols-[1fr_180px_auto]"
                         >
                           <div>
                             <p className="font-medium">{displayName(ingredient.name)}</p>
@@ -4727,10 +4727,10 @@ export default function App() {
                               <MoreVertical className="h-4 w-4" aria-hidden="true" />
                             </Button>
                             {openLibraryMenu === menuKey ? (
-                              <div className="absolute right-0 top-10 z-20 w-44 rounded-md border border-zinc-200 bg-white p-1.5 shadow-md">
+                              <div className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-border bg-card p-1.5 shadow-md">
                                 <button
                                   type="button"
-                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                                   onClick={() => handleIngredientEdit(ingredient.name)}
                                 >
                                   <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -4738,7 +4738,7 @@ export default function App() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+                                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent"
                                   onClick={() => handleIngredientCopy(ingredient.name)}
                                 >
                                   <Copy className="h-3.5 w-3.5" aria-hidden="true" />
@@ -4767,10 +4767,10 @@ export default function App() {
           ) : null}
           {isStoreWorkflow ? (
             <>
-              <Card className="border-zinc-200/70 bg-white shadow-sm">
+              <Card className="border-border/80 bg-card shadow-soft">
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-zinc-900">
+                    <p className="text-sm font-semibold text-foreground">
                       Store management
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -4811,15 +4811,15 @@ export default function App() {
                           <p className="text-xs font-medium text-destructive">{storeLookupError}</p>
                         ) : null}
                         {storeLookupResults.length > 0 ? (
-                          <div className="space-y-2 rounded-md border border-zinc-200/80 bg-zinc-50/40 p-2">
+                          <div className="space-y-2 rounded-md border border-border bg-muted/40 p-2">
                             {storeLookupResults.map((candidate) => (
                               <button
                                 key={`${candidate.googlePlaceId || candidate.storeName}-${candidate.address}`}
                                 type="button"
-                                className="block w-full rounded-md border border-transparent bg-white px-3 py-2 text-left text-sm hover:border-zinc-300"
+                                className="block w-full rounded-md border border-transparent bg-card px-3 py-2 text-left text-sm hover:border-border"
                                 onClick={() => handleStoreLookupPick(candidate)}
                               >
-                                <p className="font-semibold text-zinc-900">{candidate.displayName || candidate.storeName}</p>
+                                <p className="font-semibold text-foreground">{candidate.displayName || candidate.storeName}</p>
                                 <p className="text-xs text-muted-foreground">{candidate.address}</p>
                               </button>
                             ))}
@@ -4955,7 +4955,7 @@ export default function App() {
                   </div>
 
                   {filteredManagedStores.length === 0 ? (
-                    <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+                    <p className="rounded-sm border border-dashed border-border bg-card/70 p-4 text-sm text-muted-foreground">
                       No stores found.
                     </p>
                   ) : (
@@ -4963,10 +4963,10 @@ export default function App() {
                       {filteredManagedStores.map((store) => (
                         <article
                           key={store.storeName}
-                          className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-zinc-200/80 bg-white p-3 shadow-sm"
+                          className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-soft"
                         >
                           <div className="flex min-w-0 items-start gap-3">
-                            <div className="mt-0.5 flex h-11 w-11 items-center justify-center overflow-hidden rounded-md border border-zinc-200 bg-zinc-50">
+                            <div className="mt-0.5 flex h-11 w-11 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
                               {store.logoUrl ? (
                                 <img
                                   src={store.logoUrl}
@@ -4975,11 +4975,11 @@ export default function App() {
                                   loading="lazy"
                                 />
                               ) : (
-                                <Store className="h-4 w-4 text-zinc-500" aria-hidden="true" />
+                                <Store className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                               )}
                             </div>
                             <div className="min-w-0 space-y-1">
-                              <p className="font-semibold text-zinc-900">{store.displayName || store.storeName}</p>
+                              <p className="font-semibold text-foreground">{store.displayName || store.storeName}</p>
                               <p className="text-xs text-muted-foreground">
                                 {store.chainName || store.storeName}
                               </p>
@@ -5048,7 +5048,7 @@ export default function App() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex flex-wrap gap-4 rounded-sm border border-border/80 bg-white p-3">
+          <div className="flex flex-wrap gap-4 rounded-sm border border-border/80 bg-card p-3">
             {stores.map((store) => {
               const count = (groupedGroceries[store] || []).length;
               return (
@@ -5076,7 +5076,7 @@ export default function App() {
                 return (
                   <section
                     key={store}
-                    className="rounded-md border border-zinc-200/80 bg-white p-4 shadow-sm"
+                    className="rounded-xl border border-border bg-card p-4 shadow-soft"
                   >
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <h3 className="font-semibold">{store}</h3>
@@ -5109,13 +5109,13 @@ export default function App() {
               })}
             </div>
           ) : (
-            <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+            <p className="rounded-sm border border-dashed border-border bg-card/70 p-4 text-sm text-muted-foreground">
               Select your stores, then click "Build grocery list".
             </p>
           )}
 
           {showGroceries && !hasVisibleGroceries ? (
-            <p className="rounded-sm border border-dashed border-border bg-white/70 p-4 text-sm text-muted-foreground">
+            <p className="rounded-sm border border-dashed border-border bg-card/70 p-4 text-sm text-muted-foreground">
               No groceries yet for selected stores. Add recipe meals or adjust day overrides.
             </p>
           ) : null}
@@ -5130,12 +5130,12 @@ export default function App() {
           <button
             type="button"
             aria-label="Close import modal"
-            className="absolute inset-0 bg-zinc-950/35"
+            className="absolute inset-0 bg-black/45"
             onClick={closeRecipeImportModal}
           />
-          <Card className="relative z-10 w-full max-w-lg border-zinc-200/80 bg-white shadow-lg">
+          <Card className="relative z-10 w-full max-w-lg border-border bg-card shadow-lg">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-xl text-emerald-950">Import recipe from URL</CardTitle>
+              <CardTitle className="text-xl text-foreground">Import recipe from URL</CardTitle>
               <CardDescription>
                 Paste a recipe URL and we&apos;ll prefill the recipe editor.
               </CardDescription>
@@ -5173,12 +5173,12 @@ export default function App() {
           <button
             type="button"
             aria-label="Close recipe details"
-            className="absolute inset-0 bg-zinc-950/35"
+            className="absolute inset-0 bg-black/45"
             onClick={handleCloseRecipeDetailsModal}
           />
-          <Card className="relative z-10 w-full max-w-2xl border-zinc-200/80 bg-white shadow-lg">
+          <Card className="relative z-10 w-full max-w-2xl border-border bg-card shadow-lg">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-xl text-emerald-950">{recipeDetailsModalRecipe.title}</CardTitle>
+              <CardTitle className="text-xl text-foreground">{recipeDetailsModalRecipe.title}</CardTitle>
               <CardDescription>
                 {MEAL_SLOT_LABELS[normalizeRecipeMealType(recipeDetailsModalRecipe.mealType, "dinner")]} •{" "}
                 {recipeDetailsModalRecipe.servings} servings
@@ -5194,14 +5194,14 @@ export default function App() {
                     href={recipeDetailsModalRecipe.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-semibold text-emerald-800 underline decoration-emerald-500 underline-offset-4 hover:text-emerald-950"
+                    className="font-semibold text-foreground underline decoration-primary/60 underline-offset-4 hover:text-foreground"
                   >
                     Open source URL
                   </a>
                 </p>
               ) : null}
               <section className="space-y-2">
-                <h3 className="text-sm font-medium text-emerald-900/75">Ingredients</h3>
+                <h3 className="text-sm font-medium text-muted-foreground">Ingredients</h3>
                 {Array.isArray(recipeDetailsModalRecipe.ingredients) && recipeDetailsModalRecipe.ingredients.length > 0 ? (
                   <ul className="space-y-1 text-sm">
                     {recipeDetailsModalRecipe.ingredients.map((ingredient, index) => (
@@ -5215,7 +5215,7 @@ export default function App() {
                 )}
               </section>
               <section className="space-y-2">
-                <h3 className="text-sm font-medium text-emerald-900/75">How to make</h3>
+                <h3 className="text-sm font-medium text-muted-foreground">How to make</h3>
                 {Array.isArray(recipeDetailsModalRecipe.steps) && recipeDetailsModalRecipe.steps.length > 0 ? (
                   <ol className="list-inside list-decimal space-y-1 text-sm">
                     {recipeDetailsModalRecipe.steps.map((step, index) => (
@@ -5247,12 +5247,12 @@ export default function App() {
           <button
             type="button"
             aria-label="Close note editor"
-            className="absolute inset-0 bg-zinc-950/35"
+            className="absolute inset-0 bg-black/45"
             onClick={handleCloseDayNoteEditor}
           />
-          <Card className="relative z-10 w-full max-w-lg border-zinc-200/80 bg-white shadow-lg">
+          <Card className="relative z-10 w-full max-w-lg border-border bg-card shadow-lg">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-xl text-emerald-950">
+              <CardTitle className="text-xl text-foreground">
                 {noteEditorSavedText ? "Edit note" : "Add note"}: {noteEditorDay}
               </CardTitle>
               <CardDescription>
