@@ -5,10 +5,14 @@
   "description": "Family-first weekly meal planner with store-specific grocery lists.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "start": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:client": "vite",
+    "dev:server": "node --watch server/index.js",
+    "server": "node server/index.js",
+    "start": "node scripts/dev.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
@@ -22,6 +26,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
+    "pg": "^8.18.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.5.5"
