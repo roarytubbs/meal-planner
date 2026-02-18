@@ -32,6 +32,8 @@ Security rules:
 - `npm run dev`: Start Next.js dev server.
 - `npm run build`: Build the Next.js app.
 - `npm run start`: Run the production server.
+- `npm run lint`: Run ESLint.
+- `npm run typecheck`: Run TypeScript checks without emitting output.
 - `npm run db:generate`: Generate Prisma client.
 - `npm run db:push`: Push Prisma schema changes to Postgres.
 - `npm run db:migrate`: Create/apply local Prisma migrations.

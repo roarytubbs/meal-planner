@@ -1,9 +1,0 @@
-[    1093ms] Error: dlb hubspot-dlb/bundle.production.js not loaded
-    at o.dlbpr (//static.hsappstatic.net/DashboardUI/static-4.85327/js/earlyRequester.js:1:4128)
-    at Object.D2Y9 (//static.hsappstatic.net/DashboardUI/static-4.85327/js/earlyRequester.js:1:298)
-    at o (//static.hsappstatic.net/DashboardUI/static-4.85327/js/earlyRequester.js:1:1728)
-    at //static.hsappstatic.net/DashboardUI/static-4.85327/js/earlyRequester.js:1:40063
-    at //static.hsappstatic.net/DashboardUI/static-4.85327/js/earlyRequester.js:1:47541
-    at //static.hsappstatic.net/DashboardUI/static-4.85327/js/earlyRequester.js:1:47544
-[    9864ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8080/servers/ui-extensions-dev-server:0
-[    9937ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.prospecting.agent.rpc.AgentRunService/checkEligibility?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808:0
