@@ -22,7 +22,7 @@ import { getModeLabel, getDraftLabel } from '@/lib/types'
 interface RecipeFormProps {
   mode: RecipeMode
   initialRecipe?: Recipe
-  onSave: (recipe: Recipe) => void
+  onSave: (recipe: Recipe) => Promise<void> | void
   onCancel: () => void
 }
 
@@ -82,10 +82,10 @@ export function RecipeForm({ mode, initialRecipe, onSave, onCancel }: RecipeForm
   }, [])
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault()
       if (!recipe.name.trim()) return
-      onSave(recipe)
+      await onSave(recipe)
     },
     [recipe, onSave]
   )

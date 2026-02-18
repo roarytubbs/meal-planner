@@ -1,46 +1,74 @@
 # Meal Planner
 
-Family-first weekly meal planner with store-specific grocery lists.
+Meal Planner is a Next.js app for planning meals, managing ingredients, and maintaining store metadata for grocery workflows.
+The app now uses PostgreSQL (via Prisma) as the source of truth.
 
-## Prerequisites
+## Local setup
 
-- Node.js `20.9.0` or newer
-- npm
+1. Install dependencies: `npm install`.
+2. Create `/Users/rtubbs/Dev/meal-planner/.env.local` from `.env.example`.
+3. Set required environment variables:
+   - `DATABASE_URL=postgresql://...`
+   - `GOOGLE_PLACES_API_KEY=<meal-planner-dev key>`
+4. Generate Prisma client: `npm run db:generate`.
+5. Push schema to your database: `npm run db:push`.
+6. Start the app: `npm run dev`.
 
-## Setup
+## Environment variables
 
-```bash
-npm install
-```
+Required server-side variables:
 
-## Run Locally
+- `DATABASE_URL`: Postgres connection string used by Prisma.
+- `GOOGLE_PLACES_API_KEY`: Used only by server routes under `/api/places/*`.
 
-```bash
-npm run dev
-```
+Security rules:
 
-Open `http://localhost:3000`.
+- Never commit `.env.local` or any real key.
+- Never use `NEXT_PUBLIC_` for the Google Places key.
+- Keep Places calls server-side; the browser should only call internal API routes.
 
-## Build
+## Scripts
 
-```bash
-npm run build
-```
+- `npm run dev`: Start Next.js dev server.
+- `npm run build`: Build the Next.js app.
+- `npm run start`: Run the production server.
+- `npm run db:generate`: Generate Prisma client.
+- `npm run db:push`: Push Prisma schema changes to Postgres.
+- `npm run db:migrate`: Create/apply local Prisma migrations.
 
-## Typecheck
+## Google key restrictions (required)
 
-```bash
-npm run typecheck
-```
+For both `meal-planner-dev` and `meal-planner-prod` keys:
 
-## Tests
+1. Open key settings in Google Cloud Console.
+2. Restriction type: `API restriction`.
+3. Allowed API: `Places API` (`places.googleapis.com`).
+4. Keep app restriction as `None` for serverless environments unless you have static egress IPs.
 
-```bash
-npm run test
-```
+Also configure quota caps and billing alerts (50% / 90% / 100%).
 
-## Optional Environment Variables
+## Deployment (Vercel/Netlify)
 
-- `GOOGLE_PLACES_API_KEY`: enables `/api/places/search` place lookup.
+Set both variables in hosting provider environment settings:
 
-If `GOOGLE_PLACES_API_KEY` is not set, `/api/places/search` returns a handled `500` JSON error indicating the key is missing.
+- `DATABASE_URL`
+- `GOOGLE_PLACES_API_KEY` (`meal-planner-prod` for hosted envs)
+
+Do not place keys in repository files, client code, or build arguments.
+
+## Secret scanning
+
+This repo uses Gitleaks in GitHub Actions:
+
+- Workflow: `/Users/rtubbs/Dev/meal-planner/.github/workflows/secret-scan.yml`
+- Config: `/Users/rtubbs/Dev/meal-planner/.gitleaks.toml`
+
+The workflow runs on push/PR, uploads a scan report artifact, and fails on detected secrets.
+
+## Key rotation process
+
+If a key is exposed:
+
+1. Regenerate the compromised key in Google Cloud immediately.
+2. Update `.env.local` and hosting env vars.
+3. Re-run secret scans and remove leaked secrets from git history if needed.

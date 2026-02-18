@@ -1,0 +1,92 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e3]:
+    - generic [ref=e5]:
+      - paragraph [ref=e6]:
+        - generic [ref=e7]:
+          - text: Please confirm that the email
+          - strong [ref=e8]: rtubbs@hubspot.com
+          - text: belongs to you.
+      - button "Resend verification email." [ref=e10] [cursor=pointer]
+  - banner [ref=e13]:
+    - link "HubSpot logo" [ref=e15] [cursor=pointer]:
+      - /url: /reports-dashboard/50769493
+      - img "HubSpot logo" [ref=e16]
+    - generic [ref=e18]:
+      - generic [ref=e23]:
+        - img
+        - searchbox "Search HubSpot" [ref=e24]
+        - generic:
+          - generic: ⌘
+          - generic: K
+      - button "Create new" [ref=e27] [cursor=pointer]:
+        - img [ref=e28]
+    - navigation "Global toolbar" [ref=e30]:
+      - menu [ref=e31]:
+        - menuitem "Calls" [ref=e32]:
+          - button "Calls" [ref=e33] [cursor=pointer]:
+            - img "Calling" [ref=e34]
+        - menuitem "Marketplace" [ref=e36]:
+          - button "Marketplace" [ref=e37] [cursor=pointer]:
+            - img "Marketplace" [ref=e38]
+        - menuitem "Help" [ref=e40]:
+          - button "Help" [ref=e42] [cursor=pointer]:
+            - img "Help" [ref=e43]
+        - menuitem "Settings" [ref=e45]:
+          - link "Settings" [ref=e46] [cursor=pointer]:
+            - /url: /sales-products-settings/50769493/contacts?eschref=%2Fcontacts%2F50769493%2Fobjects%2F0-1%2Fviews%2Fall%2Flist
+            - img "Settings" [ref=e47]
+        - menuitem "Notifications" [ref=e50]:
+          - button "Notifications" [ref=e51] [cursor=pointer]:
+            - img [ref=e52]
+        - menuitem "Open Assistant" [ref=e55]:
+          - button "Open Assistant" [ref=e56] [cursor=pointer]:
+            - img "Open Assistant" [ref=e57]
+        - menuitem "View profile and more" [ref=e61]:
+          - button "View profile and more" [ref=e62] [cursor=pointer]:
+            - img "Good Monday Whiskey Club" [ref=e63]
+            - img [ref=e64]
+  - generic [ref=e67]:
+    - navigation [ref=e69]:
+      - menu [ref=e70]:
+        - menuitem "Bookmarks" [ref=e71] [cursor=pointer]:
+          - img "Bookmarks" [ref=e72]
+        - menuitem "CRM" [ref=e74] [cursor=pointer]:
+          - img "CRM" [ref=e75]
+        - menuitem "Marketing" [ref=e77] [cursor=pointer]:
+          - img "Marketing" [ref=e78]
+        - menuitem "Content" [ref=e80] [cursor=pointer]:
+          - img "Content" [ref=e81]
+        - menuitem "Sales" [ref=e83] [cursor=pointer]:
+          - img "Sales" [ref=e84]
+        - menuitem "Commerce" [ref=e86] [cursor=pointer]:
+          - img "Commerce" [ref=e87]
+        - menuitem "Service" [ref=e90] [cursor=pointer]:
+          - img "Service" [ref=e91]
+        - menuitem "Data Management" [ref=e95] [cursor=pointer]:
+          - img "Data Management" [ref=e96]
+        - menuitem "Automation" [ref=e98] [cursor=pointer]:
+          - img "Automation" [ref=e99]
+        - menuitem "Reporting" [ref=e101] [cursor=pointer]:
+          - img "Reporting" [ref=e102]
+        - menuitem "Breeze" [ref=e104] [cursor=pointer]:
+          - img "Breeze" [ref=e105]
+        - menuitem "Development" [ref=e107] [cursor=pointer]:
+          - img "Development" [ref=e108]
+    - button [ref=e112] [cursor=pointer]:
+      - img [ref=e113]
+  - button "PaperCuts Feedback" [ref=e116] [cursor=pointer]:
+    - img [ref=e117]
+  - generic [ref=e119]:
+    - generic [ref=e173]:
+      - navigation "Pagination" [ref=e174]:
+        - button "Previous page" [disabled] [ref=e176]:
+          - generic [ref=e177]:
+            - img [ref=e178]
+            - generic [ref=e180]: Prev
+        - button "Next page" [disabled] [ref=e182]:
+          - generic [ref=e183]:
+            - generic [ref=e184]: Next
+            - img [ref=e185]
+      - button "25 per page" [ref=e187] [cursor=pointer]:
+        - generic [ref=e190]: 25 per page
+    - complementary

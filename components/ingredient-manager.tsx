@@ -115,7 +115,7 @@ function IngredientDialog({
     }
   }, [open, editingEntry])
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!name.trim()) {
       toast.error('Ingredient name is required')
       return
@@ -132,14 +132,20 @@ function IngredientDialog({
       updatedAt: now,
     }
 
-    if (editingEntry) {
-      updateIngredientEntry(entry)
-      toast.success('Ingredient updated', { description: entry.name })
-    } else {
-      addIngredientEntry(entry)
-      toast.success('Ingredient added', { description: entry.name })
+    try {
+      if (editingEntry) {
+        await updateIngredientEntry(entry)
+        toast.success('Ingredient updated', { description: entry.name })
+      } else {
+        await addIngredientEntry(entry)
+        toast.success('Ingredient added', { description: entry.name })
+      }
+      onOpenChange(false)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to save ingredient.'
+      toast.error(message)
     }
-    onOpenChange(false)
   }, [name, defaultUnit, defaultStoreId, category, editingEntry, onOpenChange])
 
   const handleKeyDown = useCallback(
@@ -260,10 +266,16 @@ export function IngredientManager() {
   }, [])
 
   const handleDelete = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const entry = entries.find((e) => e.id === id)
-      deleteIngredientEntry(id)
-      toast.success('Ingredient removed', { description: entry?.name })
+      try {
+        await deleteIngredientEntry(id)
+        toast.success('Ingredient removed', { description: entry?.name })
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unable to delete ingredient.'
+        toast.error(message)
+      }
     },
     [entries]
   )

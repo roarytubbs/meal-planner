@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { UtensilsCrossed } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Toaster } from '@/components/ui/sonner'
@@ -10,7 +10,7 @@ import { MealPlannerView } from '@/components/meal-planner-view'
 import { RecipeImportDialog } from '@/components/recipe-import-dialog'
 import { StoreManager } from '@/components/store-manager'
 import { IngredientManager } from '@/components/ingredient-manager'
-import { addRecipe, updateRecipe } from '@/lib/meal-planner-store'
+import { addRecipe, updateRecipe, useStoreStatus } from '@/lib/meal-planner-store'
 import { toast } from 'sonner'
 import type { Recipe, RecipeMode } from '@/lib/types'
 
@@ -24,6 +24,22 @@ export default function MealPlannerPage() {
     undefined
   )
   const [importOpen, setImportOpen] = useState(false)
+  const { loading, error } = useStoreStatus()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    if (tab !== 'recipes' && tab !== 'ingredients' && tab !== 'stores' && tab !== 'planner') {
+      return
+    }
+
+    setActiveTab((prev) => (prev === tab ? prev : tab))
+    setView((prev) => {
+      if (tab === 'planner') return 'planner'
+      if (tab === 'recipes') return prev === 'form' ? prev : 'library'
+      return 'library'
+    })
+  }, [])
 
   const handleAddRecipe = useCallback(() => {
     setFormMode('add')
@@ -38,16 +54,22 @@ export default function MealPlannerPage() {
   }, [])
 
   const handleSaveRecipe = useCallback(
-    (recipe: Recipe) => {
-      if (formMode === 'add') {
-        addRecipe(recipe)
-        toast.success('Recipe added', { description: recipe.name })
-      } else {
-        updateRecipe(recipe)
-        toast.success('Recipe updated', { description: recipe.name })
+    async (recipe: Recipe) => {
+      try {
+        if (formMode === 'add') {
+          await addRecipe(recipe)
+          toast.success('Recipe added', { description: recipe.name })
+        } else {
+          await updateRecipe(recipe)
+          toast.success('Recipe updated', { description: recipe.name })
+        }
+        setView('library')
+        setEditingRecipe(undefined)
+      } catch (saveError) {
+        const message =
+          saveError instanceof Error ? saveError.message : 'Unable to save recipe.'
+        toast.error(message)
       }
-      setView('library')
-      setEditingRecipe(undefined)
     },
     [formMode]
   )
@@ -113,6 +135,16 @@ export default function MealPlannerPage() {
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6">
+        {loading ? (
+          <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
+            Loading planner data...
+          </div>
+        ) : null}
+        {error ? (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
         {view === 'form' ? (
           <RecipeForm
             mode={formMode}

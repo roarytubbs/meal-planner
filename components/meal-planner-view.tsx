@@ -30,8 +30,10 @@ import {
   useMealPlan,
   setMealSlot,
   clearMealPlan,
+  saveMealPlanSnapshot,
   getRecipeById,
 } from '@/lib/meal-planner-store'
+import { toast } from 'sonner'
 
 const DAYS: DayOfWeek[] = [
   'monday',
@@ -382,13 +384,21 @@ export function MealPlannerView() {
 
   const handleAssign = useCallback(
     (day: DayOfWeek, slot: MealSlot, recipeId: string) => {
-      setMealSlot(day, slot, recipeId)
+      void setMealSlot(day, slot, recipeId).catch((error) => {
+        const message =
+          error instanceof Error ? error.message : 'Unable to assign recipe.'
+        toast.error(message)
+      })
     },
     []
   )
 
   const handleClear = useCallback((day: DayOfWeek, slot: MealSlot) => {
-    setMealSlot(day, slot, null)
+    void setMealSlot(day, slot, null).catch((error) => {
+      const message =
+        error instanceof Error ? error.message : 'Unable to clear meal slot.'
+      toast.error(message)
+    })
   }, [])
 
   const shoppingList = useMemo(
@@ -406,6 +416,29 @@ export function MealPlannerView() {
     return count
   }, [mealPlan])
 
+  const handleSaveWeek = useCallback(async () => {
+    try {
+      const snapshot = await saveMealPlanSnapshot()
+      if (!snapshot) {
+        toast.error('No meals to save yet')
+        return
+      }
+      toast.success('Meal plan snapshot saved', { description: snapshot.label })
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to save snapshot.'
+      toast.error(message)
+    }
+  }, [])
+
+  const handleClearAll = useCallback(() => {
+    void clearMealPlan().catch((error) => {
+      const message =
+        error instanceof Error ? error.message : 'Unable to clear meal plan.'
+      toast.error(message)
+    })
+  }, [])
+
   return (
     <div className="flex flex-col gap-5">
       {/* Header */}
@@ -421,15 +454,25 @@ export function MealPlannerView() {
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={clearMealPlan}
-          disabled={totalMeals === 0}
-        >
-          <Trash2 className="size-3.5" />
-          Clear All
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleSaveWeek}
+            disabled={totalMeals === 0}
+          >
+            Save This Week
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClearAll}
+            disabled={totalMeals === 0}
+          >
+            <Trash2 className="size-3.5" />
+            Clear All
+          </Button>
+        </div>
       </div>
 
       {/* Two-column layout: Planner + Shopping List */}

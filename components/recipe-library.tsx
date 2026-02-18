@@ -62,12 +62,18 @@ export function RecipeLibrary({
       r.description.toLowerCase().includes(search.toLowerCase())
   )
 
-  const handleDelete = (recipe: Recipe) => {
-    deleteRecipe(recipe.id)
-    setDeleteConfirm(null)
-    toast('Recipe deleted', {
-      description: recipe.name,
-    })
+  const handleDelete = async (recipe: Recipe) => {
+    try {
+      await deleteRecipe(recipe.id)
+      setDeleteConfirm(null)
+      toast('Recipe deleted', {
+        description: recipe.name,
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to delete recipe.'
+      toast.error(message)
+    }
   }
 
   return (

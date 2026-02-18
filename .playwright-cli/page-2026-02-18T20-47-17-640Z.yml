@@ -1,0 +1,62 @@
+- generic [ref=e1]:
+  - generic:
+    - button "PaperCuts Feedback" [ref=e19] [cursor=pointer]:
+      - img [ref=e20]
+    - iframe
+  - generic [ref=e2]:
+    - generic [ref=e23]:
+      - region "Page Section" [ref=e24]:
+        - group [ref=e26]:
+          - generic [ref=e27]:
+            - button "Exit" [ref=e29] [cursor=pointer]:
+              - generic [ref=e31]: Exit
+            - heading "Contact record page Default view" [level=1] [ref=e33]:
+              - generic [ref=e34]:
+                - paragraph [ref=e35]: Contact record page
+                - textbox "Name editor" [ref=e40]: Default view
+            - generic [ref=e42]:
+              - button "Save" [ref=e43] [cursor=pointer]:
+                - generic [ref=e46]: Save
+              - button "Save and exit" [ref=e47] [cursor=pointer]:
+                - generic [ref=e50]: Save and exit
+        - navigation [ref=e58]:
+          - button "Edit layout" [ref=e59] [cursor=pointer]: Edit layout
+          - button "Settings" [active] [ref=e61] [cursor=pointer]: Settings
+      - region "Page Section" [ref=e66]:
+        - main [ref=e69]:
+          - generic [ref=e74]:
+            - generic [ref=e1254]:
+              - heading "User customization" [level=4] [ref=e1255]
+              - paragraph [ref=e1257]: Specify where users are allowed to reorder cards within this view.
+              - list [ref=e1258]:
+                - listitem [ref=e1259]:
+                  - generic [ref=e1260]:
+                    - generic [ref=e1261] [cursor=pointer]:
+                      - checkbox "ON Left sidebar" [checked] [ref=e1263]
+                      - generic [ref=e1264]: "ON"
+                    - generic [ref=e1267]: Left sidebar
+                - listitem [ref=e1268]:
+                  - generic [ref=e1269]:
+                    - generic [ref=e1270] [cursor=pointer]:
+                      - checkbox "ON Right sidebar" [checked] [ref=e1272]
+                      - generic [ref=e1273]: "ON"
+                    - generic [ref=e1276]: Right sidebar
+              - alert [ref=e1277]:
+                - generic [ref=e1279]: Any new cards added to this view will display, even if users have customized and reordered their cards.
+            - complementary:
+              - region "Collaboration sidebar":
+                - iframe [ref=e1239]:
+                  
+            - generic:
+              - generic:
+                - generic:
+                  - complementary
+                  - complementary:
+                    - generic [ref=e1241]:
+                      - button [ref=e1242]:
+                        - img [ref=e1245]
+                      - button "Collaborate with Assistant" [ref=e1250] [cursor=pointer]:
+                        - img [ref=e1252]
+                  - complementary
+                  - complementary
+    - complementary

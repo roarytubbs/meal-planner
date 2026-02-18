@@ -1,0 +1,195 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic:
+      - iframe
+    - banner [ref=e4]:
+      - link "HubSpot logo" [ref=e6] [cursor=pointer]:
+        - /url: /reports-dashboard/50769493
+        - img "HubSpot logo" [ref=e7]
+      - generic [ref=e9]:
+        - generic [ref=e14]:
+          - img
+          - searchbox "Search HubSpot" [ref=e15]
+          - generic:
+            - generic: ⌘
+            - generic: K
+        - button "Create new" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+      - navigation "Global toolbar" [ref=e21]:
+        - menu [ref=e22]:
+          - menuitem "Calls" [ref=e23]:
+            - button "Calls" [ref=e24] [cursor=pointer]:
+              - img "Calling" [ref=e25]
+          - menuitem "Marketplace" [ref=e27]:
+            - button "Marketplace" [ref=e28] [cursor=pointer]:
+              - img "Marketplace" [ref=e29]
+          - menuitem "Help" [ref=e31]:
+            - button "Help" [ref=e33] [cursor=pointer]:
+              - img "Help" [ref=e34]
+          - menuitem "Settings" [ref=e36]:
+            - link "Settings" [ref=e37] [cursor=pointer]:
+              - /url: /user-preferences/50769493?eschref=%2Fdeveloper-projects%2F50769493%2Fproject%2FContact%2520Intake%2520App
+              - img "Settings" [ref=e38]
+          - menuitem "Notifications" [ref=e41]:
+            - button "Notifications" [ref=e42] [cursor=pointer]:
+              - img [ref=e43]
+          - menuitem "Open Assistant" [ref=e46]:
+            - button "Open Assistant" [ref=e47] [cursor=pointer]:
+              - img "Open Assistant" [ref=e48]
+          - menuitem "View profile and more" [ref=e52]:
+            - button "View profile and more" [ref=e53] [cursor=pointer]:
+              - img "Good Monday Whiskey Club" [ref=e54]
+              - img [ref=e55]
+  - generic [ref=e58]:
+    - navigation [ref=e60]:
+      - menu [ref=e61]:
+        - menuitem "Bookmarks" [ref=e62] [cursor=pointer]:
+          - img "Bookmarks" [ref=e182]
+        - menuitem "CRM" [ref=e65] [cursor=pointer]:
+          - img "CRM" [ref=e66]
+        - menuitem "Marketing" [ref=e68] [cursor=pointer]:
+          - img "Marketing" [ref=e69]
+        - menuitem "Content" [ref=e71] [cursor=pointer]:
+          - img "Content" [ref=e72]
+        - menuitem "Sales" [ref=e74] [cursor=pointer]:
+          - img "Sales" [ref=e75]
+        - menuitem "Commerce" [ref=e77] [cursor=pointer]:
+          - img "Commerce" [ref=e78]
+        - menuitem "Service" [ref=e81] [cursor=pointer]:
+          - img "Service" [ref=e82]
+        - menuitem "Data Management" [ref=e86] [cursor=pointer]:
+          - img "Data Management" [ref=e87]
+        - menuitem "Automation" [ref=e89] [cursor=pointer]:
+          - img "Automation" [ref=e90]
+        - menuitem "Reporting" [ref=e92] [cursor=pointer]:
+          - img "Reporting" [ref=e93]
+        - menuitem "Breeze" [ref=e95] [cursor=pointer]:
+          - img "Breeze" [ref=e96]
+        - menuitem "Development" [ref=e98] [cursor=pointer]:
+          - img "Development" [ref=e99]
+    - button [ref=e103] [cursor=pointer]:
+      - img [ref=e104]
+  - generic:
+    - button "PaperCuts Feedback" [ref=e107] [cursor=pointer]:
+      - img [ref=e108]
+    - iframe
+  - generic [ref=e110]:
+    - generic [ref=e127]:
+      - region "Page Section" [ref=e128]:
+        - navigation [ref=e130]:
+          - link "Development" [ref=e131] [cursor=pointer]:
+            - /url: https://app.hubspot.com/developer-overview/50769493
+            - generic [ref=e132]: Development
+          - link "Projects" [ref=e133] [cursor=pointer]:
+            - /url: /developer-projects/50769493/
+            - generic [ref=e134]:
+              - img [ref=e136]
+              - text: Projects
+          - generic [ref=e139]:
+            - img [ref=e141]
+            - text: Contact Intake App
+        - banner [ref=e143]:
+          - heading "Contact Intake App Ready • View builds & deploys" [level=1] [ref=e145]:
+            - generic [ref=e146]:
+              - generic [ref=e147]: Contact Intake App
+              - paragraph [ref=e151]:
+                - generic [ref=e152]:
+                  - text: Ready •
+                  - link "View builds & deploys" [ref=e153] [cursor=pointer]:
+                    - /url: /developer-projects/50769493/project/Contact Intake App/activity
+          - generic [ref=e158]:
+            - paragraph [ref=e159]: Platform version
+            - paragraph [ref=e160]: "2025.2"
+      - region "Page Section" [ref=e163]:
+        - main [ref=e166]:
+          - generic [ref=e184]:
+            - generic [ref=e186]:
+              - generic [ref=e189]:
+                - paragraph [ref=e190]: Latest deployed build
+                - generic [ref=e191]:
+                  - generic [ref=e193]:
+                    - code [ref=e194]: "#4"
+                    - paragraph [ref=e195]: • 16 minutes ago
+                  - link "Details" [ref=e197] [cursor=pointer]:
+                    - /url: /developer-projects/50769493/project/Contact Intake App/activity/build/4
+              - navigation "Secondary" [ref=e200]:
+                - list [ref=e201]:
+                  - listitem [ref=e202]:
+                    - button "Contact Intake App" [expanded] [ref=e203] [cursor=pointer]:
+                      - img [ref=e204]
+                      - generic [ref=e208]: Contact Intake App
+                    - list [ref=e210]:
+                      - listitem [ref=e211]:
+                        - button "ContactIntakeApp_app" [expanded] [ref=e212] [cursor=pointer]:
+                          - img [ref=e213]
+                          - generic [ref=e217]: ContactIntakeApp_app
+                        - list [ref=e219]:
+                          - listitem [ref=e220]:
+                            - button "ContactIntakeApp_card" [expanded] [ref=e221] [cursor=pointer]:
+                              - img [ref=e222]
+                              - generic [ref=e226]: ContactIntakeApp_card
+                            - generic:
+                              - list
+            - generic [ref=e228]:
+              - tablist [ref=e230]:
+                - tab "Overview" [selected] [ref=e231] [cursor=pointer]
+                - tab "Builds & Deploys" [ref=e232] [cursor=pointer]
+                - tab "Settings" [ref=e233] [cursor=pointer]
+              - tabpanel [ref=e234]:
+                - generic [ref=e235]:
+                  - generic [ref=e237]:
+                    - heading "Recent Builds & Deploys" [level=5] [ref=e238]
+                    - link "View all" [ref=e239] [cursor=pointer]:
+                      - /url: /developer-projects/50769493/project/Contact Intake App/activity
+                  - table [ref=e243]:
+                    - rowgroup [ref=e244]:
+                      - row "#4 Auto Deploy Succeeded in 1s • 16 minutes ago View details" [ref=e245]:
+                        - cell "#4 Auto Deploy" [ref=e246]:
+                          - generic [ref=e248]:
+                            - code [ref=e249]: "#4"
+                            - generic [ref=e255]: Auto Deploy
+                        - cell "Succeeded in 1s • 16 minutes ago" [ref=e256]:
+                          - paragraph [ref=e259]:
+                            - generic [ref=e260]: Succeeded in 1s • 16 minutes ago
+                        - cell "View details" [ref=e261]:
+                          - button "View details" [ref=e263] [cursor=pointer]:
+                            - generic [ref=e265]: View details
+                      - row "#4 Build Succeeded in 12s • 16 minutes ago View details" [ref=e266]:
+                        - cell "#4 Build" [ref=e267]:
+                          - generic [ref=e269]:
+                            - code [ref=e270]: "#4"
+                            - generic [ref=e276]: Build
+                        - cell "Succeeded in 12s • 16 minutes ago" [ref=e277]:
+                          - paragraph [ref=e280]:
+                            - generic [ref=e281]: Succeeded in 12s • 16 minutes ago
+                        - cell "View details" [ref=e282]:
+                          - button "View details" [ref=e284] [cursor=pointer]:
+                            - generic [ref=e286]: View details
+                      - row "#3 Auto Deploy Succeeded in 1s • 27 minutes ago View details" [ref=e287]:
+                        - cell "#3 Auto Deploy" [ref=e288]:
+                          - generic [ref=e290]:
+                            - code [ref=e291]: "#3"
+                            - generic [ref=e297]: Auto Deploy
+                        - cell "Succeeded in 1s • 27 minutes ago" [ref=e298]:
+                          - paragraph [ref=e301]:
+                            - generic [ref=e302]: Succeeded in 1s • 27 minutes ago
+                        - cell "View details" [ref=e303]:
+                          - button "View details" [ref=e305] [cursor=pointer]:
+                            - generic [ref=e307]: View details
+                  - generic [ref=e308]:
+                    - heading "Project Components" [level=5] [ref=e311]
+                    - generic [ref=e314]:
+                      - generic [ref=e315]:
+                        - img [ref=e318]
+                        - generic [ref=e320]:
+                          - heading "Contact Intake App" [level=5] [ref=e321]:
+                            - link "Contact Intake App" [ref=e322] [cursor=pointer]:
+                              - /url: /developer-projects/50769493/project/Contact Intake App/component/ContactIntakeApp_app
+                          - paragraph [ref=e323]:
+                            - generic [ref=e324]:
+                              - text: "App ID: 31700045 •"
+                              - generic [ref=e325]: Updated 16 minutes ago
+                      - generic [ref=e326]:
+                        - img [ref=e330]
+                        - paragraph [ref=e332]: 1 feature
+    - complementary

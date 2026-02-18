@@ -1,0 +1,33 @@
+title = "meal-planner gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "google-api-key"
+description = "Google API key"
+regex = '''AIza[0-9A-Za-z\-_]{35}'''
+tags = ["key", "google"]
+
+[[allowlists]]
+description = "Allow documented placeholders in tracked docs"
+paths = [
+  '''^\.env\.example$''',
+  '''^README\.md$''',
+]
+regexes = [
+  '''GOOGLE_PLACES_API_KEY=$''',
+  '''GOOGLE_PLACES_API_KEY=<meal-planner-dev key>''',
+  '''GOOGLE_PLACES_API_KEY=<meal-planner-prod key>''',
+]
+
+[[allowlists]]
+description = "Ignore non-source artifacts and dependency trees"
+paths = [
+  '''^node_modules/''',
+  '''^\.next/''',
+  '''^data/.*\.db(-shm|-wal)?$''',
+  '''^pnpm-lock\.yaml$''',
+  '''^package-lock\.json$''',
+  '''^tsconfig\.tsbuildinfo$''',
+]

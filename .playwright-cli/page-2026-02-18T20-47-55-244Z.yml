@@ -1,0 +1,325 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic:
+      - iframe
+    - banner [ref=e4]:
+      - link "HubSpot logo" [ref=e6] [cursor=pointer]:
+        - /url: /reports-dashboard/50769493
+        - img "HubSpot logo" [ref=e7]
+      - generic [ref=e9]:
+        - generic [ref=e14]:
+          - img
+          - searchbox "Search HubSpot" [ref=e15]
+          - generic:
+            - generic: ⌘
+            - generic: K
+        - button "Create new" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+      - navigation "Global toolbar" [ref=e21]:
+        - menu [ref=e22]:
+          - menuitem "Calls" [ref=e23]:
+            - button "Calls" [ref=e24] [cursor=pointer]:
+              - img "Calling" [ref=e25]
+          - menuitem "Marketplace" [ref=e27]:
+            - button "Marketplace" [ref=e28] [cursor=pointer]:
+              - img "Marketplace" [ref=e29]
+          - menuitem "Help" [ref=e31]:
+            - button "Help" [ref=e33] [cursor=pointer]:
+              - img "Help" [ref=e34]
+          - menuitem "Settings" [ref=e36]:
+            - link "Settings" [ref=e37] [cursor=pointer]:
+              - /url: /user-preferences/50769493?eschref=%2Fconnected-apps%2F50769493%2Finstalled
+              - img "Settings" [ref=e38]
+          - menuitem "Notifications" [ref=e41]:
+            - button "Notifications" [ref=e42] [cursor=pointer]:
+              - img [ref=e43]
+          - menuitem "Open Assistant" [ref=e46]:
+            - button "Open Assistant" [ref=e47] [cursor=pointer]:
+              - img "Open Assistant" [ref=e48]
+          - menuitem "View profile and more" [ref=e52]:
+            - button "View profile and more" [ref=e53] [cursor=pointer]:
+              - img "Good Monday Whiskey Club" [ref=e54]
+              - img [ref=e55]
+  - generic [ref=e58]:
+    - navigation [ref=e60]:
+      - menu [ref=e61]:
+        - menuitem "Bookmarks" [ref=e62] [cursor=pointer]:
+          - img "Bookmarks" [ref=e154]
+        - menuitem "CRM" [ref=e65] [cursor=pointer]:
+          - img "CRM" [ref=e66]
+        - menuitem "Marketing" [ref=e68] [cursor=pointer]:
+          - img "Marketing" [ref=e69]
+        - menuitem "Content" [ref=e71] [cursor=pointer]:
+          - img "Content" [ref=e72]
+        - menuitem "Sales" [ref=e74] [cursor=pointer]:
+          - img "Sales" [ref=e75]
+        - menuitem "Commerce" [ref=e77] [cursor=pointer]:
+          - img "Commerce" [ref=e78]
+        - menuitem "Service" [ref=e81] [cursor=pointer]:
+          - img "Service" [ref=e82]
+        - menuitem "Data Management" [ref=e86] [cursor=pointer]:
+          - img "Data Management" [ref=e87]
+        - menuitem "Automation" [ref=e89] [cursor=pointer]:
+          - img "Automation" [ref=e90]
+        - menuitem "Reporting" [ref=e92] [cursor=pointer]:
+          - img "Reporting" [ref=e93]
+        - menuitem "Breeze" [ref=e95] [cursor=pointer]:
+          - img "Breeze" [ref=e96]
+        - menuitem "Development" [ref=e98] [cursor=pointer]:
+          - img "Development" [ref=e99]
+    - button [ref=e103] [cursor=pointer]:
+      - img [ref=e104]
+  - generic:
+    - button "PaperCuts Feedback" [ref=e107] [cursor=pointer]:
+      - img [ref=e108]
+    - iframe
+  - generic [ref=e110]:
+    - generic [ref=e113]:
+      - region "Page Section" [ref=e114]:
+        - banner [ref=e115]:
+          - heading "Connected Apps" [level=1] [ref=e117]:
+            - generic [ref=e119]: Connected Apps
+          - link "Add more connections" [ref=e123] [cursor=pointer]:
+            - /url: https://app.hubspot.com/ecosystem/50769493/marketplace/apps?source=connected-apps
+            - generic [ref=e124]: Add more connections
+        - navigation [ref=e127]:
+          - link "Connections home (5)" [ref=e156] [cursor=pointer]:
+            - /url: /connected-apps/50769493/installed
+            - text: Connections home (5)
+          - link "Connections insights" [ref=e130] [cursor=pointer]:
+            - /url: /connected-apps/50769493/overview
+            - text: Connections insights
+          - link "Notifications" [ref=e157] [cursor=pointer]:
+            - /url: /connected-apps/50769493/notifications
+            - text: Notifications
+      - region "Page Section" [ref=e134]:
+        - main [ref=e137]:
+          - heading "My Apps" [level=3] [ref=e159]
+          - generic [ref=e160]:
+            - generic [ref=e161]:
+              - searchbox "Search for an app" [ref=e162]
+              - generic:
+                - generic:
+                  - img
+            - button "App status" [ref=e165] [cursor=pointer]:
+              - generic [ref=e169]: App status
+          - table [ref=e174]:
+            - rowgroup [ref=e182]:
+              - row "APP Ascending sort. Press to sort descending. STATUS Press to sort. INSTALLED DATE Press to sort. INSTALLED BY Press to sort. LAST ACTIVITY DATE Press to sort." [ref=e183]:
+                - button "APP Ascending sort. Press to sort descending." [ref=e184] [cursor=pointer]:
+                  - generic [ref=e186]:
+                    - generic [ref=e187]: APP
+                    - generic "Ascending sort. Press to sort descending." [ref=e188]:
+                      - img [ref=e189]
+                - button "STATUS Press to sort." [ref=e191] [cursor=pointer]:
+                  - generic [ref=e193]:
+                    - generic [ref=e194]:
+                      - generic [ref=e195]: STATUS
+                      - img [ref=e198]
+                    - generic "Press to sort." [ref=e200]:
+                      - img [ref=e201]
+                - button "INSTALLED DATE Press to sort." [ref=e203] [cursor=pointer]:
+                  - generic [ref=e205]:
+                    - generic [ref=e206]: INSTALLED DATE
+                    - generic "Press to sort." [ref=e207]:
+                      - img [ref=e208]
+                - button "INSTALLED BY Press to sort." [ref=e210] [cursor=pointer]:
+                  - generic [ref=e212]:
+                    - generic [ref=e213]: INSTALLED BY
+                    - generic "Press to sort." [ref=e214]:
+                      - img [ref=e215]
+                - button "LAST ACTIVITY DATE Press to sort." [ref=e217] [cursor=pointer]:
+                  - generic [ref=e219]:
+                    - generic [ref=e220]:
+                      - generic [ref=e221]: LAST ACTIVITY DATE
+                      - img [ref=e224]
+                    - generic "Press to sort." [ref=e226]:
+                      - img [ref=e227]
+                - columnheader [ref=e229]
+            - rowgroup [ref=e230]:
+              - row "Event Manager Private App Connected Feb 17, 2026 9:36 PM CST Good Monday Whiskey Club rtubbs@hubspot.com Actions" [ref=e231]:
+                - cell "Event Manager Private App" [ref=e232]:
+                  - generic [ref=e233]:
+                    - img [ref=e235]
+                    - link "Event Manager Private App" [ref=e238] [cursor=pointer]:
+                      - /url: /integrations-settings/50769493/installed/application/31626492
+                - cell "Connected" [ref=e239]:
+                  - generic [ref=e250]: Connected
+                - cell "Feb 17, 2026 9:36 PM CST" [ref=e251]
+                - cell "Good Monday Whiskey Club rtubbs@hubspot.com" [ref=e252]:
+                  - generic [ref=e258]:
+                    - link "Good Monday Whiskey Club" [ref=e259] [cursor=pointer]:
+                      - /url: /settings/50769493/users/user/85788048
+                      - generic [ref=e261]: Good Monday Whiskey Club
+                    - text: rtubbs@hubspot.com
+                - cell [ref=e262]
+                - cell "Actions" [ref=e263]:
+                  - button "Actions" [ref=e265] [cursor=pointer]:
+                    - generic [ref=e268]: Actions
+              - row "GMWC Cabinet Feb 17, 2026 5:00 PM CST Good Monday Whiskey Club rtubbs@hubspot.com Feb 17, 2026 9:26 PM CST Actions" [ref=e270]:
+                - cell "GMWC Cabinet" [ref=e271]:
+                  - generic [ref=e272]:
+                    - img [ref=e274]
+                    - link "GMWC Cabinet" [ref=e277] [cursor=pointer]:
+                      - /url: /integrations-settings/50769493/installed/application/31614000
+                - cell [ref=e278]
+                - cell "Feb 17, 2026 5:00 PM CST" [ref=e279]
+                - cell "Good Monday Whiskey Club rtubbs@hubspot.com" [ref=e280]:
+                  - generic [ref=e286]:
+                    - link "Good Monday Whiskey Club" [ref=e287] [cursor=pointer]:
+                      - /url: /settings/50769493/users/user/85788048
+                      - generic [ref=e289]: Good Monday Whiskey Club
+                    - text: rtubbs@hubspot.com
+                - cell "Feb 17, 2026 9:26 PM CST" [ref=e290]
+                - cell "Actions" [ref=e291]:
+                  - button "Actions" [ref=e293] [cursor=pointer]:
+                    - generic [ref=e296]: Actions
+              - row "HubSpot connector for ChatGPT HubSpot connector for ChatGPT Connected Dec 3, 2025 2:00 PM CST Good Monday Whiskey Club rtubbs@hubspot.com Actions" [ref=e298]:
+                - cell "HubSpot connector for ChatGPT HubSpot connector for ChatGPT" [ref=e299]:
+                  - generic [ref=e300]:
+                    - img "HubSpot connector for ChatGPT" [ref=e302]
+                    - link "HubSpot connector for ChatGPT" [ref=e304] [cursor=pointer]:
+                      - /url: /integrations-settings/50769493/installed/application/12360546
+                - cell "Connected" [ref=e305]:
+                  - generic [ref=e316]: Connected
+                - cell "Dec 3, 2025 2:00 PM CST" [ref=e317]
+                - cell "Good Monday Whiskey Club rtubbs@hubspot.com" [ref=e318]:
+                  - generic [ref=e324]:
+                    - link "Good Monday Whiskey Club" [ref=e325] [cursor=pointer]:
+                      - /url: /settings/50769493/users/user/85788048
+                      - generic [ref=e327]: Good Monday Whiskey Club
+                    - text: rtubbs@hubspot.com
+                - cell [ref=e328]
+                - cell "Actions" [ref=e329]:
+                  - button "Actions" [ref=e331] [cursor=pointer]:
+                    - generic [ref=e334]: Actions
+              - row "HubSpot Local Development Tools HubSpot Local Development Tools Feb 2, 2026 5:43 PM CST Good Monday Whiskey Club rtubbs@hubspot.com + 1 more Actions" [ref=e336]:
+                - cell "HubSpot Local Development Tools HubSpot Local Development Tools" [ref=e337]:
+                  - generic [ref=e338]:
+                    - img "HubSpot Local Development Tools" [ref=e340]
+                    - link "HubSpot Local Development Tools" [ref=e342] [cursor=pointer]:
+                      - /url: /integrations-settings/50769493/installed/application/210158
+                - cell [ref=e343]
+                - cell "Feb 2, 2026 5:43 PM CST" [ref=e344]
+                - cell "Good Monday Whiskey Club rtubbs@hubspot.com + 1 more" [ref=e345]:
+                  - generic [ref=e346]:
+                    - generic [ref=e351]:
+                      - link "Good Monday Whiskey Club" [ref=e352] [cursor=pointer]:
+                        - /url: /settings/50769493/users/user/85788048
+                        - generic [ref=e354]: Good Monday Whiskey Club
+                      - text: rtubbs@hubspot.com
+                    - generic [ref=e355]:
+                      - text: +
+                      - button "1 more" [ref=e356] [cursor=pointer]:
+                        - generic [ref=e358]: 1 more
+                - cell [ref=e359]
+                - cell "Actions" [ref=e360]:
+                  - button "Actions" [ref=e362] [cursor=pointer]:
+                    - generic [ref=e365]: Actions
+              - row "Mailchimp Mailchimp Connected Dec 11, 2025 4:17 PM CST Good Monday Whiskey Club rtubbs@hubspot.com Feb 3, 2026 3:23 PM CST Actions" [ref=e367]:
+                - cell "Mailchimp Mailchimp" [ref=e368]:
+                  - generic [ref=e369]:
+                    - img "Mailchimp" [ref=e371]
+                    - link "Mailchimp" [ref=e373] [cursor=pointer]:
+                      - /url: /integrations-settings/50769493/installed/application/236011
+                - cell "Connected" [ref=e374]:
+                  - generic [ref=e385]: Connected
+                - cell "Dec 11, 2025 4:17 PM CST" [ref=e386]
+                - cell "Good Monday Whiskey Club rtubbs@hubspot.com" [ref=e387]:
+                  - generic [ref=e393]:
+                    - link "Good Monday Whiskey Club" [ref=e394] [cursor=pointer]:
+                      - /url: /settings/50769493/users/user/85788048
+                      - generic [ref=e396]: Good Monday Whiskey Club
+                    - text: rtubbs@hubspot.com
+                - cell "Feb 3, 2026 3:23 PM CST" [ref=e397]
+                - cell "Actions" [ref=e398]:
+                  - button "Actions" [ref=e400] [cursor=pointer]:
+                    - generic [ref=e403]: Actions
+          - generic [ref=e405]:
+            - navigation "Pagination" [ref=e406]:
+              - button "Previous page" [disabled] [ref=e408]:
+                - generic [ref=e409]:
+                  - img [ref=e410]
+                  - generic [ref=e412]: Prev
+              - button "You are currently on Page 1" [ref=e414] [cursor=pointer]:
+                - generic [ref=e415]:
+                  - generic [ref=e416]: You are currently on Page
+                  - text: "1"
+              - button "Next page" [disabled] [ref=e418]:
+                - generic [ref=e419]:
+                  - generic [ref=e420]: Next
+                  - img [ref=e421]
+            - button "25 per page" [ref=e423] [cursor=pointer]:
+              - generic [ref=e427]: 25 per page
+          - iframe [ref=e430]:
+            - generic [active] [ref=f58e1]:
+              - generic [ref=f58e5]:
+                - generic [ref=f58e6]:
+                  - heading "Recommendations" [level=3] [ref=f58e8]
+                  - button "See more" [ref=f58e10] [cursor=pointer]
+                - generic [ref=f58e11]:
+                  - generic [ref=f58e14]:
+                    - button "Prospecting Agent Prospecting Agent By HubSpot 14K installs Research prospects, monitor signals, and send timely, personalized emails. Agent Breeze" [ref=f58e17] [cursor=pointer]:
+                      - img "Prospecting Agent" [ref=f58e19]
+                      - heading "Prospecting Agent" [level=4] [ref=f58e20]
+                      - generic [ref=f58e21]:
+                        - generic [ref=f58e22]: By HubSpot
+                        - generic [ref=f58e23]: 14K installs
+                      - paragraph [ref=f58e24]: Research prospects, monitor signals, and send timely, personalized emails.
+                      - generic [ref=f58e25]:
+                        - generic [ref=f58e27]: Agent
+                        - generic [ref=f58e28]:
+                          - img [ref=f58e30]
+                          - generic [ref=f58e32]: Breeze
+                    - button "Zoom Zoom By HubSpot 98K installs Use Zoom with HubSpot meetings, workflows, contact records and more. App" [ref=f58e35] [cursor=pointer]:
+                      - img "Zoom" [ref=f58e37]
+                      - heading "Zoom" [level=4] [ref=f58e38]
+                      - generic [ref=f58e39]:
+                        - generic [ref=f58e40]: By HubSpot
+                        - generic [ref=f58e41]: 98K installs
+                      - paragraph [ref=f58e42]: Use Zoom with HubSpot meetings, workflows, contact records and more.
+                      - generic [ref=f58e45]: App
+                    - button "Salesforce Salesforce By HubSpot 19K installs An automatic, bi-directional sync between HubSpot and Salesforce. App" [ref=f58e48] [cursor=pointer]:
+                      - img "Salesforce" [ref=f58e50]
+                      - heading "Salesforce" [level=4] [ref=f58e51]
+                      - generic [ref=f58e52]:
+                        - generic [ref=f58e53]: By HubSpot
+                        - generic [ref=f58e54]: 19K installs
+                      - paragraph [ref=f58e55]: An automatic, bi-directional sync between HubSpot and Salesforce.
+                      - generic [ref=f58e58]: App
+                    - button "Google Meet Google Meet By HubSpot 67K installs meeting links, recordings & transcripts for Google Meet in HubSpot App" [ref=f58e61] [cursor=pointer]:
+                      - img "Google Meet" [ref=f58e63]
+                      - heading "Google Meet" [level=4] [ref=f58e64]
+                      - generic [ref=f58e65]:
+                        - generic [ref=f58e66]: By HubSpot
+                        - generic [ref=f58e67]: 67K installs
+                      - paragraph [ref=f58e68]: meeting links, recordings & transcripts for Google Meet in HubSpot
+                      - generic [ref=f58e71]: App
+                    - button "Slack Slack By HubSpot 80K installs Get HubSpot notifications, tasks, and slash commands within Slack App" [ref=f58e74] [cursor=pointer]:
+                      - img "Slack" [ref=f58e76]
+                      - heading "Slack" [level=4] [ref=f58e77]
+                      - generic [ref=f58e78]:
+                        - generic [ref=f58e79]: By HubSpot
+                        - generic [ref=f58e80]: 80K installs
+                      - paragraph [ref=f58e81]: Get HubSpot notifications, tasks, and slash commands within Slack
+                      - generic [ref=f58e84]: App
+                    - button "Gmail Gmail By HubSpot 506K installs Bring HubSpot to your inbox with the HubSpot integration for Gmail. App" [ref=f58e87] [cursor=pointer]:
+                      - img "Gmail" [ref=f58e89]
+                      - heading "Gmail" [level=4] [ref=f58e90]
+                      - generic [ref=f58e91]:
+                        - generic [ref=f58e92]: By HubSpot
+                        - generic [ref=f58e93]: 506K installs
+                      - paragraph [ref=f58e94]: Bring HubSpot to your inbox with the HubSpot integration for Gmail.
+                      - generic [ref=f58e97]: App
+                    - button "Microsoft Teams Microsoft Teams By HubSpot 59K installs Use Microsoft Teams and HubSpot for meetings, conversations, and more! App" [ref=f58e100] [cursor=pointer]:
+                      - img "Microsoft Teams" [ref=f58e102]
+                      - heading "Microsoft Teams" [level=4] [ref=f58e103]
+                      - generic [ref=f58e104]:
+                        - generic [ref=f58e105]: By HubSpot
+                        - generic [ref=f58e106]: 59K installs
+                      - paragraph [ref=f58e107]: Use Microsoft Teams and HubSpot for meetings, conversations, and more!
+                      - generic [ref=f58e110]: App
+                  - button "Scroll right" [ref=f58e112] [cursor=pointer]:
+                    - img "Scroll right" [ref=f58e114]
+              - complementary
+    - complementary

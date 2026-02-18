@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model GroceryStore {
+  id            String             @id @db.VarChar(128)
+  name          String             @db.VarChar(200)
+  address       String             @db.VarChar(300)
+  placeId       String?            @unique @map("place_id") @db.VarChar(200)
+  lat           Float?
+  lng           Float?
+  phone         String?            @db.VarChar(80)
+  hours         String[]
+  logoUrl       String?            @map("logo_url") @db.VarChar(500)
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  ingredients   IngredientEntry[]
+  recipeLinks   RecipeIngredient[]
+
+  @@index([name])
+  @@map("grocery_stores")
+}
+
+model IngredientEntry {
+  id             String        @id @db.VarChar(128)
+  name           String        @db.VarChar(200)
+  defaultUnit    String        @map("default_unit") @db.VarChar(64)
+  defaultStoreId String?       @map("default_store_id") @db.VarChar(128)
+  category       String        @db.VarChar(80)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  defaultStore   GroceryStore? @relation(fields: [defaultStoreId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([name])
+  @@index([defaultStoreId])
+  @@map("ingredient_entries")
+}
+
+model Recipe {
+  id          String           @id @db.VarChar(128)
+  name        String           @db.VarChar(200)
+  description String           @db.VarChar(1000)
+  mealType    String           @map("meal_type") @db.VarChar(32)
+  servings    Int
+  sourceUrl   String           @map("source_url") @db.VarChar(500)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  ingredients RecipeIngredient[]
+  steps       RecipeStep[]
+  mealSlots   MealPlanSlot[]
+
+  @@index([name])
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id        String        @id @db.VarChar(128)
+  recipeId  String        @map("recipe_id") @db.VarChar(128)
+  name      String        @db.VarChar(200)
+  qty       Float?
+  unit      String        @db.VarChar(64)
+  store     String        @db.VarChar(200)
+  storeId   String?       @map("store_id") @db.VarChar(128)
+  position  Int
+  recipe    Recipe        @relation(fields: [recipeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  storeLink GroceryStore? @relation(fields: [storeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([recipeId])
+  @@index([storeId])
+  @@unique([recipeId, position])
+  @@map("recipe_ingredients")
+}
+
+model RecipeStep {
+  id       String @id @default(cuid()) @db.VarChar(128)
+  recipeId String @map("recipe_id") @db.VarChar(128)
+  text     String @db.VarChar(2000)
+  position Int
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([recipeId])
+  @@unique([recipeId, position])
+  @@map("recipe_steps")
+}
+
+model MealPlanSlot {
+  day       String   @db.VarChar(16)
+  slot      String   @db.VarChar(16)
+  recipeId  String?  @map("recipe_id") @db.VarChar(128)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  recipe    Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@id([day, slot])
+  @@index([recipeId])
+  @@map("meal_plan_slots")
+}
+
+model MealPlanSnapshot {
+  id        String                 @id @db.VarChar(128)
+  createdAt DateTime               @default(now()) @map("created_at")
+  label     String                 @db.VarChar(200)
+  meals     MealPlanSnapshotMeal[]
+
+  @@index([createdAt(sort: Desc)])
+  @@map("meal_plan_snapshots")
+}
+
+model MealPlanSnapshotMeal {
+  id         String           @id @default(cuid()) @db.VarChar(128)
+  snapshotId String           @map("snapshot_id") @db.VarChar(128)
+  day        String           @db.VarChar(16)
+  slot       String           @db.VarChar(16)
+  recipeId   String           @map("recipe_id") @db.VarChar(128)
+  recipeName String           @map("recipe_name") @db.VarChar(200)
+  storeIds   String[]         @map("store_ids")
+  storeNames String[]         @map("store_names")
+  snapshot   MealPlanSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([snapshotId])
+  @@map("meal_plan_snapshot_meals")
+}

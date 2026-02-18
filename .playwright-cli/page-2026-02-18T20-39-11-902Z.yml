@@ -1,0 +1,222 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content":
+    - /url: "#geist-skip-nav"
+  - generic [ref=e2]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "VercelLogotype" [ref=e7] [cursor=pointer]:
+          - /url: /home
+          - img "VercelLogotype" [ref=e8]
+        - navigation "Main" [ref=e10]:
+          - list [ref=e12]:
+            - listitem [ref=e13]:
+              - button "Build" [ref=e14] [cursor=pointer]
+            - listitem [ref=e15]:
+              - button "Scale" [ref=e16] [cursor=pointer]
+            - listitem [ref=e17]:
+              - button "Secure" [ref=e18] [cursor=pointer]
+            - listitem [ref=e19]:
+              - button "Learn" [ref=e20] [cursor=pointer]
+            - listitem [ref=e21]:
+              - link "Pricing" [ref=e22] [cursor=pointer]:
+                - /url: /pricing
+    - main [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e30]:
+          - link "Back to Marketplace" [ref=e32] [cursor=pointer]:
+            - /url: /marketplace
+            - img [ref=e33]
+            - generic [ref=e35]: Back to Marketplace
+          - generic [ref=e36]:
+            - generic [ref=e38]:
+              - img [ref=e40]
+              - heading "Neon" [level=1] [ref=e41]
+            - generic [ref=e42]:
+              - link "Install" [ref=e43] [cursor=pointer]:
+                - /url: /login?next=/marketplace/neon
+                - generic [ref=e44]: Install
+              - button "Copy integration link" [ref=e46] [cursor=pointer]:
+                - img [ref=e48]
+              - button "More" [ref=e50] [cursor=pointer]:
+                - img [ref=e52]
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - generic [ref=e58]:
+              - heading "Installs" [level=4] [ref=e59]
+              - generic [ref=e60]:
+                - img [ref=e61]
+                - generic [ref=e63]: 1000+ installs
+            - generic [ref=e64]:
+              - heading "Categories" [level=4] [ref=e65]
+              - generic [ref=e66]:
+                - link "Storage" [ref=e67] [cursor=pointer]:
+                  - /url: /marketplace/category/storage
+                  - img [ref=e68]
+                  - generic [ref=e70]: Storage
+                - link "Authentication" [ref=e71] [cursor=pointer]:
+                  - /url: /marketplace/category/authentication
+                  - img [ref=e72]
+                  - generic [ref=e74]: Authentication
+            - generic [ref=e75]:
+              - heading "Type" [level=4] [ref=e76]
+              - generic [ref=e78]:
+                - img [ref=e79]
+                - generic [ref=e81]: Vercel Native
+            - generic [ref=e82]:
+              - heading "Resources" [level=4] [ref=e83]
+              - generic [ref=e84]:
+                - link "Support" [ref=e85] [cursor=pointer]:
+                  - /url: https://neon.tech/docs/introduction/support
+                  - img [ref=e86]
+                  - text: Support
+                - link "Documentation" [ref=e88] [cursor=pointer]:
+                  - /url: https://neon.tech/docs/introduction
+                  - img [ref=e89]
+                  - text: Documentation
+                - link "Terms" [ref=e91] [cursor=pointer]:
+                  - /url: https://neon.tech/terms-of-service
+                  - img [ref=e92]
+                  - text: Terms
+                - link "Privacy Policy" [ref=e94] [cursor=pointer]:
+                  - /url: https://neon.tech/privacy-policy
+                  - img [ref=e95]
+                  - text: Privacy Policy
+                - link "Website" [ref=e98] [cursor=pointer]:
+                  - /url: https://neon.tech/home
+                  - img [ref=e99]
+                  - text: Website
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - generic [ref=e103]: Preview
+              - generic [ref=e108]:
+                - button [ref=e109] [cursor=pointer]
+                - button [ref=e110] [cursor=pointer]
+                - button [ref=e111] [cursor=pointer]
+                - button [ref=e112] [cursor=pointer]
+            - generic [ref=e113]:
+              - generic [ref=e114]: Overview
+              - generic [ref=e115]:
+                - heading "Ship Faster with Serverless Postgres" [level=4] [ref=e116]
+                - paragraph [ref=e117]: Neon takes everything developers love about Postgres — reliability, performance, extensibility — and delivers it as a serverless product that helps you ship reliable, scalable applications faster than ever.
+                - paragraph [ref=e118]:
+                  - text: By integrating Neon with Vercel,
+                  - strong [ref=e119]: you can deploy a fully managed Postgres database in seconds
+                  - text: with features like database branching, autoscaling, scale-to-zero, read replicas, authorization, a Drizzle Studio-powered table editor, an AI-enabled SQL client, instant point-in-time recovery, time travel queries, a low-latency serverless driver, and more. Neon offers a generous
+                  - strong [ref=e120]: Free Plan
+                  - text: and paid plans that grow with you from prototype to enterprise.
+            - generic [ref=e121]:
+              - generic [ref=e122]: Products
+              - generic [ref=e124]:
+                - generic [ref=e125]:
+                  - img [ref=e126]
+                  - button "Add Product" [ref=e128] [cursor=pointer]:
+                    - generic [ref=e129]: Install
+                - generic [ref=e130]:
+                  - generic [ref=e131]: Neon
+                  - generic [ref=e132]: Serverless Postgres
+                - generic [ref=e133]: Plans starting at $0
+            - generic [ref=e134]:
+              - generic [ref=e135]: Instructions
+              - generic [ref=e136]:
+                - heading "Selecting the right integration mode" [level=4] [ref=e137]
+                - paragraph [ref=e138]: "There are two integration modes to select from:"
+                - list [ref=e139]:
+                  - listitem [ref=e140]:
+                    - paragraph [ref=e141]:
+                      - strong [ref=e142]: Create New Neon Account
+                      - text: ": Installs the Neon Postgres native integration and creates a Neon account for you if you do not have one already. You get access to Neon features and plans. Billing is managed through Vercel. See the"
+                      - link "Install the Neon Native Integration" [ref=e143] [cursor=pointer]:
+                        - /url: https://neon.tech/docs/guides/vercel-native-integration
+                      - text: for more information.
+                  - listitem [ref=e144]:
+                    - paragraph [ref=e145]:
+                      - strong [ref=e146]: Link Existing Neon Account
+                      - text: ": Installs the Neon Postgres Previews Integration. Connects your Vercel project to your Neon database to create a database branch for each preview deployment. See the"
+                      - link "Install the Neon Previews Integration" [ref=e147] [cursor=pointer]:
+                        - /url: https://neon.tech/docs/guides/vercel-previews-integration
+                      - text: for more information.
+                - paragraph [ref=e148]: "Explore Neon with these resources:"
+                - list [ref=e149]:
+                  - listitem [ref=e150]:
+                    - link "Neon Pricing" [ref=e151] [cursor=pointer]:
+                      - /url: https://neon.tech/pricing
+                  - listitem [ref=e152]:
+                    - link "Neon Documentation" [ref=e153] [cursor=pointer]:
+                      - /url: https://neon.tech/docs/introduction
+            - generic [ref=e155]:
+              - generic [ref=e156]:
+                - paragraph [ref=e157]: Starter Templates
+                - link "View all templates" [ref=e158] [cursor=pointer]:
+                  - /url: /templates?database=neon
+              - tablist [ref=e162]:
+                - tab "Vercel with Neon Postgres" [selected] [ref=e163] [cursor=pointer]
+                - tab "Next.js AI Chatbot" [ref=e164] [cursor=pointer]
+              - generic [ref=e165]:
+                - generic [ref=e166]:
+                  - generic [ref=e167]:
+                    - generic [ref=e168]: Get started with Vercel and Neon today.
+                    - generic [ref=e169]: A minimal template for building full-stack React applications using Next.js, Vercel, and Neon.
+                  - generic [ref=e170]:
+                    - link "Deploy an Example" [ref=e171] [cursor=pointer]:
+                      - /url: /new/clone?demo-description=A%20minimal%20template%20for%20building%20full-stack%20React%20applications%20using%20Next.js%2C%20Vercel%2C%20and%20Neon.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F1C5qjoXApiKj8hFdKy55bp%2Fbcf64203cf35dccf71e0a59f7535876d%2Fhome.png&demo-title=Vercel%20with%20Neon%20Postgres&demo-url=https%3A%2F%2Fvercel-marketplace-neon.vercel.app%2F&from=templates&products=%255B%257B%2522type%2522%253A%2522integration%2522%252C%2522protocol%2522%253A%2522storage%2522%252C%2522productSlug%2522%253A%2522neon%2522%252C%2522integrationSlug%2522%253A%2522neon%2522%257D%255D&project-name=Vercel%20with%20Neon%20Postgres&repository-name=vercel-with-neon-postgres&repository-url=https%3A%2F%2Fgithub.com%2Fneondatabase-labs%2Fvercel-marketplace-neon&skippable-integrations=1
+                      - generic [ref=e172]: Deploy an Example
+                    - link "View Demo" [ref=e173] [cursor=pointer]:
+                      - /url: https://vercel-marketplace-neon.vercel.app/
+                      - generic [ref=e174]: View Demo
+                - img "Vercel with Neon Postgres" [ref=e175] [cursor=pointer]
+    - contentinfo [ref=e176]:
+      - navigation "Vercel Directory" [ref=e177]:
+        - generic [ref=e178]:
+          - link "Vercel logo" [ref=e179] [cursor=pointer]:
+            - /url: /home
+            - img "Vercel logo" [ref=e180]
+          - list [ref=e182]:
+            - listitem [ref=e183]:
+              - link "Home" [ref=e184] [cursor=pointer]:
+                - /url: /home
+            - listitem [ref=e185]:
+              - link "Docs" [ref=e186] [cursor=pointer]:
+                - /url: /docs
+            - listitem [ref=e187]:
+              - link "Knowledge Base" [ref=e188] [cursor=pointer]:
+                - /url: /kb
+            - listitem [ref=e189]:
+              - link "Academy" [ref=e190] [cursor=pointer]:
+                - /url: /academy
+            - listitem [ref=e191]:
+              - button "SDKs" [ref=e192] [cursor=pointer]:
+                - generic [ref=e194]:
+                  - text: SDKs
+                  - img [ref=e195]
+            - listitem [ref=e197]:
+              - link "Help" [ref=e198] [cursor=pointer]:
+                - /url: /help
+            - listitem [ref=e199]:
+              - link "Contact" [ref=e200] [cursor=pointer]:
+                - /url: /contact
+            - listitem [ref=e201]:
+              - button "Legal" [ref=e202] [cursor=pointer]:
+                - generic [ref=e204]:
+                  - text: Legal
+                  - img [ref=e205]
+        - generic [ref=e207]:
+          - link "Loading status…" [ref=e208] [cursor=pointer]:
+            - /url: https://vercel-status.com
+            - paragraph [ref=e211]: Loading status…
+          - group "Select a display theme:" [ref=e212]:
+            - generic [ref=e213]: "Select a display theme:"
+            - generic [ref=e214]:
+              - radio "system"
+              - generic [ref=e215] [cursor=pointer]:
+                - generic [ref=e216]: system
+                - img [ref=e217]
+            - generic [ref=e219]:
+              - radio "light"
+              - generic [ref=e220] [cursor=pointer]:
+                - generic [ref=e221]: light
+                - img [ref=e222]
+            - generic [ref=e224]:
+              - radio "dark"
+              - generic [ref=e225] [cursor=pointer]:
+                - generic [ref=e226]: dark
+                - img [ref=e227]
