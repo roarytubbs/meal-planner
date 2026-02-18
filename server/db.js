@@ -23,14 +23,7 @@ function ensureDirectoryForFile(filePath) {
 }
 
 async function createSqliteStore(sqlitePath) {
-  const importedSqlite = await import("node:sqlite").catch(() => null);
-  const DatabaseSync = importedSqlite?.DatabaseSync;
-
-  if (!DatabaseSync) {
-    throw new Error(
-      "SQLite storage requires a Node.js runtime with node:sqlite support (Node.js 22+). Set DATABASE_URL to use Postgres instead.",
-    );
-  }
+  const { DatabaseSync } = await import("node:sqlite");
 
   ensureDirectoryForFile(sqlitePath);
 
