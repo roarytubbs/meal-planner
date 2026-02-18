@@ -6,9 +6,20 @@ __v0_jsx-dev-runtime.ts
 # Common ignores
 node_modules/
 .next/
+.playwright/
+.playwright-cli/
+playwright-report/
+test-results/
 .env*
 .envrc
 !.env.example
 .DS_Store
 .vercel
 .env*.local
+tsconfig.tsbuildinfo
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Local/temporary automation and CI artifacts that should not be public
+.github/workflows/

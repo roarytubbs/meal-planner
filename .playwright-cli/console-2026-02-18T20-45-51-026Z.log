@@ -1,3 +1,0 @@
-[   22420ms] [WARNING] Blocked aria-hidden on an element because its descendant retained focus. The focus must not be hidden from assistive technology users. Avoid using aria-hidden on a focused element or its ancestor. Consider using the inert attribute instead, which will also prevent focus. For more details, see the aria-hidden section of the WAI-ARIA specification at https://w3c.github.io/aria/#aria-hidden.
-Element with focus: <button.PrivateButton__StyledButton-eRHhiA imqGbH>
-Ancestor with aria-hidden: <button.PrivateButton__StyledButton-eRHhiA imqGbH> @ https://app.hubspot.com/layout-editor/50769493/CRM_RECORD_PAGE/0-1/edit/HubspotProvided-CRM_RECORD_PAGE:%7C:0-1:0
