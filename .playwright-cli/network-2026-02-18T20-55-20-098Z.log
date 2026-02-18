@@ -1,0 +1,317 @@
+[POST] https://app.hubspot.com/api/nudge/tracking/v1/nudge-event?portalId=50769493&clienttimeout=14000&hs_static_app=calling-remote-app&hs_static_app_version=1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-record-views-ui&hs_static_app_version=static-1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-record-views-ui&hs_static_app_version=static-1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-record-views-ui&hs_static_app_version=static-1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-record-views-ui&hs_static_app_version=static-1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://app.hubspot.com/api/cartographer/v1/performance?hs_static_app=crm-record-views-ui&hs_static_app_version=1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=notifications&hs_static_app_version=static-1.13499 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=notifications&hs_static_app_version=static-1.13499 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://app.hubspot.com/api/nudge/tracking/v1/nudge-event?portalId=50769493&clienttimeout=14000&hs_static_app=calling-remote-app&hs_static_app_version=1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=calling-remote-app&hs_static_app_version=static-1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=calling-remote-app&hs_static_app_version=static-1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=calling-remote-app&hs_static_app_version=static-1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=calling-remote-app&hs_static_app_version=static-1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=notifications&hs_static_app_version=static-1.13499 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=notifications&hs_static_app_version=static-1.13499 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=chatspot-widget-ui&hs_static_app_version=static-1.19849 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=chatspot-widget-ui&hs_static_app_version=static-1.19849 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-record-views-ui&hs_static_app_version=static-1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-record-views-ui&hs_static_app_version=static-1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://app.hubspot.com/api/cartographer/v1/performance?hs_static_app=crm-record-views-ui&hs_static_app_version=1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-record-views-ui&hs_static_app_version=static-1.24095 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-record-views-ui&hs_static_app_version=static-1.24095 => [FAILED] net::ERR_ABORTED
+[GET] https://app.hubspot.com/api/login-verify/hub-user-info?early=true&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&clienttimeout=3000 => [200] 
+[GET] https://app.hubspot.com/api/sales/v4/views/default-view/0-1/with-visualization-settings?hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&clienttimeout=14000 => [200] 
+[GET] https://app.hubspot.com/api/sales/v4/views/0-1/pinned/view?namespace=NONE&count=50&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/sales/v4/views/default-view/0-1?namespace=NONE&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&clienttimeout=15000 => [200] 
+[GET] https://app.hubspot.com/api/optins/v1/availability/Flexible%20CRM%20Views?hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&clienttimeout=15000 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.association.definitions.rpc.AssociationDefinitionsRpc/getDefinitionsFromObjectType?hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&clienttimeout=5000 => [200] 
+[GET] https://app.hubspot.com/api/properties/v4/groups/0-1/properties?includeFieldLevelPermission=true&showHighlySensitiveProperties=true&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/pipelines/v2/pipelines/0-1?includeApprovalStageStatus=true&includePermissions=true&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/customer-object-types/v1/for-portal?hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493 => [200] 
+[POST] https://app.hubspot.com/api/framework-builder/v1/read/metadata/type/all/batch?hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/growth-modals/v1/modals/has-modals?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&location=contacts&windowLocation=%2Fcontacts%2F50769493%2Fcontacts%2Flist%2Fview%2Fall%2F => [200] 
+[GET] https://app.hubspot.com/api/iris-read/v1/app?clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&hubField=paidHub => [200] 
+[GET] https://app.hubspot.com/api/trials/v1/hub-trials/app/name/all?clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/notification-station/general/v3/notifications/count?clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&showUnreadOnly=true => [200] 
+[GET] https://app.hubspot.com/api/notification-station/general/v1/ably/token-request?clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/sales-views/v2/crm-search/empty-state-redirect/0-1?hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&clienttimeout=15000 => [200] 
+[GET] https://app.hubspot.com/api/growth-modals/v1/banner/all?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.custom.enrichment.rpc.client.PropertyConfigService/getProperties?hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493&clienttimeout=5000 => [200] 
+[POST] https://app.hubspot.com/api/hubs-settings/v2/hubs-setting/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&caller=customer-data-properties => [200] 
+[GET] https://app.hubspot.com/api/sales/v4/views/default-view/0-1?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&viewId=all&namespace=NONE => [200] 
+[POST] https://hubspot-na1-rest.ably.io/keys/8MeEUg.osb9gA/requestToken?rnd=8268537421608273 => [201] Created
+[POST] https://app.hubspot.com/api/treatments/v3/get?portalId=50769493&portalUserId=50769493%3A%3A%3A85788048&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&clienttimeout=8000 => [200] 
+[GET] https://app.hubspot.com/hublytics/session-replay/v1/config?api_key=crm-index-ui%3A%3A%3Astatic-2.51449%3A%3A%3A50769493&config_keys=sessionReplay&session_id=1771447202405 => [200] 
+[POST] https://app.hubspot.com/api/user-attributes/v1/app-preferences/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&caller=crm-index-ui => [200] 
+[GET] https://app.hubspot.com/api/sales/v4/views/0-1/pinned/view?namespace=NONE&portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&count=50 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.ai.access.controls.rpc.AiAccessControlsChirpService/getAccessControls?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/graphql/crm?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/graphql/crm?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/hublytics/session-replay/v1/config?api_key=crm-index-ui%3A%3A%3Astatic-2.51449%3A%3A%3A50769493&config_keys=sessionReplay&session_id=1771447202405 => [200] 
+[GET] https://app.hubspot.com/api/notification-station/general/v1/ably/token-request?clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&portalId=50769493 => [200] 
+[GET] https://api.hubspot.com/feedback-proxy/v1/survey-config/web?email=rtubbs%40hubspot.com&portalId=50769493&targetPortalId=53&bundleVersion=1.29453&currentUrl=https%3A%2F%2Fapp.hubspot.com%2Fcontacts%2F50769493%2Fobjects%2F0-1%2Fviews%2Fall%2Flist&pageUrl=https%3A%2F%2Fapp.hubspot.com%2Fcontacts%2F50769493%2Fobjects%2F0-1%2Fviews%2Fall%2Flist => [200] 
+[POST] https://chirp-stream-app-na1.hubspot.com/chirp-frontend-app-stream/v1/gateway/com.hubspot.crm.streaming.views.rpc.CRMStreamingViewsRpc/streamObjectUpdates/stream?clienttimeout=18000000&portalId=50769493 => [FAILED] net::ERR_ABORTED
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-index-ui => [200] 
+[POST] https://exceptions.hubspot.com/v2/api/js/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&deployable=whisper-core => [200] 
+[GET] https://app.hubspot.com/api/payments/v1/payment-accounts/eligibility?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/api/inbounddb-objects/v1/crm-objects/0-1/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&allPropertiesFetchMode=latest_version&includeAllProperties=true&id=203700025689&id=203644779079&id=203699666703&id=203685473955&id=194231664502&id=187658480563&id=184221851757&id=184219683208&id=184228079289&id=184242916867&id=184241986906&id=184210350482&id=184229845892&id=184224547942&id=184225632283&id=184219220498&id=184222007886&id=184209577018&id=184209885051&id=184211433992&id=184209730880&id=184238580520&includeCurrentUserPermissions=true => [200] 
+[GET] https://app.hubspot.com/hublytics/session-replay/v1/config?api_key=crm-index-ui%3A%3A%3Astatic-2.51449%3A%3A%3A50769493&config_keys=sessionReplay&session_id=1771447202405 => [200] 
+[GET] https://app.hubspot.com/api/iris-read/v1/app?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&hubField=salesProductLevel&hubField=serviceProductLevel => [200] 
+[GET] https://app.hubspot.com/api/sales-views/v2/crm-search/limit-check/0-1?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&limit=15000000&threshold=95 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.growth.usage.rpc.GrowthUsageChirpService/getHasCreatedObjectV2?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/user-attributes/v1/app-preferences/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&caller=crm-index-ui => [200] 
+[POST] https://app.hubspot.com/api/graphql/crm?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/hubs-settings/v2/hubs-setting/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&caller=crm-index-ui => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.nudge.manager.rpc.NudgeManagerRpc/getNudges?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-index-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-index-ui => [200] 
+[GET] https://app.hubspot.com/api/customer-object-types/v1/for-portal/include-disabled?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/api/properties/v4/groups/0-1?portalId=50769493&clienttimeout=60000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&includeFieldLevelPermission=true&includeProperties=true => [200] 
+[GET] https://app.hubspot.com/api/associations/v1/definitions/0-1?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&includeFATypes=true => [200] 
+[GET] https://app.hubspot.com/api/associations/v1/definitions/0-3?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&includeFATypes=true => [200] 
+[GET] https://app.hubspot.com/api/customer-object-types/v1/for-portal/include-disabled?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/api/customer-object-types/v1/for-portal/include-disabled?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/api/framework-builder/v1/read/metadata/types/crmSegmentsUI?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&transformGateValues=true => [200] 
+[GET] https://app.hubspot.com/api/multi-currency/v2/currencies/information?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/hublytics/session-replay/v1/config?api_key=crm-index-ui%3A%3A%3Astatic-2.51449%3A%3A%3A50769493&config_keys=sessionReplay&session_id=1771447202405 => [200] 
+[GET] https://app.hubspot.com/api/reporting-discovery/v1/report-template/template-key/datawell-report-crm-contacts-index-page?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/api/calls/v1/settings?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.reporting.api.metadata.rpc.ReportingApiMetadataRpc/getVisibleProperties?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/avatars/v1/avatars/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/api/properties/v4/groups/0-1?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/hubs-settings/v2/hubs-setting/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449&caller=reporting-data => [200] 
+[POST] https://app.hubspot.com/api/hubs-settings/v2/hubs-setting/fetch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/external-options/v3/pagedFetch/OWNER?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/external-options/v3/pagedFetch/OWNER?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/chatspot-widget-ui/50769493?hostAppName=crm-index-ui&pathname=%252Fcontacts%252F50769493%252Fcontacts%252Flist%252Fview%252Fall%252F => [FAILED] net::ERR_ABORTED
+[GET] https://app.hubspot.com/chatspot-widget-ui/50769493?hostAppName=crm-index-ui&pathname=%252Fcontacts%252F50769493%252Fcontacts%252Flist%252Fview%252Fall%252F => [FAILED] net::ERR_ABORTED
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.ai.access.controls.rpc.AiAccessControlsChirpService/getAccessControls?hs_static_app=chatspot-widget-ui&hs_static_app_version=1.19849&portalId=50769493&clienttimeout=5000 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.customassistants.rpc.CustomAssistantsService/listCustomAssistants?portalId=50769493&clienttimeout=5000&hs_static_app=chatspot-widget-ui&hs_static_app_version=1.19849 => [200] 
+[GET] https://app.hubspot.com/notifications/50769493/banners?hostAppName=crm-index-ui&completeHostUrl=https%253A%252F%252Fapp.hubspot.com%252Fcontacts%252F50769493%252Fcontacts%252Flist%252Fview%252Fall%252F => [FAILED] net::ERR_ABORTED
+[GET] https://app.hubspot.com/notifications/50769493/banners?hostAppName=crm-index-ui&completeHostUrl=https%253A%252F%252Fapp.hubspot.com%252Fcontacts%252F50769493%252Fcontacts%252Flist%252Fview%252Fall%252F => [FAILED] net::ERR_ABORTED
+[GET] https://app.hubspot.com/calling-cross-tab-embed/shared-worker.js?v=0.0.9
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=chatspot-widget-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=notifications => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=calling-remote-app => [200] 
+[GET] https://app.hubspot.com/api/calling-orchestration/v1/settings/user?portalId=50769493&clienttimeout=14000&hs_static_app=calling-remote-app&hs_static_app_version=1.17548 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.onboarding.tours.rpc.ToursRpc/getTour?portalId=50769493&clienttimeout=5000&hs_static_app=calling-remote-app&hs_static_app_version=1.17548 => [200] 
+[GET] https://app.hubspot.com/api/firealarm/v4/alarm/crm-index-ui/50769493?lang=en&clienttimeout=14000&hs_static_app=notifications&hs_static_app_version=1.13499 => [200] 
+[GET] https://app.hubspot.com/api/navconfig/v2/alerts?portalId=50769493&clienttimeout=14000&hs_static_app=notifications&hs_static_app_version=1.13499 => [200] 
+[GET] https://app.hubspot.com/api/login-verify/user-info?clienttimeout=14000&hs_static_app=notifications&hs_static_app_version=1.13499 => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=notifications => [200] 
+[GET] https://app.hubspot.com/api/notification/preferences/v1/generic-user-settings?clienttimeout=14000&hs_static_app=notifications&hs_static_app_version=1.13499&portalId=50769493 => [200] 
+[POST] https://app.hubspot.com/api/nudge/tracking/v1/nudge-event?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [202] 
+[GET] https://app.hubspot.com/api/navconfig/v5/navconfig?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.nav.config.rpc.PersonalisedNavService/getPersonalisedNav?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://app.hubspot.com/api/trials/v1/hub-trials/app/active?portalId=50769493&clienttimeout=14000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[GET] https://api.hubspot.com/feedback-proxy/v1/survey-config/CSAT/1437/can-show?email=rtubbs%40hubspot.com&targetPortalId=53&bundleVersion=1.29453&portalId=50769493 => [200] 
+[GET] https://api.hubspot.com/feedback-proxy/v1/survey-config/CSAT/1437?email=rtubbs%40hubspot.com&targetPortalId=53&bundleVersion=1.29453&portalId=50769493 => [200] 
+[POST] https://app.hubspot.com/api/nudge/tracking/v1/nudge-event?portalId=50769493&clienttimeout=14000&hs_static_app=calling-remote-app&hs_static_app_version=1.17548 => [202] 
+[GET] https://app.hubspot.com/hublytics/session-replay/v1/config?api_key=crm-index-ui%3A%3A%3Astatic-2.51449%3A%3A%3A50769493&config_keys=sessionReplay&session_id=1771447202405 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.nudge.manager.rpc.NudgeManagerRpc/getNudges?portalId=50769493&clienttimeout=5000&hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [200] 
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-index-ui&hs_static_app_version=static-2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-index-ui&hs_static_app_version=static-2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-index-ui&hs_static_app_version=static-2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-index-ui&hs_static_app_version=static-2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://app.hubspot.com/api/cartographer/v1/performance?hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=notifications&hs_static_app_version=static-1.13499 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=notifications&hs_static_app_version=static-1.13499 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=calling-remote-app&hs_static_app_version=static-1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=calling-remote-app&hs_static_app_version=static-1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=calling-remote-app&hs_static_app_version=static-1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=calling-remote-app&hs_static_app_version=static-1.17548 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=notifications&hs_static_app_version=static-1.13499 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=notifications&hs_static_app_version=static-1.13499 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=chatspot-widget-ui&hs_static_app_version=static-1.19849 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=chatspot-widget-ui&hs_static_app_version=static-1.19849 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-index-ui&hs_static_app_version=static-2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-index-ui&hs_static_app_version=static-2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://app.hubspot.com/api/cartographer/v1/performance?hs_static_app=crm-index-ui&hs_static_app_version=2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-index-ui&hs_static_app_version=static-2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-index-ui&hs_static_app_version=static-2.51449 => [FAILED] net::ERR_ABORTED
+[POST] https://chirp-stream-app-na1.hubspot.com/chirp-frontend-app-stream/v1/gateway/com.hubspot.crm.streaming.views.rpc.CRMStreamingViewsRpc/streamObjectUpdates/stream?clienttimeout=18000000&portalId=50769493 => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/cartographer/v1/ipl => [FAILED] net::ERR_ABORTED
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/send => [FAILED] net::ERR_ABORTED
+[GET] https://app.hubspot.com/api/login-verify/hub-user-info?early=true&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=3000 => [200] 
+[POST] https://app.hubspot.com/api/graphql/crm?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493 => [200] 
+[POST] https://app.hubspot.com/api/graphql/crm?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493 => [200] 
+[POST] https://app.hubspot.com/api/graphql/crm?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493 => [200] 
+[POST] https://app.hubspot.com/api/crm-record-cards/v4/container-views/get-view?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[POST] https://app.hubspot.com/api/crm-record-cards/v4/container-views/get-view?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[POST] https://app.hubspot.com/api/crm-record-cards/v4/container-views/get-view?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[POST] https://app.hubspot.com/api/crm-record-cards/v4/container-views/get-view?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[GET] https://app.hubspot.com/api/contacts/v1/contact/vids/batch/?formSubmissionMode=none&identityProfileMode=all&propertyMode=value_only&resolveAssociations=false&resolveOwner=false&showAnalyticsDetails=false&showListMemberships=true&showPastListMemberships=false&showPublicToken=false&showSourceMetadata=false&vid=203700025689&flpViewValidation=true&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[GET] https://app.hubspot.com/api/framework-builder/v1/read/metadata/type/0-1/crmRecordsPage?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[GET] https://app.hubspot.com/api/timeline/v2/object/0-1/203700025689?limit=20&renderingRequested=true&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[GET] https://app.hubspot.com/api/integrators/timeline/internal/v4/event-type-installations/by-user?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[GET] https://app.hubspot.com/api/integrators/v1/portal-installs/hubspot-owned?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.ai.access.controls.rpc.AiAccessControlsChirpService/getAccessControls?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&clienttimeout=5000 => [200] 
+[GET] https://app.hubspot.com/api/properties/v4/groups/0-1/properties?includeFieldLevelPermission=true&showHighlySensitiveProperties=true&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493 => [200] 
+[POST] https://app.hubspot.com/api/framework-builder/v1/read/metadata/type/all/batch?hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/growth-modals/v1/modals/has-modals?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&location=contact-record-page&windowLocation=%2Fcontacts%2F50769493%2Frecord%2F0-1%2F203700025689&contactId=203700025689 => [200] 
+[GET] https://app.hubspot.com/api/iris-read/v1/app?clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&hubField=paidHub => [200] 
+[GET] https://app.hubspot.com/api/trials/v1/hub-trials/app/name/all?clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/notification-station/general/v3/notifications/count?clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493&showUnreadOnly=true => [200] 
+[GET] https://app.hubspot.com/api/notification-station/general/v1/ably/token-request?clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/growth-modals/v1/banner/all?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://hubspot-na1-rest.ably.io/keys/8MeEUg.osb9gA/requestToken?rnd=9792084380427545 => [201] Created
+[GET] https://app.hubspot.com/hublytics/session-replay/v1/config?api_key=crm-records-ui%3A%3A%3Astatic-1.81808%3A%3A%3A50769493&config_keys=sessionReplay&session_id=1771447202405 => [200] 
+[POST] https://app.hubspot.com/api/hubs-settings/v2/hubs-setting/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&caller=customer-data-properties => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.card.associated.objects.rpc.AssociatedObjectsGatewayRpc/getAssociatedObjectsPaged?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.card.associated.objects.rpc.AssociatedObjectsGatewayRpc/getAssociatedObjectsPaged?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.card.associated.objects.rpc.AssociatedObjectsGatewayRpc/getAssociatedObjectsPaged?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/crm-record-attachments/v1/attachments/0-1/203700025689/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&origin=CARD => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.prospecting.agent.rpc.ContactAssignmentService/getActiveOrMostRecentAssignmentForContact?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/customer-object-types/v1/for-portal?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/app-users/v1/teams?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/filemanager/api/v4/portal-meta?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/owners/v2/owners/current/remotes?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/inbounddb-objects/v1/crm-objects/0-1/203700025689?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&allPropertiesFetchMode=latest_version => [200] 
+[POST] https://app.hubspot.com/api/associations/v1/associations/queries-app?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/framework-builder/v1/read/metadata/type/all/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/user-attributes/v1/app-preferences/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&caller=crm_data => [200] 
+[POST] https://app.hubspot.com/api/user-attributes/v1/app-preferences/user-attributes/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&caller=crm_data => [200] 
+[GET] https://app.hubspot.com/api/engagements/v1/pinned/CONTACT/203700025689?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&throwOnUnauthorized=true => [204] 
+[GET] https://app.hubspot.com/api/sales-views/v1/associated-open-objects/CONTACT/203700025689/DEAL?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/sales-views/v1/associated-open-objects/CONTACT/203700025689/TICKET?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.property.validation.rpc.PropertyValidationRpc/getValidationRulesByObjectType?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/notification-station/general/v1/ably/token-request?clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/inbounddb-meta/v1/object-types/0-1?locale=EN&portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/framework-scoring/v1/history/MH/score-card/0-1/203700025689?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&offset=0&count=3&filterStates=ENABLED&filterStates=DISABLED => [200] 
+[GET] https://app.hubspot.com/api/conditional-properties/v2/options/0-1/unmerged/paged?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&pageSize=100 => [200] 
+[GET] https://app.hubspot.com/api/inbounddb-objects/v1/crm-objects/0-1/203700025689?includeAllValues=true&portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/conditional-properties/v2/unified-rules?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&objectTypeId=0-1&pageSize=100&includeActualConditionalPropertyRules=true => [200] 
+[GET] https://app.hubspot.com/api/engagements/v1/queues/owner/85788048?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&includeShared=true&includeEngagements=false => [200] 
+[GET] https://app.hubspot.com/api/vetting/public/v2/account-verification/state/scope/calling-access?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.multi.account.configuration.manager.rpc.MultiAccountConnectionsChirpService/getDataSharingSourceAccounts?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] http://localhost:8080/servers/ui-extensions-dev-server => [FAILED] net::ERR_CONNECTION_REFUSED
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.prospecting.agent.rpc.AgentConfigurationService/getAllConfigurations?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.prospecting.agent.rpc.AgentRunService/checkEligibility?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [400] 
+[GET] http://localhost:8080/servers/ui-extensions-dev-server => [FAILED] net::ERR_CONNECTION_REFUSED
+[POST] https://exceptions.hubspot.com/v2/api/js/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.ai.access.controls.rpc.AiAccessControlsChirpService/getAccessControls?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/pipelines/v2/pipelines/0-1?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&includePermissions=true => [200] 
+[POST] https://app.hubspot.com/api/pipelines-validation/v2/validate/objects/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/pipelines/v2/pipelines/0-1?includeApprovalStageStatus=true&portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.breeze.assistant.extensions.rpc.PreviewService/getOrCreatePreview?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/pipelines-validation/v2/validate/objects/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/hubs-settings/v2/hubs-setting/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&caller=reporting-data => [200] 
+[POST] https://app.hubspot.com/api/avatars/v1/avatars/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/avatars/v1/avatars/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://exceptions.hubspot.com/v2/api/js/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&deployable=whisper-core => [200] 
+[POST] https://app.hubspot.com/api/reporting-migration/v2/reports/migrate?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/reporting-migration/v2/reports/migrate?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://api.hubspot.com/feedback-proxy/v1/survey-config/web?email=rtubbs%40hubspot.com&portalId=50769493&targetPortalId=53&bundleVersion=1.29453&currentUrl=https%3A%2F%2Fapp.hubspot.com%2Fcontacts%2F50769493%2Frecord%2F0-1%2F203700025689%3Feschref%3D%252Fcontacts%252F50769493%252Fobjects%252F0-1%252Fviews%252Fall%252Flist&pageUrl=https%3A%2F%2Fapp.hubspot.com%2Fcontacts%2F50769493%2Frecord%2F0-1%2F203700025689%3Feschref%3D%252Fcontacts%252F50769493%252Fobjects%252F0-1%252Fviews%252Fall%252Flist => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.crm.object.user.views.rpc.CrmObjectUserViewsRpc/logCrmObjectUserView?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.nudge.manager.rpc.NudgeManagerRpc/getNudges?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/usage-logging/v1/log/session-replay?device_id=653847e8-616d-4c8c-91e7-42c807be9983&session_id=1771447202405&type=replay => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[GET] https://app.hubspot.com/api/calls/v1/callees/omnibus/0-1/203700025689?portalId=50769493&clienttimeout=45000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[GET] https://app.hubspot.com/api/data-privacy-settings/hub-settings?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/reporting-metadata/v1/property/rolled-out-crm-objects?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/subscriptions/v1/status/EMAIL/codex.1771446723%40example.com/business-unit?businessUnitId=0&portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/email/v1/unbounce/self-service/can-unbounce?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808&recipient=codex.1771446723%40example.com => [200] 
+[GET] https://app.hubspot.com/api/sequences/v2/enrollments/vid/203700025689/state?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app-slow/v1/gateway/com.hubspot.reporting.api.metadata.rpc.ReportingApiMetadataRpc/getPropertyMetadata?portalId=50769493&clienttimeout=20000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/calling-cross-tab-embed/shared-worker.js?v=0.0.9
+[GET] https://app.hubspot.com/api/calls/v1/settings/?hubSetting=engagements%3AActivityTypes%3AEnabled&hs_static_app=calling-widget-ui&hs_static_app_version=1.41747&portalId=50769493&clienttimeout=7000 => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://app.hubspot.com/api/reporting/v3/dataset/resolve/async?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/reporting/v3/dataset/resolve/async?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://api.hubspot.com/firealarm/v4/alarm/calling-widget-ui/50769493?lang=en => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=calling-widget-ui => [200] 
+[POST] https://app.hubspot.com/api/crm-associations-features/v3/auto-associations?portalId=50769493&clienttimeout=14000&hs_static_app=calling-widget-ui&hs_static_app_version=1.41747 => [200] 
+[POST] https://app.hubspot.com/api/graphql/crm?portalId=50769493&clienttimeout=14000&hs_static_app=calling-widget-ui&hs_static_app_version=1.41747 => [200] 
+[GET] https://app.hubspot.com/api/properties/v4/groups/0-1/properties?includeFieldLevelPermission=true&showHighlySensitiveProperties=true&portalId=50769493&clienttimeout=14000&hs_static_app=calling-widget-ui&hs_static_app_version=1.41747 => [200] 
+[POST] https://app.hubspot.com/api/user-attributes/v1/app-preferences/user-attributes/fetch?portalId=50769493&clienttimeout=5000&hs_static_app=calling-widget-ui&hs_static_app_version=1.41747&caller=calling-lifecycle-internal => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=calling-widget-ui => [200] 
+[GET] https://app.hubspot.com/api/reporting/v3/dataset/resolve/async/f6ce56db-aa52-2be7-d5da-1f037e13b681?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/reporting/v3/dataset/resolve/async/eaf3909d-5151-2795-f2a1-c3a793839ad7?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://app.hubspot.com/api/reporting-usage-service/v1/ingestion/report?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [204] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=crm-records-ui => [200] 
+[POST] https://app.hubspot.com/api/reporting-usage-service/v1/ingestion/report?portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [204] 
+[POST] https://app.hubspot.com/api/usage-logging/v1/log/session-replay?device_id=653847e8-616d-4c8c-91e7-42c807be9983&session_id=1771447202405&type=replay => [200] 
+[GET] https://app.hubspot.com/chatspot-widget-ui/50769493?hostAppName=crm-records-ui&pathname=%252Fcontacts%252F50769493%252Frecord%252F0-1%252F203700025689 => [FAILED] net::ERR_ABORTED
+[GET] https://app.hubspot.com/chatspot-widget-ui/50769493?hostAppName=crm-records-ui&pathname=%252Fcontacts%252F50769493%252Frecord%252F0-1%252F203700025689 => [FAILED] net::ERR_ABORTED
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.ai.access.controls.rpc.AiAccessControlsChirpService/getAccessControls?hs_static_app=chatspot-widget-ui&hs_static_app_version=1.19849&portalId=50769493&clienttimeout=5000 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.customassistants.rpc.CustomAssistantsService/listCustomAssistants?portalId=50769493&clienttimeout=5000&hs_static_app=chatspot-widget-ui&hs_static_app_version=1.19849 => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=chatspot-widget-ui => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=calling-remote-app => [200] 
+[GET] https://app.hubspot.com/api/calling-orchestration/v1/settings/user?portalId=50769493&clienttimeout=14000&hs_static_app=calling-remote-app&hs_static_app_version=1.17548 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.onboarding.tours.rpc.ToursRpc/getTour?portalId=50769493&clienttimeout=5000&hs_static_app=calling-remote-app&hs_static_app_version=1.17548 => [200] 
+[GET] https://app.hubspot.com/notifications/50769493/banners?hostAppName=crm-records-ui&completeHostUrl=https%253A%252F%252Fapp.hubspot.com%252Fcontacts%252F50769493%252Frecord%252F0-1%252F203700025689%253Feschref%253D%25252Fcontacts%25252F50769493%25252Fobjects%25252F0-1%25252Fviews%25252Fall%25252Flist => [FAILED] net::ERR_ABORTED
+[GET] https://app.hubspot.com/notifications/50769493/banners?hostAppName=crm-records-ui&completeHostUrl=https%253A%252F%252Fapp.hubspot.com%252Fcontacts%252F50769493%252Frecord%252F0-1%252F203700025689%253Feschref%253D%25252Fcontacts%25252F50769493%25252Fobjects%25252F0-1%25252Fviews%25252Fall%25252Flist => [FAILED] net::ERR_ABORTED
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=notifications => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=notifications => [200] 
+[POST] https://app.hubspot.com/api/usage-logging/v1/log/session-replay?device_id=653847e8-616d-4c8c-91e7-42c807be9983&session_id=1771447202405&type=replay => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.presence.rpc.PresenceRpcService/updatePresence?portalId=50769493&clienttimeout=5000&hs_static_app=notifications&hs_static_app_version=1.13499 => [200] 
+[GET] https://app.hubspot.com/api/firealarm/v4/alarm/crm-records-ui/50769493?lang=en&clienttimeout=14000&hs_static_app=notifications&hs_static_app_version=1.13499 => [200] 
+[GET] https://app.hubspot.com/api/navconfig/v2/alerts?portalId=50769493&clienttimeout=14000&hs_static_app=notifications&hs_static_app_version=1.13499 => [200] 
+[GET] https://app.hubspot.com/api/login-verify/user-info?clienttimeout=14000&hs_static_app=notifications&hs_static_app_version=1.13499 => [200] 
+[GET] https://app.hubspot.com/api/notification/preferences/v1/generic-user-settings?clienttimeout=14000&hs_static_app=notifications&hs_static_app_version=1.13499&portalId=50769493 => [200] 
+[GET] https://app.hubspot.com/api/navconfig/v5/navconfig?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.nav.config.rpc.PersonalisedNavService/getPersonalisedNav?portalId=50769493&clienttimeout=5000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[GET] https://app.hubspot.com/api/trials/v1/hub-trials/app/active?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [200] 
+[POST] https://app.hubspot.com/api/nudge/tracking/v1/nudge-event?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [202] 
+[POST] https://app.hubspot.com/api/developer/platform/logging/public/publish/v1/system-logs/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [204] 
+[POST] https://app.hubspot.com/api/developer/platform/logging/public/publish/v1/action-logs/batch?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [204] 
+[POST] https://app.hubspot.com/api/nudge/tracking/v1/nudge-event?portalId=50769493&clienttimeout=14000&hs_static_app=calling-widget-ui&hs_static_app_version=1.41747 => [202] 
+[POST] https://app.hubspot.com/api/nudge/tracking/v1/nudge-event?portalId=50769493&clienttimeout=14000&hs_static_app=calling-remote-app&hs_static_app_version=1.17548 => [202] 
+[POST] https://app.hubspot.com/api/usage-logging/v1/log/session-replay?device_id=653847e8-616d-4c8c-91e7-42c807be9983&session_id=1771447202405&type=replay => [200] 
+[POST] https://exceptions.hubspot.com/frontend/observability/page-tracking/store/?sentry_version=7&sentry_client=raven-js%2F3.19.1&deployable=calling-widget-ui => [200] 
+[POST] https://app.hubspot.com/api/usage-logging/v1/log/session-replay?device_id=653847e8-616d-4c8c-91e7-42c807be9983&session_id=1771447202405&type=replay => [200] 
+[POST] https://app.hubspot.com/api/usage-logging/v1/log/session-replay?device_id=653847e8-616d-4c8c-91e7-42c807be9983&session_id=1771447202405&type=replay => [200] 
+[POST] https://app.hubspot.com/api/usage-logging/v1/log/session-replay?device_id=653847e8-616d-4c8c-91e7-42c807be9983&session_id=1771447202405&type=replay => [200] 
+[POST] https://app.hubspot.com/api/crm-extensibility/execution/internal/v3/proxy?appId=31700045&portalId=50769493&clienttimeout=30000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [400] 
+[POST] https://app.hubspot.com/api/usage-logging/v1/log/session-replay?device_id=653847e8-616d-4c8c-91e7-42c807be9983&session_id=1771447202405&type=replay => [200] 
+[POST] https://app.hubspot.com/api/nudge/tracking/v1/nudge-event?portalId=50769493&clienttimeout=14000&hs_static_app=crm-records-ui&hs_static_app_version=1.81808 => [202] 
+[POST] https://metrics-fe-na1.hubspot.com/metrics/v1/frontend/custom/send?hs_static_app=crm-records-ui&hs_static_app_version=static-1.81808
+[POST] https://app.hubspot.com/api/chirp-frontend-app/v1/gateway/com.hubspot.presence.rpc.PresenceRpcService/updatePresence?portalId=50769493&clienttimeout=5000&hs_static_app=notifications&hs_static_app_version=1.13499 => [200] 

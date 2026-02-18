@@ -1,0 +1,161 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - button "PaperCuts Feedback" [ref=e2] [cursor=pointer]:
+      - img [ref=e3]
+    - iframe
+  - generic [ref=e5]:
+    - generic [ref=e10]:
+      - region "Page Section" [ref=e11]:
+        - group [ref=e13]:
+          - generic [ref=e14]:
+            - button "Exit" [ref=e16] [cursor=pointer]:
+              - generic [ref=e18]: Exit
+            - heading "Contact record page New Contact record page - (12/11/2025 5:24 PM)" [level=1] [ref=e20]:
+              - generic [ref=e21]:
+                - paragraph [ref=e22]: Contact record page
+                - generic [ref=e25]:
+                  - textbox "Name editor" [ref=e27]: New Contact record page - (12/11/2025 5:24 PM)
+                  - generic:
+                    - img
+            - generic [ref=e29]:
+              - button "Save" [ref=e30] [cursor=pointer]:
+                - generic [ref=e33]: Save
+              - button "Save and exit" [ref=e34] [cursor=pointer]:
+                - generic [ref=e37]: Save and exit
+        - generic [ref=e38]:
+          - navigation [ref=e45]:
+            - button "Edit layout" [ref=e46] [cursor=pointer]: Edit layout
+            - button "Settings" [ref=e48] [cursor=pointer]: Settings
+          - generic [ref=e51]:
+            - img [ref=e52]
+            - button "Assign teams" [ref=e54] [cursor=pointer]:
+              - generic [ref=e55]:
+                - img [ref=e56]
+                - generic [ref=e58]: Assign teams
+      - region "Page Section" [ref=e61]:
+        - main [ref=e64]:
+          - generic [ref=e69]:
+            - generic [ref=e72]:
+              - generic [ref=e78]:
+                - generic [ref=e85]:
+                  - img [ref=e88]
+                  - paragraph [ref=e90]: Contact name
+                - generic [ref=e119]:
+                  - button "Add card" [ref=e127] [cursor=pointer]:
+                    - generic [ref=e129]: Add card
+                  - generic [ref=e146]:
+                    - generic [ref=e148]:
+                      - generic [ref=e149]:
+                        - heading "Key information" [level=2] [ref=e151]:
+                          - generic [ref=e153]: Key information
+                        - img [ref=e157]
+                      - generic [ref=e162]: Key information (default)
+                    - generic [ref=e163]:
+                      - button "Edit card" [ref=e164] [cursor=pointer]:
+                        - img [ref=e166]
+                      - button "More card actions" [ref=e168] [cursor=pointer]:
+                        - img [ref=e170]
+                  - button "Add card" [ref=e185] [cursor=pointer]:
+                    - generic [ref=e187]: Add card
+              - generic [ref=e190]:
+                - generic [ref=e192]:
+                  - generic [ref=e193]:
+                    - navigation [ref=e197]:
+                      - button "About" [ref=e198] [cursor=pointer]:
+                        - generic [ref=e202]: About
+                      - button "Activities":
+                        - generic: Activities
+                      - button "Revenue":
+                        - generic: Revenue
+                      - button "Intelligence":
+                        - generic: Intelligence
+                      - button [ref=e204] [cursor=pointer]:
+                        - generic [ref=e207]: More
+                    - button "Create new tab" [ref=e210] [cursor=pointer]:
+                      - img [ref=e212]
+                    - button "Change tab order" [ref=e215] [cursor=pointer]:
+                      - generic [ref=e217]: Change tab order
+                  - separator [ref=e218]
+                - generic [ref=e223]:
+                  - generic [ref=e226]:
+                    - generic [ref=e232]:
+                      - button "Add card" [ref=e234] [cursor=pointer]:
+                        - generic [ref=e236]: Add card
+                      - button "Add section" [ref=e238] [cursor=pointer]:
+                        - generic [ref=e240]: Add section
+                    - generic [ref=e242]:
+                      - button "Add card" [ref=e249] [cursor=pointer]:
+                        - img [ref=e251]
+                      - generic [ref=e264]:
+                        - generic [ref=e266]:
+                          - generic [ref=e267]:
+                            - heading "Breeze record summary" [level=2] [ref=e269]:
+                              - generic [ref=e271]: Breeze record summary
+                            - img [ref=e275]
+                          - generic [ref=e280]: Breeze Assistant record summary (default)
+                        - button "More card actions" [ref=e282] [cursor=pointer]:
+                          - img [ref=e284]
+                      - button "Add card" [ref=e292] [cursor=pointer]:
+                        - img [ref=e294]
+                    - generic [ref=e302]:
+                      - button "Add card" [ref=e304] [cursor=pointer]:
+                        - generic [ref=e306]: Add card
+                      - button "Add section" [ref=e308] [cursor=pointer]:
+                        - generic [ref=e310]: Add section
+                  - generic [ref=e314]:
+                    - generic [ref=e315]:
+                      - button "Add card" [ref=e322] [cursor=pointer]:
+                        - img [ref=e324]
+                      - generic [ref=e337]:
+                        - generic [ref=e339]:
+                          - generic [ref=e340]:
+                            - heading "Contact profile" [level=2] [ref=e342]:
+                              - generic [ref=e344]: Contact profile
+                            - img [ref=e348]
+                          - generic [ref=e353]: Contact profile (default)
+                        - generic [ref=e354]:
+                          - button "Edit card" [ref=e355] [cursor=pointer]:
+                            - img [ref=e357]
+                          - button "More card actions" [ref=e359] [cursor=pointer]:
+                            - img [ref=e361]
+                      - button "Add card" [ref=e369] [cursor=pointer]:
+                        - img [ref=e371]
+                    - generic [ref=e379]:
+                      - button "Add card" [ref=e381] [cursor=pointer]:
+                        - generic [ref=e383]: Add card
+                      - button "Add section" [ref=e385] [cursor=pointer]:
+                        - generic [ref=e387]: Add section
+              - generic [ref=e395]:
+                - button "Add card" [ref=e403] [cursor=pointer]:
+                  - generic [ref=e405]: Add card
+                - generic [ref=e422]:
+                  - generic [ref=e424]:
+                    - generic [ref=e425]:
+                      - heading "Companies" [level=2] [ref=e427]:
+                        - generic [ref=e429]: Companies
+                      - img [ref=e433]
+                    - generic [ref=e438]: Companies Association card (default)
+                  - generic [ref=e439]:
+                    - button "Edit card" [ref=e440] [cursor=pointer]:
+                      - img [ref=e442]
+                    - button "More card actions" [ref=e444] [cursor=pointer]:
+                      - img [ref=e446]
+                - button "Add card" [ref=e461] [cursor=pointer]:
+                  - generic [ref=e463]: Add card
+            - complementary:
+              - region "Collaboration sidebar":
+                - iframe [ref=e465]:
+                  
+            - generic:
+              - generic:
+                - generic:
+                  - complementary
+                  - complementary:
+                    - generic [ref=e467]:
+                      - button [ref=e468]:
+                        - img [ref=e471]
+                      - button "Collaborate with Assistant" [ref=e476] [cursor=pointer]:
+                        - img [ref=e478]
+                  - complementary
+                  - complementary
+    - complementary
