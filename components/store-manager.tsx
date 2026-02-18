@@ -1,17 +1,17 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import {
   MapPin,
   Phone,
   Clock,
-  Pencil,
-  Trash2,
   Plus,
   Search,
   Loader2,
   Store,
   X,
+  MoreVertical,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,9 +32,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import type { GroceryStore } from '@/lib/types'
 import {
@@ -61,7 +66,7 @@ interface PlaceResult {
 }
 
 // ---- Add/Edit Store Dialog ----
-function StoreDialog({
+export function StoreDialog({
   open,
   onOpenChange,
   editingStore,
@@ -86,6 +91,7 @@ function StoreDialog({
   const [lat, setLat] = useState<number | undefined>()
   const [lng, setLng] = useState<number | undefined>()
 
+  const stores = useGroceryStores()
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Reset form when dialog opens
@@ -100,7 +106,7 @@ function StoreDialog({
         setPlaceId(editingStore.placeId)
         setLat(editingStore.lat)
         setLng(editingStore.lng)
-        setQuery('')
+        setQuery(editingStore.address ?? '')
         setResults([])
         setSelectedPlace(null)
       } else {
@@ -119,6 +125,14 @@ function StoreDialog({
       setSearchError(null)
     }
   }, [open, editingStore])
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current)
+      }
+    }
+  }, [])
 
   // Debounced search
   const handleSearchChange = useCallback((value: string) => {
@@ -170,10 +184,10 @@ function StoreDialog({
     setLat(place.lat)
     setLng(place.lng)
     setResults([])
-    setQuery('')
+    setQuery(place.address)
   }, [])
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!name.trim()) {
       toast.error('Store name is required')
       return
@@ -181,6 +195,19 @@ function StoreDialog({
     if (!address.trim()) {
       toast.error('Store address is required')
       return
+    }
+    if (placeId) {
+      const duplicate = stores.find((s) => {
+        if (!s.placeId) return false
+        if (editingStore && s.id === editingStore.id) return false
+        return s.placeId === placeId
+      })
+      if (duplicate) {
+        toast.error('This store has already been added', {
+          description: duplicate.name,
+        })
+        return
+      }
     }
 
     const now = new Date().toISOString()
@@ -198,15 +225,21 @@ function StoreDialog({
       updatedAt: now,
     }
 
-    if (editingStore) {
-      updateGroceryStore(storeData)
-      toast.success('Store updated', { description: storeData.name })
-    } else {
-      addGroceryStore(storeData)
-      toast.success('Store added', { description: storeData.name })
+    try {
+      if (editingStore) {
+        await updateGroceryStore(storeData)
+        toast.success('Store updated', { description: storeData.name })
+      } else {
+        await addGroceryStore(storeData)
+        toast.success('Store added', { description: storeData.name })
+      }
+      onOpenChange(false)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to save store.'
+      toast.error(message)
     }
-    onOpenChange(false)
-  }, [name, address, phone, hours, logoUrl, placeId, lat, lng, editingStore, onOpenChange])
+  }, [name, address, phone, hours, logoUrl, placeId, lat, lng, editingStore, onOpenChange, stores])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -223,92 +256,95 @@ function StoreDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4 pt-2">
-          {/* Address search */}
-          {!editingStore && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="store-search">Search by address or store name</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                <Input
-                  id="store-search"
-                  value={query}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  placeholder="e.g. Trader Joe's on Market St, SF"
-                  className="pl-10"
-                />
-                {searching && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground animate-spin" />
-                )}
-              </div>
-
-              {/* Search results */}
-              {results.length > 0 && (
-                <div className="rounded-lg border border-border bg-card overflow-hidden max-h-60 overflow-y-auto">
-                  {results.map((place) => (
-                    <button
-                      key={place.placeId}
-                      type="button"
-                      onClick={() => selectPlace(place)}
-                      className="flex items-start gap-3 w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b border-border last:border-b-0"
-                    >
-                      {place.photoUrl ? (
-                        <img
-                          src={place.photoUrl}
-                          alt=""
-                          className="size-10 rounded-md object-cover shrink-0 bg-muted"
-                          crossOrigin="anonymous"
-                        />
-                      ) : (
-                        <div className="size-10 rounded-md bg-muted flex items-center justify-center shrink-0">
-                          <Store className="size-4 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="flex flex-col gap-0.5 min-w-0">
-                        <span className="text-sm font-medium text-foreground truncate">
-                          {place.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {place.address}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {searchError && (
-                <p className="text-xs text-muted-foreground">{searchError}</p>
-              )}
-
-              {selectedPlace && (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-accent/30 px-3 py-2">
-                  <Store className="size-4 text-foreground shrink-0" />
-                  <div className="flex flex-col gap-0 flex-1 min-w-0">
-                    <span className="text-sm font-medium text-foreground truncate">
-                      {selectedPlace.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground truncate">
-                      {selectedPlace.address}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPlace(null)
-                      setName('')
-                      setAddress('')
-                      setPhone('')
-                      setHours([])
-                      setLogoUrl('')
-                    }}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="store-search">Find store by address</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                id="store-search"
+                value={query}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Type an address, then pick the matching listing"
+                className="pl-10"
+              />
+              {searching && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground animate-spin" />
               )}
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              Selecting a listing will fill name, address, phone, hours, and logo. If you only enter an address, we also suggest nearby grocery stores.
+            </p>
+
+            {/* Search results */}
+            {results.length > 0 && (
+              <div className="rounded-lg border border-border bg-card overflow-hidden max-h-60 overflow-y-auto">
+                {results.map((place) => (
+                  <button
+                    key={place.placeId}
+                    type="button"
+                    onClick={() => selectPlace(place)}
+                    className="flex items-start gap-3 w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b border-border last:border-b-0"
+                  >
+                    {place.photoUrl ? (
+                      <img
+                        src={place.photoUrl}
+                        alt=""
+                        className="size-10 rounded-md object-cover shrink-0 bg-muted"
+                        crossOrigin="anonymous"
+                      />
+                    ) : (
+                      <div className="size-10 rounded-md bg-muted flex items-center justify-center shrink-0">
+                        <Store className="size-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-sm font-medium text-foreground truncate">
+                        {place.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {place.address}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {searchError && (
+              <p className="text-xs text-muted-foreground">{searchError}</p>
+            )}
+
+            {selectedPlace && (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-accent/30 px-3 py-2">
+                <Store className="size-4 text-foreground shrink-0" />
+                <div className="flex flex-col gap-0 flex-1 min-w-0">
+                  <span className="text-sm font-medium text-foreground truncate">
+                    {selectedPlace.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {selectedPlace.address}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPlace(null)
+                    setName('')
+                    setAddress('')
+                    setPhone('')
+                    setHours([])
+                    setLogoUrl('')
+                    setPlaceId(undefined)
+                    setLat(undefined)
+                    setLng(undefined)
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Manual form fields */}
           <div className="flex flex-col gap-3">
@@ -381,8 +417,10 @@ function StoreCard({
 }: {
   store: GroceryStore
   onEdit: (store: GroceryStore) => void
-  onDelete: (id: string) => void
+  onDelete: (id: string) => Promise<void> | void
 }) {
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-md">
       <CardContent className="p-0">
@@ -406,7 +444,12 @@ function StoreCard({
           {/* Details */}
           <div className="flex-1 min-w-0 flex flex-col gap-1.5">
             <h3 className="text-sm font-semibold text-foreground truncate">
-              {store.name}
+              <Link
+                href={`/stores/${store.id}`}
+                className="hover:underline underline-offset-2"
+              >
+                {store.name}
+              </Link>
             </h3>
             <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
               <MapPin className="size-3.5 shrink-0 mt-0.5" />
@@ -427,45 +470,50 @@ function StoreCard({
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => onEdit(store)}
-              aria-label={`Edit ${store.name}`}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
+          <div className="shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                  aria-label={`Delete ${store.name}`}
+                  className="h-8 w-8 p-0"
+                  aria-label={`Open actions for ${store.name}`}
                 >
-                  <Trash2 className="size-3.5" />
+                  <MoreVertical className="size-4" />
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete {store.name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will remove the store from your list. Existing recipe
-                    ingredients referencing this store will keep their store name
-                    but lose the link.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(store.id)}>
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => onEdit(store)}>
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => setDeleteOpen(true)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+
+          <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {store.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove the store from your list. Existing recipe
+                  ingredients referencing this store will keep their store name
+                  but lose the link.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onDelete(store.id)}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </CardContent>
     </Card>
@@ -489,11 +537,20 @@ export function StoreManager() {
     setDialogOpen(true)
   }, [])
 
-  const handleDelete = useCallback((id: string) => {
-    const store = stores.find((s) => s.id === id)
-    deleteGroceryStore(id)
-    toast.success('Store removed', { description: store?.name })
-  }, [stores])
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const store = stores.find((s) => s.id === id)
+      try {
+        await deleteGroceryStore(id)
+        toast.success('Store removed', { description: store?.name })
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unable to delete store.'
+        toast.error(message)
+      }
+    },
+    [stores]
+  )
 
   const filtered = search.trim()
     ? stores.filter(

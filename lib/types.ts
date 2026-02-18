@@ -1,44 +1,69 @@
-// A grocery store with location details
+export const DAY_OF_WEEK_VALUES = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const
+
+export const MEAL_SLOT_VALUES = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack',
+] as const
+
+export const MEAL_TYPE_VALUES = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack',
+] as const
+
+export type DayOfWeek = (typeof DAY_OF_WEEK_VALUES)[number]
+export type MealSlot = (typeof MEAL_SLOT_VALUES)[number]
+export type MealType = (typeof MEAL_TYPE_VALUES)[number]
+
 export interface GroceryStore {
   id: string
   name: string
   address: string
-  placeId?: string        // Google Places ID
+  placeId?: string
   lat?: number
   lng?: number
   phone?: string
-  hours?: string[]        // array of day-hours strings
-  logoUrl?: string        // Google Place photo URL
+  hours?: string[]
+  logoUrl?: string
   createdAt: string
   updatedAt: string
 }
 
-// An ingredient in the global ingredients database (autocomplete source)
 export interface IngredientEntry {
   id: string
   name: string
   defaultUnit: string
-  defaultStoreId: string  // links to GroceryStore.id
-  category: string        // e.g. "Produce", "Dairy", "Pantry"
+  defaultStoreId: string
+  category: string
   createdAt: string
   updatedAt: string
 }
 
-// An ingredient as it appears in a recipe (copy from DB, customizable per-recipe)
 export interface Ingredient {
   id: string
   name: string
   qty: number | null
   unit: string
-  store: string           // store name (denormalized for display)
-  storeId?: string        // optional link back to GroceryStore
+  store: string
+  storeId?: string
 }
 
 export interface Recipe {
   id: string
   name: string
   description: string
-  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  mealType: MealType
   servings: number
   ingredients: Ingredient[]
   steps: string[]
@@ -47,14 +72,50 @@ export interface Recipe {
   updatedAt: string
 }
 
-export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+export type MealPlan = Record<DayOfWeek, Record<MealSlot, string | null>>
 
-export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+export interface MealPlanSnapshotMeal {
+  day: DayOfWeek
+  slot: MealSlot
+  recipeId: string
+  recipeName: string
+  storeIds: string[]
+  storeNames: string[]
+}
 
-export interface MealPlan {
-  [day: string]: {
-    [slot: string]: string | null // recipe ID or null
+export interface MealPlanSnapshot {
+  id: string
+  createdAt: string
+  label: string
+  meals: MealPlanSnapshotMeal[]
+}
+
+export interface PlannerBootstrapMeta {
+  isEmpty: boolean
+  counts: {
+    recipes: number
+    stores: number
+    ingredientEntries: number
+    mealPlanAssignments: number
+    snapshots: number
   }
+}
+
+export interface PlannerBootstrapResponse {
+  recipes: Recipe[]
+  mealPlan: MealPlan
+  mealPlanSnapshots: MealPlanSnapshot[]
+  groceryStores: GroceryStore[]
+  ingredientEntries: IngredientEntry[]
+  meta: PlannerBootstrapMeta
+}
+
+export interface LocalStorageMigrationPayload {
+  recipes?: Recipe[]
+  mealPlan?: MealPlan
+  mealPlanSnapshots?: MealPlanSnapshot[]
+  groceryStores?: GroceryStore[]
+  ingredientEntries?: IngredientEntry[]
 }
 
 export type RecipeMode = 'add' | 'edit'
@@ -65,4 +126,17 @@ export function getModeLabel(mode: RecipeMode): string {
 
 export function getDraftLabel(mode: RecipeMode): string {
   return mode === 'add' ? 'Add Recipe Draft' : 'Edit Recipe Draft'
+}
+
+export function createEmptyMealPlan(): MealPlan {
+  const mealPlan = {} as MealPlan
+  for (const day of DAY_OF_WEEK_VALUES) {
+    mealPlan[day] = {
+      breakfast: null,
+      lunch: null,
+      dinner: null,
+      snack: null,
+    }
+  }
+  return mealPlan
 }
