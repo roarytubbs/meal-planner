@@ -14,14 +14,17 @@ const idSchema = z.string().trim().min(1).max(128)
 
 const boundedString = (max: number) => z.string().trim().max(max)
 
-const optionalBoundedString = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .optional()
-    .or(z.literal(''))
-    .transform((value) => (value && value.trim().length > 0 ? value.trim() : undefined))
+const optionalBoundedString = (
+  max: number,
+  options?: { dropIfTooLong?: boolean }
+) =>
+  z.preprocess((value) => {
+    if (typeof value !== 'string') return value
+    const trimmed = value.trim()
+    if (trimmed.length === 0) return undefined
+    if (options?.dropIfTooLong && trimmed.length > max) return undefined
+    return trimmed
+  }, z.string().max(max).optional())
 
 export const daySchema = z.enum(DAY_OF_WEEK_VALUES)
 export const slotSchema = z.enum(MEAL_SLOT_VALUES)
@@ -58,7 +61,8 @@ export const groceryStoreSchema = z.object({
   lng: z.number().finite().optional(),
   phone: optionalBoundedString(80),
   hours: z.array(boundedString(120).min(1)).max(14).optional(),
-  logoUrl: optionalBoundedString(500),
+  // Google photo proxy URLs can exceed this storage limit; drop instead of failing create/update.
+  logoUrl: optionalBoundedString(500, { dropIfTooLong: true }),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
 })

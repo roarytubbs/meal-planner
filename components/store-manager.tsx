@@ -196,6 +196,14 @@ export function StoreDialog({
       toast.error('Store address is required')
       return
     }
+
+    const normalizedLogoUrl = logoUrl.trim()
+    const safeLogoUrl =
+      normalizedLogoUrl.length === 0
+        ? undefined
+        : normalizedLogoUrl.length <= 500
+          ? normalizedLogoUrl
+          : undefined
     if (placeId) {
       const duplicate = stores.find((s) => {
         if (!s.placeId) return false
@@ -220,7 +228,7 @@ export function StoreDialog({
       lng,
       phone: phone.trim() || undefined,
       hours: hours.length > 0 ? hours : undefined,
-      logoUrl: logoUrl.trim() || undefined,
+      logoUrl: safeLogoUrl,
       createdAt: editingStore?.createdAt ?? now,
       updatedAt: now,
     }
