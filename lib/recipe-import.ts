@@ -8,6 +8,7 @@ export interface ScrapedRecipe {
   steps: string[]
   servings: number
   mealType: Recipe['mealType']
+  imageUrl: string
 }
 
 const IMPORT_ERROR_TEXT_PATTERN =
@@ -139,6 +140,39 @@ function asString(value: unknown): string {
     const source = value as Record<string, unknown>
     if (typeof source.text === 'string') return source.text
     if (typeof source.name === 'string') return source.name
+  }
+  return ''
+}
+
+function normalizeImageUrl(value: string): string {
+  const candidate = String(value || '').trim()
+  if (!candidate) return ''
+  try {
+    const parsed = new URL(candidate)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
+    return parsed.toString().slice(0, 1000)
+  } catch {
+    return ''
+  }
+}
+
+function extractImageFromUnknown(value: unknown): string {
+  if (!value) return ''
+  if (typeof value === 'string') return normalizeImageUrl(value)
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const resolved = extractImageFromUnknown(item)
+      if (resolved) return resolved
+    }
+    return ''
+  }
+  if (typeof value === 'object') {
+    const source = value as Record<string, unknown>
+    return (
+      extractImageFromUnknown(source.url) ||
+      extractImageFromUnknown(source.contentUrl) ||
+      extractImageFromUnknown(source.image)
+    )
   }
   return ''
 }
@@ -369,6 +403,7 @@ function parseRecipeFromTextContent(text: string): ScrapedRecipe {
     steps,
     servings: 4,
     mealType,
+    imageUrl: '',
   }
 }
 
@@ -487,6 +522,7 @@ function parseRecipeNode(node: Record<string, unknown>): ScrapedRecipe {
     name,
     description,
   ])
+  const imageUrl = extractImageFromUnknown(node.image)
 
   return {
     name,
@@ -495,6 +531,7 @@ function parseRecipeNode(node: Record<string, unknown>): ScrapedRecipe {
     steps,
     servings,
     mealType,
+    imageUrl,
   }
 }
 
@@ -548,6 +585,10 @@ function extractBasicRecipe(html: string): ScrapedRecipe {
   })
   const servings = parseServings(extractMetaContent(html, 'recipeYield'))
   const mealType = inferMealType([name, description])
+  const imageUrl =
+    normalizeImageUrl(extractMetaContent(html, 'og:image')) ||
+    normalizeImageUrl(extractMetaContent(html, 'twitter:image')) ||
+    normalizeImageUrl(extractMetaContent(html, 'image'))
 
   return {
     name,
@@ -556,6 +597,7 @@ function extractBasicRecipe(html: string): ScrapedRecipe {
     steps,
     servings,
     mealType,
+    imageUrl,
   }
 }
 
@@ -575,6 +617,7 @@ export function parseRecipeFromHtml(html: string): ScrapedRecipe {
       : fallbackRecipe.steps
   const servings = jsonLdRecipe?.servings || fallbackRecipe.servings || 4
   const mealType = jsonLdRecipe?.mealType || fallbackRecipe.mealType
+  const imageUrl = jsonLdRecipe?.imageUrl || fallbackRecipe.imageUrl || ''
 
   return {
     name,
@@ -583,6 +626,7 @@ export function parseRecipeFromHtml(html: string): ScrapedRecipe {
     steps,
     servings,
     mealType,
+    imageUrl,
   }
 }
 

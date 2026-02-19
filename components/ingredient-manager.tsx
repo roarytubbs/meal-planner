@@ -8,12 +8,13 @@ import {
   Trash2,
   Search,
   X,
-  ChevronDown,
-  ChevronRight,
+  Loader2,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,7 @@ import {
   useGroceryStores,
   addIngredientEntry,
   updateIngredientEntry,
+  bulkUpdateIngredientDefaultStore,
   deleteIngredientEntry,
 } from '@/lib/meal-planner-store'
 
@@ -76,6 +78,42 @@ const CATEGORY_COLORS: Record<string, string> = {
   Frozen: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
   Beverages: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
   Other: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
+}
+
+const PAGE_SIZE = 20
+
+type PageToken = number | 'left-ellipsis' | 'right-ellipsis'
+
+function buildPageTokens(currentPage: number, totalPages: number): PageToken[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, 'right-ellipsis', totalPages]
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      'left-ellipsis',
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ]
+  }
+
+  return [
+    1,
+    'left-ellipsis',
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    'right-ellipsis',
+    totalPages,
+  ]
 }
 
 // ---- Add/Edit Dialog ----
@@ -252,8 +290,16 @@ export function IngredientManager() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<IngredientEntry | null>(null)
   const [search, setSearch] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [filterCategory, setFilterCategory] = useState<string>('all')
-  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
+  const [filterStoreId, setFilterStoreId] = useState<string>('all')
+  const [page, setPage] = useState(1)
+  const [selectedIngredientIds, setSelectedIngredientIds] = useState<Set<string>>(
+    new Set()
+  )
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+  const [bulkStoreId, setBulkStoreId] = useState<string>('__none')
+  const [bulkApplying, setBulkApplying] = useState(false)
 
   const handleAdd = useCallback(() => {
     setEditingEntry(null)
@@ -270,6 +316,12 @@ export function IngredientManager() {
       const entry = entries.find((e) => e.id === id)
       try {
         await deleteIngredientEntry(id)
+        setSelectedIngredientIds((prev) => {
+          if (!prev.has(id)) return prev
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
         toast.success('Ingredient removed', { description: entry?.name })
       } catch (error) {
         const message =
@@ -290,41 +342,130 @@ export function IngredientManager() {
     if (filterCategory !== 'all') {
       list = list.filter((e) => e.category === filterCategory)
     }
+    if (filterStoreId === '__none') {
+      list = list.filter((e) => !e.defaultStoreId)
+    } else if (filterStoreId !== 'all') {
+      list = list.filter((e) => e.defaultStoreId === filterStoreId)
+    }
     return list
-  }, [entries, search, filterCategory])
+  }, [entries, search, filterCategory, filterStoreId])
 
-  const grouped = useMemo(() => {
-    const map: Record<string, IngredientEntry[]> = {}
-    for (const entry of filtered) {
-      const cat = entry.category || 'Other'
-      if (!map[cat]) map[cat] = []
-      map[cat].push(entry)
-    }
-    // Sort categories
-    const order = CATEGORIES
-    const sorted: Record<string, IngredientEntry[]> = {}
-    for (const cat of order) {
-      if (map[cat]) {
-        sorted[cat] = map[cat].sort((a, b) => a.name.localeCompare(b.name))
-      }
-    }
-    // any remaining
-    for (const cat of Object.keys(map)) {
-      if (!sorted[cat]) {
-        sorted[cat] = map[cat].sort((a, b) => a.name.localeCompare(b.name))
-      }
-    }
-    return sorted
-  }, [filtered])
+  const sortedFiltered = useMemo(
+    () => [...filtered].sort((a, b) => a.name.localeCompare(b.name)),
+    [filtered]
+  )
 
-  const toggleCat = useCallback((cat: string) => {
-    setCollapsedCats((prev) => {
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const startIndex = (safePage - 1) * PAGE_SIZE
+  const paginatedEntries = sortedFiltered.slice(startIndex, startIndex + PAGE_SIZE)
+  const pageTokens = useMemo(() => buildPageTokens(safePage, totalPages), [safePage, totalPages])
+
+  const selectedEntries = useMemo(
+    () => entries.filter((entry) => selectedIngredientIds.has(entry.id)),
+    [entries, selectedIngredientIds]
+  )
+  const selectedCount = selectedEntries.length
+  const selectedFilteredCount = useMemo(
+    () => filtered.filter((entry) => selectedIngredientIds.has(entry.id)).length,
+    [filtered, selectedIngredientIds]
+  )
+  const allFilteredSelected =
+    filtered.length > 0 && selectedFilteredCount === filtered.length
+
+  useEffect(() => {
+    const validIds = new Set(entries.map((entry) => entry.id))
+    setSelectedIngredientIds((prev) => {
+      const next = new Set(Array.from(prev).filter((id) => validIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [entries])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, filterCategory, filterStoreId])
+
+  useEffect(() => {
+    setPage((prev) => (prev > totalPages ? totalPages : prev))
+  }, [totalPages])
+
+  useEffect(() => {
+    if (selectedIngredientIds.size === 0 && bulkDialogOpen) {
+      setBulkDialogOpen(false)
+    }
+  }, [selectedIngredientIds, bulkDialogOpen])
+
+  const toggleIngredientSelection = useCallback((id: string, checked: boolean) => {
+    setSelectedIngredientIds((prev) => {
       const next = new Set(prev)
-      if (next.has(cat)) next.delete(cat)
-      else next.add(cat)
+      if (checked) {
+        next.add(id)
+      } else {
+        next.delete(id)
+      }
       return next
     })
   }, [])
+
+  const handleSelectAllFiltered = useCallback(() => {
+    setSelectedIngredientIds((prev) => {
+      const next = new Set(prev)
+      for (const entry of filtered) {
+        next.add(entry.id)
+      }
+      return next
+    })
+  }, [filtered])
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIngredientIds(new Set())
+  }, [])
+
+  const handleBulkApplyDefaultStore = useCallback(async () => {
+    if (selectedEntries.length === 0) {
+      toast.error('Select one or more ingredients first.')
+      return
+    }
+
+    const normalizedStoreId =
+      bulkStoreId === '__none' ? '' : String(bulkStoreId || '').trim()
+    if (normalizedStoreId && !stores.some((store) => store.id === normalizedStoreId)) {
+      toast.error('Selected store no longer exists.')
+      return
+    }
+
+    const targetEntries = selectedEntries.filter(
+      (entry) => entry.defaultStoreId !== normalizedStoreId
+    )
+    if (targetEntries.length === 0) {
+      toast.info('No changes needed for selected ingredients.')
+      return
+    }
+
+    setBulkApplying(true)
+    try {
+      const updated = await bulkUpdateIngredientDefaultStore(
+        targetEntries.map((entry) => entry.id),
+        normalizedStoreId
+      )
+      const storeName = normalizedStoreId
+        ? (stores.find((store) => store.id === normalizedStoreId)?.name ??
+          'selected store')
+        : 'No default store'
+      toast.success('Default store updated', {
+        description: `Updated ${updated.length} ingredient${updated.length === 1 ? '' : 's'} to ${storeName}.`,
+      })
+      setBulkDialogOpen(false)
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to apply default store to selected ingredients.'
+      toast.error(message)
+    } finally {
+      setBulkApplying(false)
+    }
+  }, [bulkStoreId, selectedEntries, stores])
 
   const getStoreName = useCallback(
     (storeId: string) => {
@@ -342,6 +483,11 @@ export function IngredientManager() {
     }
     return counts
   }, [entries])
+
+  const activeFilterCount =
+    Number(filterCategory !== 'all') + Number(filterStoreId !== 'all')
+  const showingStart = sortedFiltered.length === 0 ? 0 : startIndex + 1
+  const showingEnd = Math.min(startIndex + PAGE_SIZE, sortedFiltered.length)
 
   return (
     <div className="flex flex-col gap-4">
@@ -365,7 +511,7 @@ export function IngredientManager() {
         </Button>
       </div>
 
-      {/* Filters */}
+      {/* Search and filter toggle */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -385,58 +531,130 @@ export function IngredientManager() {
             </button>
           )}
         </div>
-
-        {/* Category chips */}
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setFilterCategory('all')}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              filterCategory === 'all'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-accent'
-            }`}
-          >
-            All ({entries.length})
-          </button>
-          {CATEGORIES.filter((cat) => categoryCounts[cat]).map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() =>
-                setFilterCategory(filterCategory === cat ? 'all' : cat)
-              }
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                filterCategory === cat
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-accent'
-              }`}
-            >
-              {cat} ({categoryCounts[cat]})
-            </button>
-          ))}
-        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant={filtersOpen || activeFilterCount > 0 ? 'secondary' : 'outline'}
+          onClick={() => setFiltersOpen((prev) => !prev)}
+          className="w-full sm:w-auto"
+        >
+          <SlidersHorizontal className="size-4" />
+          Filters
+          {activeFilterCount > 0 ? (
+            <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
+              {activeFilterCount}
+            </Badge>
+          ) : null}
+        </Button>
       </div>
 
-      {/* Grouped list */}
-      {Object.keys(grouped).length === 0 ? (
+      {filtersOpen ? (
+        <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ingredient-filter-type">Type</Label>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger id="ingredient-filter-type" className="h-9">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types ({entries.length})</SelectItem>
+                {CATEGORIES.filter((cat) => categoryCounts[cat]).map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat} ({categoryCounts[cat]})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ingredient-filter-store">Store</Label>
+            <Select value={filterStoreId} onValueChange={setFilterStoreId}>
+              <SelectTrigger id="ingredient-filter-store" className="h-9">
+                <SelectValue placeholder="All stores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stores</SelectItem>
+                <SelectItem value="__none">No Default Store</SelectItem>
+                {stores.map((store) => (
+                  <SelectItem key={store.id} value={store.id}>
+                    {store.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-9 w-full sm:w-auto"
+              onClick={() => {
+                setFilterCategory('all')
+                setFilterStoreId('all')
+              }}
+              disabled={activeFilterCount === 0}
+            >
+              Clear filters
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={handleSelectAllFiltered}
+          disabled={filtered.length === 0 || allFilteredSelected}
+        >
+          Select all filtered ({filtered.length})
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={handleClearSelection}
+          disabled={selectedCount === 0}
+        >
+          Clear selection
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {selectedCount} selected
+          {selectedFilteredCount !== selectedCount
+            ? ` (${selectedFilteredCount} in current view)`
+            : ''}
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => setBulkDialogOpen(true)}
+          disabled={selectedCount === 0}
+        >
+          Set Default Store
+        </Button>
+      </div>
+
+      {/* Flat list */}
+      {sortedFiltered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <Apple className="size-6 text-muted-foreground" />
           </div>
           <div>
             <p className="text-sm font-medium text-foreground">
-              {search || filterCategory !== 'all'
+              {search || activeFilterCount > 0
                 ? 'No ingredients match your filters'
                 : 'No ingredients yet'}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {search || filterCategory !== 'all'
+              {search || activeFilterCount > 0
                 ? 'Try a different search or category.'
                 : 'Start building your ingredient database.'}
             </p>
           </div>
-          {!search && filterCategory === 'all' && (
+          {!search && activeFilterCount === 0 && (
             <Button size="sm" variant="outline" onClick={handleAdd}>
               <Plus className="size-4" />
               Add your first ingredient
@@ -444,72 +662,55 @@ export function IngredientManager() {
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {Object.entries(grouped).map(([category, items]) => {
-            const isCollapsed = collapsedCats.has(category)
-
-            return (
-              <div
-                key={category}
-                className="rounded-xl border border-border overflow-hidden"
-              >
-                {/* Category header */}
-                <button
-                  type="button"
-                  onClick={() => toggleCat(category)}
-                  className="flex items-center gap-2 w-full px-4 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors"
-                >
-                  {isCollapsed ? (
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="size-4 text-muted-foreground" />
-                  )}
-                  <Badge
-                    variant="secondary"
-                    className={`text-xs font-medium ${CATEGORY_COLORS[category] || CATEGORY_COLORS.Other}`}
-                  >
-                    {category}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {items.length} item{items.length !== 1 ? 's' : ''}
-                  </span>
-                </button>
-
-                {/* Items */}
-                {!isCollapsed && (
-                  <div className="divide-y divide-border">
-                    {items.map((entry) => {
-                      const storeName = getStoreName(entry.defaultStoreId)
-                      return (
-                        <div
-                          key={entry.id}
-                          className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors group"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm font-medium text-foreground">
-                              {entry.name}
-                            </span>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {entry.defaultUnit && (
-                                <span className="text-xs text-muted-foreground">
-                                  Unit: {entry.defaultUnit}
-                                </span>
-                              )}
-                              {storeName && (
-                                <>
-                                  {entry.defaultUnit && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {'|'}
-                                    </span>
-                                  )}
-                                  <span className="text-xs text-muted-foreground">
-                                    {storeName}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex flex-col gap-3">
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="w-10 px-3 py-2 text-left font-medium">
+                      <span className="sr-only">Select</span>
+                    </th>
+                    <th className="px-3 py-2 text-left font-medium">Ingredient</th>
+                    <th className="px-3 py-2 text-left font-medium">Unit</th>
+                    <th className="px-3 py-2 text-left font-medium">Type</th>
+                    <th className="px-3 py-2 text-left font-medium">Store</th>
+                    <th className="w-24 px-3 py-2 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedEntries.map((entry) => {
+                    const storeName = getStoreName(entry.defaultStoreId)
+                    return (
+                      <tr key={entry.id} className="hover:bg-muted/20">
+                        <td className="px-3 py-2.5 align-middle">
+                          <Checkbox
+                            checked={selectedIngredientIds.has(entry.id)}
+                            onCheckedChange={(checked) =>
+                              toggleIngredientSelection(entry.id, checked === true)
+                            }
+                            aria-label={`Select ${entry.name}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2.5 align-middle font-medium text-foreground">
+                          {entry.name}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle text-muted-foreground">
+                          {entry.defaultUnit || '—'}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs font-medium ${CATEGORY_COLORS[entry.category] || CATEGORY_COLORS.Other}`}
+                          >
+                            {entry.category || 'Other'}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2.5 align-middle text-muted-foreground">
+                          {storeName || '—'}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -552,16 +753,115 @@ export function IngredientManager() {
                               </AlertDialogContent>
                             </AlertDialog>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Showing {showingStart}-{showingEnd} of {sortedFiltered.length}
+            </p>
+            {totalPages > 1 ? (
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safePage <= 1}
+                >
+                  Prev
+                </Button>
+                {pageTokens.map((token) => {
+                  if (token === 'left-ellipsis' || token === 'right-ellipsis') {
+                    return (
+                      <span
+                        key={token}
+                        className="inline-flex h-8 min-w-8 items-center justify-center px-1 text-xs text-muted-foreground"
+                      >
+                        ...
+                      </span>
+                    )
+                  }
+
+                  const isCurrent = token === safePage
+                  return (
+                    <Button
+                      key={token}
+                      type="button"
+                      size="sm"
+                      variant={isCurrent ? 'default' : 'outline'}
+                      className="h-8 min-w-8 px-2"
+                      onClick={() => setPage(token)}
+                      disabled={isCurrent}
+                    >
+                      {token}
+                    </Button>
+                  )
+                })}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                  disabled={safePage >= totalPages}
+                >
+                  Next
+                </Button>
               </div>
-            )
-          })}
+            ) : null}
+          </div>
         </div>
       )}
+
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set Default Store</DialogTitle>
+            <DialogDescription>
+              Apply a default store to {selectedCount} selected ingredient
+              {selectedCount === 1 ? '' : 's'}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="bulk-default-store">Store</Label>
+              <Select value={bulkStoreId} onValueChange={setBulkStoreId}>
+                <SelectTrigger id="bulk-default-store" className="h-9">
+                  <SelectValue placeholder="No default store" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">No default store</SelectItem>
+                  {stores.map((store) => (
+                    <SelectItem key={store.id} value={store.id}>
+                      {store.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleBulkApplyDefaultStore()}
+                disabled={bulkApplying}
+              >
+                {bulkApplying ? <Loader2 className="size-4 animate-spin" /> : null}
+                Apply
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Dialog */}
       <IngredientDialog

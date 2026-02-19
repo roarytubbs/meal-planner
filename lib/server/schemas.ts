@@ -63,6 +63,7 @@ export const recipeSchema = z.object({
   ingredients: z.array(ingredientSchema).max(300),
   steps: z.array(boundedString(2000).min(1)).max(200),
   sourceUrl: boundedString(500),
+  imageUrl: optionalBoundedString(1000).default(''),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
 })
@@ -128,6 +129,11 @@ export const ingredientEntrySchema = z.object({
   category: boundedString(80).min(1),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
+})
+
+export const ingredientDefaultStoreBulkSchema = z.object({
+  ingredientIds: z.array(idSchema).min(1).max(1000),
+  defaultStoreId: z.string().trim().max(128),
 })
 
 export const mealPlanSlotUpdateSchema = z

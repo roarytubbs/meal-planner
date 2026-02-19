@@ -12,6 +12,39 @@ export interface SpoonacularSearchResult {
   servings: number
   sourceUrl: string
   mealType: Recipe['mealType']
+  summary: string
+  readyInMinutes: number | null
+  aggregateLikes: number | null
+  healthScore: number | null
+  spoonacularScore: number | null
+  pricePerServing: number | null
+  cuisines: string[]
+  diets: string[]
+  dishTypes: string[]
+  usedIngredientCount: number | null
+  missedIngredientCount: number | null
+}
+
+export interface SpoonacularSearchFilters {
+  mealType?: Exclude<Recipe['mealType'], ''>
+  diet?: string
+  cuisine?: string
+  maxReadyTime?: number
+  sort?: 'popularity' | 'healthiness' | 'time' | 'random'
+}
+
+export interface SpoonacularSearchPagination {
+  page: number
+  pageSize: number
+  totalResults: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+export interface SpoonacularSearchResponse {
+  results: SpoonacularSearchResult[]
+  pagination: SpoonacularSearchPagination
 }
 
 export interface SpoonacularRecipeImport {
@@ -22,6 +55,7 @@ export interface SpoonacularRecipeImport {
   servings: number
   mealType: Recipe['mealType']
   sourceUrl: string
+  imageUrl: string
 }
 
 function truncate(value: string, maxLength: number): string {
@@ -112,6 +146,18 @@ function toBoundedQty(value: unknown): number | null {
   if (!Number.isFinite(qty)) return null
   const rounded = Math.round(qty * 1000) / 1000
   return rounded > 0 ? rounded : null
+}
+
+function toNullableNumber(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => toNonEmptyString(item))
+    .filter(Boolean)
 }
 
 function toIngredientId(recipeId: number, index: number): string {
@@ -211,6 +257,18 @@ function normalizeSourceUrl(payload: Record<string, unknown>): string {
   return truncate(spoonacularUrl, 500)
 }
 
+function normalizeImageUrl(value: unknown): string {
+  const imageUrl = toNonEmptyString(value)
+  if (!imageUrl) return ''
+  try {
+    const parsed = new URL(imageUrl)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
+    return truncate(parsed.toString(), 1000)
+  } catch {
+    return ''
+  }
+}
+
 function parseSearchResult(item: unknown): SpoonacularSearchResult | null {
   if (!item || typeof item !== 'object') return null
   const source = item as Record<string, unknown>
@@ -222,6 +280,21 @@ function parseSearchResult(item: unknown): SpoonacularSearchResult | null {
   const image = toNonEmptyString(source.image)
   const servings = toBoundedServings(source.servings)
   const mealType = toMealTypeFromPayload(source)
+  const summary = truncate(stripHtml(toNonEmptyString(source.summary)), 260)
+  const readyInMinutes = toNullableNumber(source.readyInMinutes)
+  const aggregateLikes = toNullableNumber(source.aggregateLikes)
+  const healthScore = toNullableNumber(source.healthScore)
+  const spoonacularScore = toNullableNumber(source.spoonacularScore)
+  const pricePerServing = toNullableNumber(source.pricePerServing)
+  const cuisines = toStringArray(source.cuisines)
+  const diets = toStringArray(source.diets)
+  const dishTypes = toStringArray(source.dishTypes)
+  const usedIngredientCount = Array.isArray(source.usedIngredients)
+    ? source.usedIngredients.length
+    : toNullableNumber(source.usedIngredientCount)
+  const missedIngredientCount = Array.isArray(source.missedIngredients)
+    ? source.missedIngredients.length
+    : toNullableNumber(source.missedIngredientCount)
 
   return {
     id,
@@ -230,6 +303,17 @@ function parseSearchResult(item: unknown): SpoonacularSearchResult | null {
     servings,
     sourceUrl,
     mealType,
+    summary,
+    readyInMinutes,
+    aggregateLikes,
+    healthScore,
+    spoonacularScore,
+    pricePerServing,
+    cuisines,
+    diets,
+    dishTypes,
+    usedIngredientCount,
+    missedIngredientCount,
   }
 }
 
@@ -254,6 +338,7 @@ function parseRecipeDetails(payload: unknown): SpoonacularRecipeImport {
   const servings = toBoundedServings(source.servings)
   const mealType = toMealTypeFromPayload(source)
   const sourceUrl = normalizeSourceUrl(source)
+  const imageUrl = normalizeImageUrl(source.image)
 
   return {
     name,
@@ -263,6 +348,7 @@ function parseRecipeDetails(payload: unknown): SpoonacularRecipeImport {
     servings,
     mealType,
     sourceUrl,
+    imageUrl,
   }
 }
 
@@ -323,7 +409,7 @@ async function fetchSpoonacularJson(
       throw new Error('Recipe provider key is invalid or quota has been exceeded.')
     }
     if (response.status === 404) {
-      throw new Error('Recipe was not found in Spoonacular.')
+      throw new Error('Recipe was not found.')
     }
     if (providerMessage) {
       throw new Error(`Recipe provider error: ${providerMessage}`)
@@ -336,29 +422,112 @@ async function fetchSpoonacularJson(
 
 export async function searchSpoonacularRecipes(
   query: string,
-  limit = DEFAULT_SEARCH_LIMIT
-): Promise<SpoonacularSearchResult[]> {
+  options?: {
+    page?: number
+    pageSize?: number
+    filters?: SpoonacularSearchFilters
+  }
+): Promise<SpoonacularSearchResponse> {
   const trimmedQuery = query.trim()
-  if (!trimmedQuery) return []
+  const requestedPage = Number(options?.page)
+  const safePage =
+    Number.isFinite(requestedPage) && requestedPage > 0
+      ? Math.floor(requestedPage)
+      : 1
+  const requestedPageSize = Number(options?.pageSize)
+  const safePageSize =
+    Number.isFinite(requestedPageSize) && requestedPageSize > 0
+      ? Math.max(1, Math.min(MAX_SEARCH_LIMIT, Math.floor(requestedPageSize)))
+      : DEFAULT_SEARCH_LIMIT
 
-  const safeLimit = Math.max(1, Math.min(MAX_SEARCH_LIMIT, Math.floor(limit)))
+  if (!trimmedQuery) {
+    return {
+      results: [],
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        totalResults: 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: safePage > 1,
+      },
+    }
+  }
+
+  const filters = options?.filters || {}
+  const sort = filters.sort || 'popularity'
+  const sortDirection =
+    sort === 'time' ? 'asc' : sort === 'random' ? undefined : 'desc'
+  const offset = (safePage - 1) * safePageSize
+
   const payload = await fetchSpoonacularJson('/recipes/complexSearch', {
     query: trimmedQuery,
-    number: safeLimit,
+    number: safePageSize,
+    offset,
     addRecipeInformation: true,
-    fillIngredients: false,
-    instructionsRequired: true,
-    sort: 'popularity',
-    sortDirection: 'desc',
+    fillIngredients: true,
+    instructionsRequired: false,
+    sort,
+    sortDirection,
+    type: filters.mealType,
+    diet: toNonEmptyString(filters.diet),
+    cuisine: toNonEmptyString(filters.cuisine),
+    maxReadyTime:
+      typeof filters.maxReadyTime === 'number' && Number.isFinite(filters.maxReadyTime)
+        ? Math.max(1, Math.min(600, Math.floor(filters.maxReadyTime)))
+        : undefined,
   })
 
-  if (!payload || typeof payload !== 'object') return []
-  const source = payload as Record<string, unknown>
-  if (!Array.isArray(source.results)) return []
+  if (!payload || typeof payload !== 'object') {
+    return {
+      results: [],
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        totalResults: 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: safePage > 1,
+      },
+    }
+  }
 
-  return source.results
+  const source = payload as Record<string, unknown>
+  if (!Array.isArray(source.results)) {
+    return {
+      results: [],
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        totalResults: 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: safePage > 1,
+      },
+    }
+  }
+
+  const results = source.results
     .map((item) => parseSearchResult(item))
     .filter((item): item is SpoonacularSearchResult => item !== null)
+  const totalResultsRaw = toNullableNumber(source.totalResults)
+  const totalResults =
+    totalResultsRaw !== null && totalResultsRaw >= 0
+      ? Math.floor(totalResultsRaw)
+      : results.length
+  const totalPages = Math.max(1, Math.ceil(totalResults / safePageSize))
+
+  return {
+    results,
+    pagination: {
+      page: safePage,
+      pageSize: safePageSize,
+      totalResults,
+      totalPages,
+      hasNextPage: safePage < totalPages,
+      hasPreviousPage: safePage > 1,
+    },
+  }
 }
 
 export async function importSpoonacularRecipe(

@@ -110,6 +110,21 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
+async function refreshIngredientEntriesFromServer(): Promise<void> {
+  try {
+    const entries = await requestJson<IngredientEntry[]>('/api/ingredients')
+    store = {
+      ...store,
+      ingredientEntries: entries
+        .map((entry) => normalizeIngredientEntry(entry))
+        .filter((entry): entry is IngredientEntry => entry !== null),
+    }
+    emitChange()
+  } catch {
+    // Preserve successful recipe saves even if ingredient entry refresh fails.
+  }
+}
+
 function normalizeMealPlanSelection(input: unknown): MealSelection {
   const value = String(input || '')
     .trim()
@@ -348,6 +363,7 @@ function normalizeRecipe(value: unknown): Recipe | null {
     ingredients,
     steps,
     sourceUrl: String(source.sourceUrl || '').trim(),
+    imageUrl: String(source.imageUrl || '').trim() || undefined,
     createdAt,
     updatedAt,
   }
@@ -791,6 +807,7 @@ export async function addRecipe(recipe: Recipe): Promise<Recipe> {
     recipes: [...store.recipes.filter((item) => item.id !== created.id), created],
   }
   emitChange()
+  await refreshIngredientEntriesFromServer()
   return created
 }
 
@@ -805,6 +822,7 @@ export async function updateRecipe(recipe: Recipe): Promise<Recipe> {
     recipes: store.recipes.map((item) => (item.id === updated.id ? updated : item)),
   }
   emitChange()
+  await refreshIngredientEntriesFromServer()
   return updated
 }
 
@@ -1026,6 +1044,38 @@ export async function updateIngredientEntry(entry: IngredientEntry): Promise<Ing
   }
   emitChange()
   return updated
+}
+
+export async function bulkUpdateIngredientDefaultStore(
+  ingredientIds: string[],
+  defaultStoreId: string
+): Promise<IngredientEntry[]> {
+  await hydrateStore()
+  const payload = await requestJson<{ ingredientEntries?: IngredientEntry[] }>(
+    '/api/ingredients/default-store',
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        ingredientIds,
+        defaultStoreId,
+      }),
+    }
+  )
+
+  const updatedEntries = Array.isArray(payload.ingredientEntries)
+    ? payload.ingredientEntries
+    : []
+  if (updatedEntries.length === 0) return []
+
+  const byId = new Map(updatedEntries.map((entry) => [entry.id, entry]))
+  store = {
+    ...store,
+    ingredientEntries: store.ingredientEntries.map(
+      (item) => byId.get(item.id) ?? item
+    ),
+  }
+  emitChange()
+  return updatedEntries
 }
 
 export async function deleteIngredientEntry(id: string): Promise<void> {

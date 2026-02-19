@@ -1,18 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Calendar,
-  Eye,
+  ChevronDown,
   Loader2,
   MoreHorizontal,
   ShoppingCart,
   Store,
-  Trash2,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -26,9 +24,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
+  buildShoppingList,
+  type PlannedSlotState,
+  type ShoppingStoreBucket,
+} from '@/lib/shopping-list'
 import type {
   GroceryStore,
   MealSelection,
@@ -75,66 +91,69 @@ const STATUS_VALUES: Array<Exclude<MealSelection, 'recipe'>> = [
 
 interface RecipeSearchFieldProps {
   dateKey: string
+  slot: MealSlot
   slotLabel: string
   recipes: Recipe[]
-  selectedRecipe: Recipe | null
+  disabled?: boolean
   onSelectRecipe: (recipeId: string) => void
-  onClearSelection: () => void
+  onViewRecipe?: (recipe: Recipe) => void
 }
 
 function RecipeSearchField({
   dateKey,
+  slot,
   slotLabel,
   recipes,
-  selectedRecipe,
+  disabled = false,
   onSelectRecipe,
-  onClearSelection,
+  onViewRecipe,
 }: RecipeSearchFieldProps) {
-  const [query, setQuery] = useState(selectedRecipe?.name ?? '')
+  const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [highlightIndex, setHighlightIndex] = useState(-1)
 
-  useEffect(() => {
-    setQuery(selectedRecipe?.name ?? '')
-  }, [selectedRecipe?.id, selectedRecipe?.name])
-
   const suggestions = useMemo(() => {
+    const slotScopedRecipes = recipes.filter(
+      (recipe) => recipe.mealType === '' || recipe.mealType === slot
+    )
     const normalizedQuery = query.trim().toLowerCase()
-    if (!normalizedQuery) return recipes.slice(0, 8)
+    if (!normalizedQuery) return slotScopedRecipes.slice(0, 8)
 
-    const startsWithMatches = recipes.filter((recipe) =>
+    const startsWithMatches = slotScopedRecipes.filter((recipe) =>
       recipe.name.toLowerCase().startsWith(normalizedQuery)
     )
-    const includesMatches = recipes.filter(
+    const includesMatches = slotScopedRecipes.filter(
       (recipe) =>
         !recipe.name.toLowerCase().startsWith(normalizedQuery) &&
         recipe.name.toLowerCase().includes(normalizedQuery)
     )
 
     return [...startsWithMatches, ...includesMatches].slice(0, 8)
-  }, [query, recipes])
+  }, [query, recipes, slot])
 
   const handleSelect = useCallback(
     (recipe: Recipe) => {
-      setQuery(recipe.name)
+      if (disabled) return
+      setQuery('')
       setOpen(false)
       setHighlightIndex(-1)
       onSelectRecipe(recipe.id)
     },
-    [onSelectRecipe]
+    [disabled, onSelectRecipe]
   )
 
-  const handleClear = useCallback(() => {
+  const clearQuery = useCallback(() => {
+    if (disabled) return
     setQuery('')
     setOpen(false)
     setHighlightIndex(-1)
-    onClearSelection()
-  }, [onClearSelection])
+  }, [disabled])
 
   const commitQuery = useCallback(() => {
+    if (disabled) return
     const normalized = query.trim().toLowerCase()
     if (!normalized) {
-      if (selectedRecipe) handleClear()
+      setQuery('')
       return
     }
 
@@ -142,28 +161,27 @@ function RecipeSearchField({
       (recipe) => recipe.name.trim().toLowerCase() === normalized
     )
     if (exactMatch) {
-      if (selectedRecipe?.id !== exactMatch.id) {
-        onSelectRecipe(exactMatch.id)
-      }
-      setQuery(exactMatch.name)
+      onSelectRecipe(exactMatch.id)
+      setQuery('')
       return
     }
-
-    if (selectedRecipe) {
-      setQuery(selectedRecipe.name)
-    }
-  }, [handleClear, onSelectRecipe, query, recipes, selectedRecipe])
+    setQuery('')
+  }, [disabled, onSelectRecipe, query, recipes])
 
   return (
     <div className="relative">
       <Input
+        disabled={disabled}
         value={query}
         onChange={(event) => {
+          if (disabled) return
           setQuery(event.target.value)
           setOpen(true)
           setHighlightIndex(-1)
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          if (!disabled) setOpen(true)
+        }}
         onBlur={() => {
           setTimeout(() => {
             commitQuery()
@@ -198,7 +216,7 @@ function RecipeSearchField({
           }
         }}
         className="h-8 pr-7 text-xs"
-        placeholder="Search recipes..."
+        placeholder="Add recipe..."
         aria-label={`${slotLabel} recipe search for ${dateKey}`}
         autoComplete="off"
       />
@@ -206,9 +224,10 @@ function RecipeSearchField({
       {query ? (
         <button
           type="button"
-          onClick={handleClear}
+          disabled={disabled}
+          onClick={clearQuery}
           className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label={`Clear ${slotLabel} recipe selection`}
+          aria-label={`Clear ${slotLabel} recipe search`}
         >
           <X className="size-3.5" />
         </button>
@@ -219,28 +238,45 @@ function RecipeSearchField({
           className="absolute left-0 top-full z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md"
           role="listbox"
         >
+          <p className="border-b border-border px-2 py-1.5 text-[11px] text-muted-foreground">
+            Showing {slotLabel.toLowerCase()} and uncategorized recipes
+          </p>
           {suggestions.length > 0 ? (
             <div className="max-h-52 overflow-y-auto p-1">
               {suggestions.map((recipe, index) => (
-                <button
+                <div
                   key={recipe.id}
-                  type="button"
                   role="option"
                   aria-selected={index === highlightIndex}
-                  className={`flex w-full items-center rounded-sm px-2 py-1.5 text-left text-xs ${
+                  className={`flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs ${
                     index === highlightIndex
                       ? 'bg-accent text-accent-foreground'
                       : 'text-popover-foreground hover:bg-accent/50'
                   }`}
-                  onMouseDown={(event) => {
-                    event.preventDefault()
-                    handleSelect(recipe)
-                  }}
-                  onClick={() => handleSelect(recipe)}
                   onMouseEnter={() => setHighlightIndex(index)}
                 >
-                  <span className="truncate">{recipe.name}</span>
-                </button>
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 truncate text-left"
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      handleSelect(recipe)
+                    }}
+                    onClick={() => handleSelect(recipe)}
+                  >
+                    {recipe.name}
+                  </button>
+                  {onViewRecipe ? (
+                    <button
+                      type="button"
+                      className="shrink-0 text-[11px] font-medium text-primary hover:underline"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => onViewRecipe(recipe)}
+                    >
+                      View details
+                    </button>
+                  ) : null}
+                </div>
               ))}
             </div>
           ) : (
@@ -252,108 +288,26 @@ function RecipeSearchField({
   )
 }
 
-interface ShoppingItem {
-  name: string
-  qty: number | null
-  unit: string
+interface OptimisticSlotState {
+  selection: MealSelection | null
+  recipeId: string | null
 }
 
-interface ShoppingStoreBucket {
-  key: string
-  storeId: string | null
-  storeName: string
-  items: ShoppingItem[]
+interface MealPlannerViewProps {
+  onEditRecipe?: (recipe: Recipe) => void
 }
 
-function buildShoppingList(
-  activeDateKeys: string[],
-  slotMap: Map<string, { selection: MealSelection; recipeId: string | null }>,
-  recipes: Recipe[],
-  stores: GroceryStore[]
-): ShoppingStoreBucket[] {
-  const storeNameToId = new Map<string, string>()
-  const storeById = new Map<string, GroceryStore>()
-  for (const store of stores) {
-    const normalized = store.name.trim().toLowerCase()
-    if (normalized) storeNameToId.set(normalized, store.id)
-    storeById.set(store.id, store)
-  }
-
-  const bucketMap = new Map<
-    string,
-    { storeId: string | null; storeName: string; items: ShoppingItem[] }
-  >()
-
-  for (const dateKey of activeDateKeys) {
-    for (const slot of SLOTS) {
-      const entry = slotMap.get(`${dateKey}:${slot}`)
-      if (!entry || entry.selection !== 'recipe' || !entry.recipeId) continue
-      const recipe = getRecipeById(recipes, entry.recipeId)
-      if (!recipe) continue
-
-      for (const ingredient of recipe.ingredients) {
-        const explicitStoreId =
-          typeof ingredient.storeId === 'string' && ingredient.storeId.trim()
-            ? ingredient.storeId.trim()
-            : null
-        const ingredientStoreName = ingredient.store?.trim() || ''
-        const inferredStoreId =
-          !explicitStoreId && ingredientStoreName
-            ? storeNameToId.get(ingredientStoreName.toLowerCase()) || null
-            : null
-        const storeId = explicitStoreId || inferredStoreId
-        const resolvedStoreName = storeId
-          ? storeById.get(storeId)?.name || ingredientStoreName || 'Unknown Store'
-          : ingredientStoreName || 'Uncategorized'
-        const bucketKey = storeId
-          ? `id:${storeId}`
-          : `name:${resolvedStoreName.toLowerCase()}`
-
-        const current = bucketMap.get(bucketKey)
-        if (!current) {
-          bucketMap.set(bucketKey, {
-            storeId,
-            storeName: resolvedStoreName,
-            items: [],
-          })
-        }
-        bucketMap.get(bucketKey)?.items.push({
-          name: ingredient.name,
-          qty: ingredient.qty,
-          unit: ingredient.unit,
-        })
-      }
-    }
-  }
-
-  const buckets = Array.from(bucketMap.entries()).map(([key, value]) => {
-    const deduped: Record<string, ShoppingItem> = {}
-    for (const item of value.items) {
-      const dedupeKey = `${item.name.toLowerCase()}|${item.unit.toLowerCase()}`
-      if (deduped[dedupeKey]) {
-        if (deduped[dedupeKey].qty !== null && item.qty !== null) {
-          deduped[dedupeKey].qty = (deduped[dedupeKey].qty as number) + item.qty
-        }
-      } else {
-        deduped[dedupeKey] = { ...item }
-      }
-    }
-    return {
-      key,
-      storeId: value.storeId,
-      storeName: value.storeName,
-      items: Object.values(deduped).sort((a, b) => a.name.localeCompare(b.name)),
-    }
+function buildDefaultPlanLabel(dateKeys: string[]): string {
+  if (dateKeys.length === 0) return 'Meal Plan'
+  const start = formatDateLabel(dateKeys[0], { month: 'short', day: 'numeric' })
+  const end = formatDateLabel(dateKeys[dateKeys.length - 1], {
+    month: 'short',
+    day: 'numeric',
   })
-
-  return buckets.sort((a, b) => {
-    if (a.storeName === 'Uncategorized') return 1
-    if (b.storeName === 'Uncategorized') return -1
-    return a.storeName.localeCompare(b.storeName)
-  })
+  return dateKeys.length === 1 ? `Plan ${start}` : `Plan ${start} - ${end}`
 }
 
-export function MealPlannerView() {
+export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
   const recipes = useRecipes()
   const stores = useGroceryStores()
   const mealPlanSlots = useMealPlanSlots()
@@ -361,14 +315,30 @@ export function MealPlannerView() {
   const [startDate, setStartDate] = useState<string>(() => toDateKey(new Date()))
   const [dayCount, setDayCount] = useState<number>(7)
   const [buildingStoreId, setBuildingStoreId] = useState<string | null>(null)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [saveLabel, setSaveLabel] = useState('')
+  const [saveDescription, setSaveDescription] = useState('')
+  const [savingSnapshot, setSavingSnapshot] = useState(false)
+  const [openStoreKeys, setOpenStoreKeys] = useState<Set<string>>(() => new Set())
+  const [optimisticSlots, setOptimisticSlots] = useState<Map<string, OptimisticSlotState>>(
+    () => new Map()
+  )
+  const [pendingSlotKeys, setPendingSlotKeys] = useState<Set<string>>(() => new Set())
+  const pendingSlotKeysRef = useRef<Set<string>>(new Set())
 
   const activeDateKeys = useMemo(
     () => buildDateRange(startDate, dayCount),
     [startDate, dayCount]
   )
 
+  useEffect(() => {
+    if (saveDialogOpen) return
+    setSaveLabel(buildDefaultPlanLabel(activeDateKeys))
+    setSaveDescription('')
+  }, [activeDateKeys, saveDialogOpen])
+
   const slotMap = useMemo(() => {
-    const map = new Map<string, { selection: MealSelection; recipeId: string | null }>()
+    const map = new Map<string, PlannedSlotState>()
     for (const slot of mealPlanSlots) {
       map.set(`${slot.dateKey}:${slot.slot}`, {
         selection: slot.selection,
@@ -378,19 +348,53 @@ export function MealPlannerView() {
     return map
   }, [mealPlanSlots])
 
+  const effectiveSlotMap = useMemo(() => {
+    const merged = new Map<string, PlannedSlotState>(slotMap)
+    for (const [key, entry] of optimisticSlots.entries()) {
+      if (!entry.selection) {
+        merged.delete(key)
+        continue
+      }
+      merged.set(key, {
+        selection: entry.selection,
+        recipeId: entry.selection === 'recipe' ? entry.recipeId : null,
+      })
+    }
+    return merged
+  }, [optimisticSlots, slotMap])
+
+  useEffect(() => {
+    setOptimisticSlots((previous) => {
+      let changed = false
+      const next = new Map(previous)
+
+      for (const [key, entry] of previous.entries()) {
+        const persisted = slotMap.get(key)
+        const persistedSelection = persisted?.selection ?? null
+        const persistedRecipeId = persisted?.recipeId ?? null
+        if (persistedSelection === entry.selection && persistedRecipeId === entry.recipeId) {
+          next.delete(key)
+          changed = true
+        }
+      }
+
+      return changed ? next : previous
+    })
+  }, [slotMap])
+
   const totalPlanned = useMemo(() => {
     let count = 0
     for (const dateKey of activeDateKeys) {
       for (const slot of SLOTS) {
-        if (slotMap.has(`${dateKey}:${slot}`)) count += 1
+        if (effectiveSlotMap.has(`${dateKey}:${slot}`)) count += 1
       }
     }
     return count
-  }, [activeDateKeys, slotMap])
+  }, [activeDateKeys, effectiveSlotMap])
 
   const shoppingBuckets = useMemo(
-    () => buildShoppingList(activeDateKeys, slotMap, recipes, stores),
-    [activeDateKeys, slotMap, recipes, stores]
+    () => buildShoppingList(activeDateKeys, effectiveSlotMap, recipes, stores),
+    [activeDateKeys, effectiveSlotMap, recipes, stores]
   )
 
   const storesById = useMemo(() => {
@@ -500,21 +504,54 @@ export function MealPlannerView() {
       selection: MealSelection | null,
       recipeId: string | null
     ) => {
+      const slotKey = `${dateKey}:${slot}`
+      if (pendingSlotKeysRef.current.has(slotKey)) return
+      pendingSlotKeysRef.current.add(slotKey)
+
+      const nextState: OptimisticSlotState = {
+        selection,
+        recipeId: selection === 'recipe' ? recipeId : null,
+      }
+      const previousState = effectiveSlotMap.get(slotKey)
+
+      setPendingSlotKeys(new Set(pendingSlotKeysRef.current))
+      setOptimisticSlots((previous) => {
+        const next = new Map(previous)
+        next.set(slotKey, nextState)
+        return next
+      })
+
       try {
         await setMealSlot(dateKey, slot, selection, recipeId)
       } catch (error) {
+        setOptimisticSlots((previous) => {
+          const next = new Map(previous)
+          if (previousState) {
+            next.set(slotKey, {
+              selection: previousState.selection,
+              recipeId: previousState.recipeId,
+            })
+          } else {
+            next.delete(slotKey)
+          }
+          return next
+        })
         const message =
           error instanceof Error ? error.message : 'Unable to update meal slot.'
         toast.error(message)
+      } finally {
+        pendingSlotKeysRef.current.delete(slotKey)
+        setPendingSlotKeys(new Set(pendingSlotKeysRef.current))
       }
     },
-    []
+    [effectiveSlotMap]
   )
 
   const handleRecipeSelection = useCallback(
     (dateKey: string, slot: MealSlot, recipeId: string) => {
-      if (!recipeId.trim()) return
-      void updateSlot(dateKey, slot, 'recipe', recipeId)
+      const normalizedRecipeId = recipeId.trim()
+      if (!normalizedRecipeId) return
+      void updateSlot(dateKey, slot, 'recipe', normalizedRecipeId)
     },
     [updateSlot]
   )
@@ -534,42 +571,81 @@ export function MealPlannerView() {
     [updateSlot]
   )
 
-  const handleSavePlan = useCallback(async () => {
+  const handleOpenSaveDialog = useCallback(() => {
+    if (pendingSlotKeysRef.current.size > 0) {
+      toast.info('Please wait for meal slot updates to finish syncing.')
+      return
+    }
+    setSaveLabel(buildDefaultPlanLabel(activeDateKeys))
+    setSaveDescription('')
+    setSaveDialogOpen(true)
+  }, [activeDateKeys])
+
+  const handleConfirmSavePlan = useCallback(async () => {
+    if (pendingSlotKeysRef.current.size > 0) {
+      toast.info('Please wait for meal slot updates to finish syncing.')
+      return
+    }
     try {
+      setSavingSnapshot(true)
       const snapshot = await saveMealPlanSnapshot({
+        label: saveLabel.trim() || undefined,
+        description: saveDescription.trim() || undefined,
         startDate,
         days: dayCount,
       })
       if (!snapshot) {
-        toast.error('No meals to save in this date range yet.')
+        if (totalPlanned > 0) {
+          toast.error('Your meal changes are still syncing. Please try Save Plan again.')
+        } else {
+          toast.error('No meals to save in this date range yet.')
+        }
         return
       }
       toast.success('Meal plan snapshot saved', { description: snapshot.label })
+      setSaveDialogOpen(false)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to save meal plan snapshot.'
       toast.error(message)
+    } finally {
+      setSavingSnapshot(false)
     }
-  }, [dayCount, startDate])
+  }, [dayCount, saveDescription, saveLabel, startDate, totalPlanned])
 
   const handleClearRange = useCallback(() => {
-    void clearMealPlan({ startDate, days: dayCount }).catch((error) => {
-      const message =
-        error instanceof Error ? error.message : 'Unable to clear meal slots.'
-      toast.error(message)
-    })
+    void clearMealPlan({ startDate, days: dayCount })
+      .then(() => {
+        pendingSlotKeysRef.current.clear()
+        setPendingSlotKeys(new Set())
+        setOptimisticSlots(new Map())
+      })
+      .catch((error) => {
+        const message =
+          error instanceof Error ? error.message : 'Unable to clear meal slots.'
+        toast.error(message)
+      })
   }, [dayCount, startDate])
+
+  const setStoreSectionOpen = useCallback((bucketKey: string, open: boolean) => {
+    setOpenStoreKeys((previous) => {
+      const next = new Set(previous)
+      if (open) next.add(bucketKey)
+      else next.delete(bucketKey)
+      return next
+    })
+  }, [])
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+      <div className="rounded-xl border border-border/60 bg-card/40 p-4 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
               <Calendar className="size-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-foreground">Meal Planner</h2>
+              <h2 className="text-lg font-semibold text-foreground">Meal Planner</h2>
               <p className="text-xs text-muted-foreground">
                 {totalPlanned} slot{totalPlanned !== 1 ? 's' : ''} planned in this range
               </p>
@@ -600,18 +676,17 @@ export function MealPlannerView() {
             </Select>
             <Button
               variant="secondary"
-              onClick={handleSavePlan}
-              disabled={totalPlanned === 0}
-            >
-              Save Plan
-            </Button>
-            <Button
-              variant="outline"
               onClick={handleClearRange}
               disabled={totalPlanned === 0}
             >
-              <Trash2 className="size-4" />
-              Clear Range
+              Reset Plan
+            </Button>
+            <Button
+              onClick={handleOpenSaveDialog}
+              disabled={totalPlanned === 0}
+              className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+            >
+              Save Plan
             </Button>
           </div>
         </div>
@@ -619,44 +694,45 @@ export function MealPlannerView() {
 
       <div className="flex flex-col gap-5 xl:flex-row">
         <div className="min-w-0 flex-1">
-          <div className="space-y-3">
-              {activeDateKeys.map((dateKey) => (
-                <Card
-                  key={dateKey}
-                  className="w-full gap-3 border-border/80 py-4"
-                >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold text-foreground">
-                      {formatDateLabel(dateKey, {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="overflow-hidden rounded-xl border border-border/60 bg-card/25">
+            {activeDateKeys.map((dateKey) => (
+              <section
+                key={dateKey}
+                className="px-4 py-4 first:pt-4 last:pb-4 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-border/60"
+              >
+                <div className="pb-2">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {formatDateLabel(dateKey, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </h3>
+                </div>
+                <div className="pt-0">
+                  <div className="divide-y divide-border/50">
                     {SLOTS.map((slot) => {
                       const key = `${dateKey}:${slot}`
-                      const entry = slotMap.get(key)
+                      const entry = effectiveSlotMap.get(key)
+                      const isSlotPending = pendingSlotKeys.has(key)
+                      const statusSelection =
+                        entry && entry.selection !== 'recipe' ? entry.selection : null
                       const recipe =
                         entry?.selection === 'recipe' && entry.recipeId
                           ? getRecipeById(recipes, entry.recipeId)
                           : undefined
 
                       return (
-                        <div
-                          key={slot}
-                          className="rounded-lg border border-border bg-muted/20 p-2.5"
-                        >
-                          <div className="mb-2 flex items-center justify-between gap-1">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div key={slot} className="space-y-2 py-3 first:pt-0 last:pb-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold tracking-tight text-foreground">
                               {SLOT_LABELS[slot]}
                             </p>
                             <div className="flex items-center gap-1">
-                              {entry && entry.selection !== 'recipe' ? (
-                                <Badge variant="secondary" className="text-[11px]">
-                                  {STATUS_LABELS[entry.selection as Exclude<MealSelection, 'recipe'>]}
-                                </Badge>
+                              {isSlotPending ? (
+                                <span className="text-[11px] text-muted-foreground">
+                                  Saving...
+                                </span>
                               ) : null}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -665,15 +741,17 @@ export function MealPlannerView() {
                                     variant="ghost"
                                     size="icon"
                                     className="size-6"
+                                    disabled={isSlotPending}
                                     aria-label={`${SLOT_LABELS[slot]} status options for ${dateKey}`}
                                   >
                                     <MoreHorizontal className="size-3.5" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuContent align="end" className="w-44">
                                   {STATUS_VALUES.map((statusValue) => (
                                     <DropdownMenuItem
                                       key={`${dateKey}-${slot}-${statusValue}`}
+                                      disabled={isSlotPending}
                                       onSelect={() =>
                                         handleStatusSelection(dateKey, slot, statusValue)
                                       }
@@ -682,61 +760,81 @@ export function MealPlannerView() {
                                     </DropdownMenuItem>
                                   ))}
                                   <DropdownMenuItem
+                                    disabled={isSlotPending}
                                     onSelect={() => handleClearSelection(dateKey, slot)}
                                   >
-                                    No plan
+                                    Select plan
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
                           </div>
 
-                          <RecipeSearchField
-                            dateKey={dateKey}
-                            slotLabel={SLOT_LABELS[slot]}
-                            recipes={recipes}
-                            selectedRecipe={recipe ?? null}
-                            onSelectRecipe={(recipeId) =>
-                              handleRecipeSelection(dateKey, slot, recipeId)
-                            }
-                            onClearSelection={() => handleClearSelection(dateKey, slot)}
-                          />
-
-                          {recipe ? (
-                            <div className="mt-2 flex items-center justify-between gap-2">
-                              <p className="line-clamp-2 text-sm font-medium text-foreground">
-                                {recipe.name}
+                          {statusSelection ? (
+                            <div className="rounded-md border border-border/60 bg-muted/35 px-3 py-2">
+                              <p className="text-xs text-muted-foreground">
+                                This meal is marked as{' '}
+                                {STATUS_LABELS[statusSelection].toLowerCase()}.
                               </p>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setViewRecipe(recipe)}
-                                className="h-7 px-2"
-                              >
-                                <Eye className="size-3.5" />
-                              </Button>
                             </div>
-                          ) : null}
+                          ) : (
+                            <>
+                              <RecipeSearchField
+                                dateKey={dateKey}
+                                slot={slot}
+                                slotLabel={SLOT_LABELS[slot]}
+                                recipes={recipes}
+                                disabled={isSlotPending}
+                                onSelectRecipe={(recipeId) =>
+                                  handleRecipeSelection(dateKey, slot, recipeId)
+                                }
+                                onViewRecipe={(selectedRecipe) => setViewRecipe(selectedRecipe)}
+                              />
+
+                              {recipe ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewRecipe(recipe)}
+                                    className="line-clamp-1 text-left text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
+                                  >
+                                    {recipe.name}
+                                  </button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7"
+                                    disabled={isSlotPending}
+                                    onClick={() => handleClearSelection(dateKey, slot)}
+                                    aria-label={`Remove ${recipe.name} from ${SLOT_LABELS[slot]}`}
+                                  >
+                                    <X className="size-3.5" />
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       )
                     })}
-                  </CardContent>
-                </Card>
-              ))}
+                  </div>
+                </div>
+              </section>
+            ))}
           </div>
         </div>
 
         <div className="xl:w-80 xl:shrink-0">
-          <Card className="overflow-hidden">
-            <div className="flex items-center gap-2.5 border-b border-border bg-muted/40 px-4 py-3">
+          <section className="overflow-hidden rounded-xl border border-border/60 bg-card/25">
+            <div className="flex items-center gap-2.5 border-b border-border/60 bg-muted/20 px-4 py-3">
               <ShoppingCart className="size-4 text-foreground" />
               <h3 className="text-sm font-semibold text-foreground">Shopping List</h3>
-              <Badge variant="outline" className="ml-auto text-xs">
+              <span className="ml-auto rounded-md border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
                 {shoppingBuckets.reduce((sum, bucket) => sum + bucket.items.length, 0)} items
-              </Badge>
+              </span>
             </div>
-            <CardContent className="p-3">
+            <div className="p-3">
               {shoppingBuckets.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-7 text-center">
                   <div className="flex size-9 items-center justify-center rounded-full bg-muted">
@@ -748,73 +846,159 @@ export function MealPlannerView() {
                 </div>
               ) : (
                 <ScrollArea className="max-h-[calc(100vh-15rem)]">
-                  <div className="space-y-3">
+                  <div className="divide-y divide-border/60">
                     {shoppingBuckets.map((bucket) => {
                       const disabledReason = getBuildDisabledReason(bucket)
                       const isBuilding = Boolean(
                         bucket.storeId && buildingStoreId === bucket.storeId
                       )
+                      const isOpen = openStoreKeys.has(bucket.key)
+
                       return (
-                        <div key={bucket.key} className="rounded-md border border-border p-2">
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <p className="text-xs font-semibold text-foreground">
-                              {bucket.storeName}
-                            </p>
-                            <Button
+                        <Collapsible
+                          key={bucket.key}
+                          open={isOpen}
+                          onOpenChange={(open) => setStoreSectionOpen(bucket.key, open)}
+                          className="py-2"
+                        >
+                          <CollapsibleTrigger asChild>
+                            <button
                               type="button"
-                              size="sm"
-                              variant="secondary"
-                              className="h-7 px-2 text-[11px]"
-                              disabled={Boolean(disabledReason) || isBuilding}
-                              onClick={() => {
-                                void handleBuildShoppingList(bucket)
-                              }}
-                              title={disabledReason || undefined}
+                              className="flex w-full items-center justify-between gap-2 px-1 py-1.5 text-left"
                             >
-                              {isBuilding ? (
-                                <Loader2 className="size-3.5 animate-spin" />
-                              ) : (
-                                'Build Shopping List'
-                              )}
-                            </Button>
-                          </div>
-                          {disabledReason ? (
-                            <p className="mb-2 text-[11px] text-muted-foreground">
-                              {disabledReason}
-                            </p>
-                          ) : null}
-                        <div className="space-y-1">
-                          {bucket.items.map((item, index) => (
-                            <p
-                              key={`${bucket.key}-${index}`}
-                              className="text-xs text-muted-foreground"
-                            >
-                              {item.qty !== null
-                                ? `${Number.isInteger(item.qty)
-                                    ? item.qty
-                                    : item.qty.toFixed(2).replace(/\.?0+$/, '')} `
-                                : ''}
-                              {item.unit ? `${item.unit} ` : ''}
-                              {item.name}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <p className="truncate text-xs font-semibold text-foreground">
+                                  {bucket.storeName}
+                                </p>
+                                <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                  {bucket.items.length} item{bucket.items.length === 1 ? '' : 's'}
+                                </span>
+                              </div>
+                              <ChevronDown
+                                className={`size-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                              />
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="border-t border-border/60 px-1 py-2">
+                              <div className="mb-2 flex items-center justify-end">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-7 px-2 text-[11px]"
+                                  disabled={Boolean(disabledReason) || isBuilding}
+                                  onClick={() => {
+                                    void handleBuildShoppingList(bucket)
+                                  }}
+                                  title={disabledReason || undefined}
+                                >
+                                  {isBuilding ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    'Build Shopping List'
+                                  )}
+                                </Button>
+                              </div>
+                              {disabledReason ? (
+                                <p className="mb-2 text-[11px] text-muted-foreground">
+                                  {disabledReason}
+                                </p>
+                              ) : null}
+                              <ul className="list-disc space-y-1 pl-4">
+                                {bucket.items.map((item, index) => (
+                                  <li
+                                    key={`${bucket.key}-${index}`}
+                                    className="text-xs text-muted-foreground"
+                                  >
+                                    {item.qty !== null
+                                      ? `${Number.isInteger(item.qty)
+                                          ? item.qty
+                                          : item.qty.toFixed(2).replace(/\.?0+$/, '')} `
+                                      : ''}
+                                    {item.unit ? `${item.unit} ` : ''}
+                                    {item.name}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       )
                     })}
                   </div>
                 </ScrollArea>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
       </div>
+
+      <Dialog
+        open={saveDialogOpen}
+        onOpenChange={(open) => {
+          if (!savingSnapshot) setSaveDialogOpen(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save Meal Plan</DialogTitle>
+            <DialogDescription>
+              Give this plan a name and optional description for later reference.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Plan Name</p>
+              <Input
+                value={saveLabel}
+                onChange={(event) => setSaveLabel(event.target.value)}
+                placeholder="Weekly Family Plan"
+                maxLength={120}
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Description</p>
+              <Textarea
+                value={saveDescription}
+                onChange={(event) => setSaveDescription(event.target.value)}
+                placeholder="Optional notes about this plan"
+                rows={3}
+                maxLength={600}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSaveDialogOpen(false)}
+              disabled={savingSnapshot}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void handleConfirmSavePlan()} disabled={savingSnapshot}>
+              {savingSnapshot ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Plan'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <RecipeDetailModal
         recipe={viewRecipe}
         open={Boolean(viewRecipe)}
         onOpenChange={(open) => {
           if (!open) setViewRecipe(null)
+        }}
+        onEditRecipe={(recipe) => {
+          onEditRecipe?.(recipe)
+          setViewRecipe(null)
         }}
       />
     </div>

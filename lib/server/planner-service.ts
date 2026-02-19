@@ -167,6 +167,86 @@ function mapIngredientEntry(row: {
   }
 }
 
+function normalizeIngredientEntryName(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function buildIngredientEntryId(seed: string, index: number): string {
+  const cleanedSeed = seed
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40)
+  return `ie_recipe_${Date.now()}_${index}_${cleanedSeed || 'item'}_${Math.random()
+    .toString(36)
+    .slice(2, 7)}`
+}
+
+async function syncIngredientEntriesFromRecipe(recipe: Recipe): Promise<void> {
+  const candidatesByName = new Map<
+    string,
+    { name: string; defaultUnit: string; defaultStoreId: string }
+  >()
+
+  for (const ingredient of recipe.ingredients) {
+    const name = normalizeIngredientEntryName(String(ingredient.name || ''))
+    if (!name) continue
+
+    const defaultUnit = String(ingredient.unit || '').trim()
+    const defaultStoreId = sanitizeStoreId(ingredient.storeId)
+    const existing = candidatesByName.get(name)
+
+    if (!existing) {
+      candidatesByName.set(name, {
+        name,
+        defaultUnit,
+        defaultStoreId,
+      })
+      continue
+    }
+
+    if (!existing.defaultUnit && defaultUnit) {
+      existing.defaultUnit = defaultUnit
+    }
+    if (!existing.defaultStoreId && defaultStoreId) {
+      existing.defaultStoreId = defaultStoreId
+    }
+  }
+
+  const candidates = Array.from(candidatesByName.values())
+  if (candidates.length === 0) return
+
+  const existing = await db.ingredientEntry.findMany({
+    where: {
+      OR: candidates.map((candidate) => ({
+        name: { equals: candidate.name, mode: 'insensitive' as const },
+      })),
+    },
+    select: { name: true },
+  })
+
+  const existingNames = new Set(
+    existing.map((entry) => normalizeIngredientEntryName(entry.name))
+  )
+
+  const rowsToCreate = candidates.filter(
+    (candidate) => !existingNames.has(candidate.name)
+  )
+  if (rowsToCreate.length === 0) return
+
+  const now = new Date()
+  await db.ingredientEntry.createMany({
+    data: rowsToCreate.map((candidate, index) => ({
+      id: buildIngredientEntryId(candidate.name, index),
+      name: candidate.name,
+      defaultUnit: candidate.defaultUnit,
+      defaultStoreId: candidate.defaultStoreId || null,
+      category: 'Other',
+      createdAt: now,
+      updatedAt: now,
+    })),
+  })
+}
+
 function mapRecipe(row: {
   id: string
   name: string
@@ -174,6 +254,7 @@ function mapRecipe(row: {
   mealType: string
   servings: number
   sourceUrl: string
+  imageUrl: string | null
   createdAt: Date
   updatedAt: Date
   ingredients: Array<{
@@ -197,6 +278,7 @@ function mapRecipe(row: {
     mealType: row.mealType as Recipe['mealType'],
     servings: row.servings,
     sourceUrl: row.sourceUrl,
+    imageUrl: row.imageUrl || undefined,
     createdAt: toIsoString(row.createdAt),
     updatedAt: toIsoString(row.updatedAt),
     ingredients: row.ingredients
@@ -374,6 +456,7 @@ async function upsertRecipe(recipe: Recipe): Promise<void> {
       mealType: recipe.mealType,
       servings: recipe.servings,
       sourceUrl: recipe.sourceUrl,
+      imageUrl: recipe.imageUrl || null,
       createdAt: new Date(recipe.createdAt),
       updatedAt: new Date(recipe.updatedAt),
       ingredients: {
@@ -400,6 +483,7 @@ async function upsertRecipe(recipe: Recipe): Promise<void> {
       mealType: recipe.mealType,
       servings: recipe.servings,
       sourceUrl: recipe.sourceUrl,
+      imageUrl: recipe.imageUrl || null,
       updatedAt: new Date(recipe.updatedAt),
     },
   })
@@ -435,6 +519,7 @@ async function upsertRecipe(recipe: Recipe): Promise<void> {
 
 export async function createRecipe(recipe: Recipe): Promise<Recipe> {
   await upsertRecipe(recipe)
+  await syncIngredientEntriesFromRecipe(recipe)
   const next = await db.recipe.findUniqueOrThrow({
     where: { id: recipe.id },
     include: {
@@ -450,6 +535,7 @@ export async function updateRecipe(id: string, recipe: Recipe): Promise<Recipe> 
     throw new Error('Recipe ID mismatch.')
   }
   await upsertRecipe(recipe)
+  await syncIngredientEntriesFromRecipe(recipe)
   const next = await db.recipe.findUniqueOrThrow({
     where: { id: recipe.id },
     include: {
@@ -462,6 +548,13 @@ export async function updateRecipe(id: string, recipe: Recipe): Promise<Recipe> 
 
 export async function deleteRecipe(id: string): Promise<void> {
   await db.recipe.delete({ where: { id } })
+}
+
+export async function getIngredientEntries(): Promise<IngredientEntry[]> {
+  const rows = await db.ingredientEntry.findMany({
+    orderBy: { name: 'asc' },
+  })
+  return rows.map(mapIngredientEntry)
 }
 
 async function getCurrentMealPlanSlots(): Promise<MealPlanSlotEntry[]> {
@@ -820,6 +913,49 @@ export async function updateIngredientEntry(
   return mapIngredientEntry(updated)
 }
 
+export async function bulkSetIngredientEntryDefaultStore(
+  ingredientIds: string[],
+  defaultStoreId: string
+): Promise<IngredientEntry[]> {
+  const ids = Array.from(
+    new Set(
+      ingredientIds
+        .map((id) => String(id || '').trim())
+        .filter((id) => id.length > 0)
+    )
+  )
+
+  if (ids.length === 0) {
+    return []
+  }
+
+  const normalizedStoreId = sanitizeStoreId(defaultStoreId)
+  if (normalizedStoreId) {
+    const store = await db.groceryStore.findUnique({
+      where: { id: normalizedStoreId },
+      select: { id: true },
+    })
+    if (!store) {
+      throw new Error('Selected default store does not exist.')
+    }
+  }
+
+  const now = new Date()
+  await db.ingredientEntry.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      defaultStoreId: normalizedStoreId || null,
+      updatedAt: now,
+    },
+  })
+
+  const updated = await db.ingredientEntry.findMany({
+    where: { id: { in: ids } },
+    orderBy: { name: 'asc' },
+  })
+  return updated.map((row) => mapIngredientEntry(row))
+}
+
 export async function deleteIngredientEntry(id: string): Promise<void> {
   await db.ingredientEntry.delete({ where: { id } })
 }
@@ -952,6 +1088,7 @@ export async function importLocalMigration(
           mealType: recipe.mealType,
           servings: recipe.servings,
           sourceUrl: recipe.sourceUrl,
+          imageUrl: recipe.imageUrl || null,
           createdAt: new Date(recipe.createdAt),
           updatedAt: new Date(recipe.updatedAt),
         },
@@ -961,6 +1098,7 @@ export async function importLocalMigration(
           mealType: recipe.mealType,
           servings: recipe.servings,
           sourceUrl: recipe.sourceUrl,
+          imageUrl: recipe.imageUrl || null,
           updatedAt: new Date(recipe.updatedAt),
         },
       })

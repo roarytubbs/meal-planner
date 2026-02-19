@@ -20,8 +20,7 @@ export async function GET(
     if (!isSpoonacularConfigured()) {
       return NextResponse.json(
         {
-          error:
-            'Spoonacular import is not configured. Set SPOONACULAR_API_KEY in your server environment.',
+          error: 'Recipe import is not configured on this server.',
         },
         { status: 503 }
       )

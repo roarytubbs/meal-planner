@@ -25,6 +25,7 @@ import { useIngredientEntries, useGroceryStores } from '@/lib/meal-planner-store
 interface IngredientTableProps {
   ingredients: Ingredient[]
   onChange: (ingredients: Ingredient[]) => void
+  showTitle?: boolean
 }
 
 function generateId() {
@@ -207,7 +208,11 @@ function StoreSelect({
   )
 }
 
-export function IngredientTable({ ingredients, onChange }: IngredientTableProps) {
+export function IngredientTable({
+  ingredients,
+  onChange,
+  showTitle = true,
+}: IngredientTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Ingredient | null>(null)
   const [showPaste, setShowPaste] = useState(false)
@@ -337,7 +342,11 @@ export function IngredientTable({ ingredients, onChange }: IngredientTableProps)
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-foreground">Ingredients</h3>
+        {showTitle ? (
+          <h3 className="text-base font-semibold text-foreground">Ingredients</h3>
+        ) : (
+          <span />
+        )}
         <Button
           type="button"
           variant="outline"
