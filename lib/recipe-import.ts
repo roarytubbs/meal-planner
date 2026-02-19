@@ -10,13 +10,16 @@ export interface ScrapedRecipe {
   mealType: Recipe['mealType']
 }
 
+const IMPORT_ERROR_TEXT_PATTERN =
+  /(paramvalidationerror|could not be resolved|dns|access denied|forbidden|captcha|temporarily unavailable|request failed)/i
+
 const RECIPE_HEADING_PATTERN =
-  /^(recipe|ingredients?|instructions?|directions?|method|preparation|steps?)[:\s-]*$/i
-const INGREDIENTS_HEADING_PATTERN = /^ingredients?[:\s-]*$/i
+  /^(?:#{1,6}\s*)?(recipe|ingredients?|instructions?|directions?|method|preparation|steps?)[:\s-]*$/i
+const INGREDIENTS_HEADING_PATTERN = /^(?:#{1,6}\s*)?ingredients?[:\s-]*$/i
 const STEPS_HEADING_PATTERN =
-  /^(instructions?|directions?|method|preparation|steps?)[:\s-]*$/i
+  /^(?:#{1,6}\s*)?(instructions?|directions?|method|preparation|steps?)[:\s-]*$/i
 const STOP_SECTION_PATTERN =
-  /^(nutrition|reviews?|notes?|tips?|video|faq|author|related|more recipes|print)[:\s-]*$/i
+  /^(?:#{1,6}\s*)?(nutrition|reviews?|notes?|tips?|video|faq|author|related|more recipes|print)[:\s-]*$/i
 
 function generateIngredientId() {
   return `ing_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
@@ -60,7 +63,20 @@ function stripHtml(value: string): string {
 }
 
 function normalizeText(value: string): string {
-  return stripHtml(value).replace(/\s+/g, ' ').trim()
+  return stripHtml(value)
+    .replace(/^\s{0,3}#{1,6}\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isLikelyErrorText(value: string): boolean {
+  const text = normalizeText(value)
+  if (!text) return false
+  if (IMPORT_ERROR_TEXT_PATTERN.test(text)) return true
+  if (/^\{.+\}$/.test(text) && text.includes('"code"') && text.includes('"message"')) {
+    return true
+  }
+  return false
 }
 
 function normalizeLines(lines: string[]): string[] {
@@ -205,6 +221,22 @@ function extractTitle(html: string): string {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
   if (!titleMatch) return ''
   return normalizeText(titleMatch[1]).replace(/\s*[-|].*$/, '').trim()
+}
+
+function extractTitleFromLines(lines: string[]): string {
+  for (const line of lines) {
+    const titleLine = line.match(/^title:\s*(.+)$/i)
+    if (titleLine?.[1]) return normalizeText(titleLine[1])
+  }
+
+  for (const line of lines) {
+    if (!line) continue
+    if (RECIPE_HEADING_PATTERN.test(line)) continue
+    if (STOP_SECTION_PATTERN.test(line)) continue
+    return normalizeText(line)
+  }
+
+  return ''
 }
 
 function htmlToLines(html: string): string[] {
@@ -381,7 +413,7 @@ function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
 
 function extractBasicRecipe(html: string): ScrapedRecipe {
   const lines = htmlToLines(html)
-  const name = extractTitle(html)
+  const name = extractTitle(html) || extractTitleFromLines(lines)
   const description =
     extractMetaContent(html, 'description') ||
     extractMetaContent(html, 'og:description') ||
@@ -434,6 +466,17 @@ export function parseRecipeFromHtml(html: string): ScrapedRecipe {
     servings,
     mealType,
   }
+}
+
+export function hasMeaningfulRecipeData(recipe: ScrapedRecipe): boolean {
+  const safeName = recipe.name && !isLikelyErrorText(recipe.name)
+  const safeDescription = recipe.description && !isLikelyErrorText(recipe.description)
+  return Boolean(
+    safeName ||
+      safeDescription ||
+      recipe.ingredients.length > 0 ||
+      recipe.steps.length > 0
+  )
 }
 
 function isPrivateHostname(hostname: string): boolean {
@@ -500,4 +543,23 @@ export async function fetchRecipeHtml(url: string): Promise<string> {
     throw new Error('Recipe page returned empty content.')
   }
   return html
+}
+
+export async function fetchRecipeHtmlFallback(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(`https://r.jina.ai/${url}`, {
+      method: 'GET',
+      redirect: 'follow',
+      cache: 'no-store',
+      headers: {
+        Accept: 'text/plain,text/markdown;q=0.9,*/*;q=0.8',
+        'User-Agent': 'MealPlannerBot/1.0',
+      },
+      signal: AbortSignal.timeout(15000),
+    })
+    const text = await response.text()
+    return text && text.trim() ? text : null
+  } catch {
+    return null
+  }
 }

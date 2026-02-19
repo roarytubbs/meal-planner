@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
   fetchRecipeHtml,
+  fetchRecipeHtmlFallback,
+  hasMeaningfulRecipeData,
   normalizeRecipeImportUrl,
   parseRecipeFromHtml,
 } from '@/lib/recipe-import'
@@ -30,8 +32,35 @@ export async function POST(request: Request) {
       )
     }
 
-    const html = await fetchRecipeHtml(normalizedUrl)
-    const recipe = parseRecipeFromHtml(html)
+    let recipe = null
+
+    try {
+      const html = await fetchRecipeHtml(normalizedUrl)
+      const parsedRecipe = parseRecipeFromHtml(html)
+      if (hasMeaningfulRecipeData(parsedRecipe)) {
+        recipe = parsedRecipe
+      }
+    } catch {
+      // Fallback parser below handles primary fetch failures.
+    }
+
+    if (!recipe) {
+      const fallbackHtml = await fetchRecipeHtmlFallback(normalizedUrl)
+      if (fallbackHtml) {
+        const fallbackRecipe = parseRecipeFromHtml(fallbackHtml)
+        if (hasMeaningfulRecipeData(fallbackRecipe)) {
+          recipe = fallbackRecipe
+        }
+      }
+    }
+
+    if (!recipe) {
+      return NextResponse.json(
+        { error: 'Could not extract recipe data from that URL.' },
+        { status: 422 }
+      )
+    }
+
     return NextResponse.json({
       ...recipe,
       sourceUrl: normalizedUrl,
