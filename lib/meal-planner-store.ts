@@ -196,11 +196,14 @@ function normalizeRecipe(value: unknown): Recipe | null {
   const name = rawName.trim()
   if (!id || !name) return null
 
-  const mealType = String(source.mealType || 'dinner').trim().toLowerCase()
+  const mealType = String(source.mealType || '').trim().toLowerCase()
   const normalizedMealType: Recipe['mealType'] =
-    mealType === 'breakfast' || mealType === 'lunch' || mealType === 'snack'
+    mealType === 'breakfast' ||
+    mealType === 'lunch' ||
+    mealType === 'dinner' ||
+    mealType === 'snack'
       ? mealType
-      : 'dinner'
+      : ''
 
   const servingsRaw = Number(source.servings)
   const servings = Number.isFinite(servingsRaw) && servingsRaw > 0 ? Math.round(servingsRaw) : 1

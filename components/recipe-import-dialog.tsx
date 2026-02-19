@@ -26,6 +26,31 @@ function generateId() {
   return `recipe_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 }
 
+function normalizeMealType(value: unknown): Recipe['mealType'] {
+  const mealType = String(value || '')
+    .trim()
+    .toLowerCase()
+  if (
+    mealType === 'breakfast' ||
+    mealType === 'lunch' ||
+    mealType === 'dinner' ||
+    mealType === 'snack'
+  ) {
+    return mealType
+  }
+  return ''
+}
+
+interface ImportResponse {
+  name?: string
+  description?: string
+  ingredients?: Recipe['ingredients']
+  steps?: string[]
+  servings?: number
+  mealType?: Recipe['mealType']
+  sourceUrl?: string
+}
+
 export function RecipeImportDialog({
   open,
   onOpenChange,
@@ -53,15 +78,20 @@ export function RecipeImportDialog({
         throw new Error('Failed to import recipe')
       }
 
-      const data = await res.json()
+      const data = (await res.json()) as ImportResponse
+      const ingredients = Array.isArray(data.ingredients) ? data.ingredients : []
+      const steps = Array.isArray(data.steps)
+        ? data.steps.map((step) => String(step || '').trim()).filter(Boolean)
+        : []
+
       onImport({
         id: generateId(),
         name: data.name || '',
         description: data.description || '',
-        ingredients: data.ingredients || [],
-        steps: data.steps || [],
-        sourceUrl: url.trim(),
-        mealType: 'dinner',
+        ingredients,
+        steps: steps.length > 0 ? steps : [''],
+        sourceUrl: data.sourceUrl || url.trim(),
+        mealType: normalizeMealType(data.mealType),
         servings: data.servings || 4,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -80,7 +110,7 @@ export function RecipeImportDialog({
         ingredients: [],
         steps: [''],
         sourceUrl: url.trim(),
-        mealType: 'dinner',
+        mealType: '',
         servings: 4,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
