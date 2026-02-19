@@ -1,13 +1,15 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Calendar,
   Eye,
   Loader2,
+  MoreHorizontal,
   ShoppingCart,
   Store,
   Trash2,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
@@ -64,6 +72,185 @@ const STATUS_VALUES: Array<Exclude<MealSelection, 'recipe'>> = [
   'eating_out',
   'leftovers',
 ]
+
+interface RecipeSearchFieldProps {
+  dateKey: string
+  slotLabel: string
+  recipes: Recipe[]
+  selectedRecipe: Recipe | null
+  onSelectRecipe: (recipeId: string) => void
+  onClearSelection: () => void
+}
+
+function RecipeSearchField({
+  dateKey,
+  slotLabel,
+  recipes,
+  selectedRecipe,
+  onSelectRecipe,
+  onClearSelection,
+}: RecipeSearchFieldProps) {
+  const [query, setQuery] = useState(selectedRecipe?.name ?? '')
+  const [open, setOpen] = useState(false)
+  const [highlightIndex, setHighlightIndex] = useState(-1)
+
+  useEffect(() => {
+    setQuery(selectedRecipe?.name ?? '')
+  }, [selectedRecipe?.id, selectedRecipe?.name])
+
+  const suggestions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery) return recipes.slice(0, 8)
+
+    const startsWithMatches = recipes.filter((recipe) =>
+      recipe.name.toLowerCase().startsWith(normalizedQuery)
+    )
+    const includesMatches = recipes.filter(
+      (recipe) =>
+        !recipe.name.toLowerCase().startsWith(normalizedQuery) &&
+        recipe.name.toLowerCase().includes(normalizedQuery)
+    )
+
+    return [...startsWithMatches, ...includesMatches].slice(0, 8)
+  }, [query, recipes])
+
+  const handleSelect = useCallback(
+    (recipe: Recipe) => {
+      setQuery(recipe.name)
+      setOpen(false)
+      setHighlightIndex(-1)
+      onSelectRecipe(recipe.id)
+    },
+    [onSelectRecipe]
+  )
+
+  const handleClear = useCallback(() => {
+    setQuery('')
+    setOpen(false)
+    setHighlightIndex(-1)
+    onClearSelection()
+  }, [onClearSelection])
+
+  const commitQuery = useCallback(() => {
+    const normalized = query.trim().toLowerCase()
+    if (!normalized) {
+      if (selectedRecipe) handleClear()
+      return
+    }
+
+    const exactMatch = recipes.find(
+      (recipe) => recipe.name.trim().toLowerCase() === normalized
+    )
+    if (exactMatch) {
+      if (selectedRecipe?.id !== exactMatch.id) {
+        onSelectRecipe(exactMatch.id)
+      }
+      setQuery(exactMatch.name)
+      return
+    }
+
+    if (selectedRecipe) {
+      setQuery(selectedRecipe.name)
+    }
+  }, [handleClear, onSelectRecipe, query, recipes, selectedRecipe])
+
+  return (
+    <div className="relative">
+      <Input
+        value={query}
+        onChange={(event) => {
+          setQuery(event.target.value)
+          setOpen(true)
+          setHighlightIndex(-1)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => {
+          setTimeout(() => {
+            commitQuery()
+            setOpen(false)
+          }, 120)
+        }}
+        onKeyDown={(event) => {
+          if (!open || suggestions.length === 0) {
+            if (event.key === 'Escape') setOpen(false)
+            return
+          }
+
+          if (event.key === 'ArrowDown') {
+            event.preventDefault()
+            setHighlightIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0))
+            return
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault()
+            setHighlightIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1))
+            return
+          }
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            const target =
+              highlightIndex >= 0 ? suggestions[highlightIndex] : suggestions[0]
+            if (target) handleSelect(target)
+            return
+          }
+          if (event.key === 'Escape') {
+            setOpen(false)
+          }
+        }}
+        className="h-8 pr-7 text-xs"
+        placeholder="Search recipes..."
+        aria-label={`${slotLabel} recipe search for ${dateKey}`}
+        autoComplete="off"
+      />
+
+      {query ? (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label={`Clear ${slotLabel} recipe selection`}
+        >
+          <X className="size-3.5" />
+        </button>
+      ) : null}
+
+      {open ? (
+        <div
+          className="absolute left-0 top-full z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md"
+          role="listbox"
+        >
+          {suggestions.length > 0 ? (
+            <div className="max-h-52 overflow-y-auto p-1">
+              {suggestions.map((recipe, index) => (
+                <button
+                  key={recipe.id}
+                  type="button"
+                  role="option"
+                  aria-selected={index === highlightIndex}
+                  className={`flex w-full items-center rounded-sm px-2 py-1.5 text-left text-xs ${
+                    index === highlightIndex
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-popover-foreground hover:bg-accent/50'
+                  }`}
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    handleSelect(recipe)
+                  }}
+                  onClick={() => handleSelect(recipe)}
+                  onMouseEnter={() => setHighlightIndex(index)}
+                >
+                  <span className="truncate">{recipe.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="px-2 py-2 text-xs text-muted-foreground">No matching recipes.</p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 interface ShoppingItem {
   name: string
@@ -306,26 +493,15 @@ export function MealPlannerView() {
     [getBuildDisabledReason]
   )
 
-  const handleSlotSelection = useCallback(
-    async (dateKey: string, slot: MealSlot, value: string) => {
+  const updateSlot = useCallback(
+    async (
+      dateKey: string,
+      slot: MealSlot,
+      selection: MealSelection | null,
+      recipeId: string | null
+    ) => {
       try {
-        if (value === '__empty') {
-          await setMealSlot(dateKey, slot, null, null)
-          return
-        }
-
-        if (value.startsWith('recipe:')) {
-          const recipeId = value.slice('recipe:'.length).trim()
-          if (!recipeId) return
-          await setMealSlot(dateKey, slot, 'recipe', recipeId)
-          return
-        }
-
-        if (value.startsWith('status:')) {
-          const selection = value.slice('status:'.length) as Exclude<MealSelection, 'recipe'>
-          if (!STATUS_VALUES.includes(selection)) return
-          await setMealSlot(dateKey, slot, selection, null)
-        }
+        await setMealSlot(dateKey, slot, selection, recipeId)
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Unable to update meal slot.'
@@ -333,6 +509,29 @@ export function MealPlannerView() {
       }
     },
     []
+  )
+
+  const handleRecipeSelection = useCallback(
+    (dateKey: string, slot: MealSlot, recipeId: string) => {
+      if (!recipeId.trim()) return
+      void updateSlot(dateKey, slot, 'recipe', recipeId)
+    },
+    [updateSlot]
+  )
+
+  const handleStatusSelection = useCallback(
+    (dateKey: string, slot: MealSlot, selection: Exclude<MealSelection, 'recipe'>) => {
+      if (!STATUS_VALUES.includes(selection)) return
+      void updateSlot(dateKey, slot, selection, null)
+    },
+    [updateSlot]
+  )
+
+  const handleClearSelection = useCallback(
+    (dateKey: string, slot: MealSlot) => {
+      void updateSlot(dateKey, slot, null, null)
+    },
+    [updateSlot]
   )
 
   const handleSavePlan = useCallback(async () => {
@@ -420,11 +619,13 @@ export function MealPlannerView() {
 
       <div className="flex flex-col gap-5 xl:flex-row">
         <div className="min-w-0 flex-1">
-          <ScrollArea className="w-full">
-            <div className="grid min-w-max grid-flow-col auto-cols-[minmax(220px,1fr)] gap-4 pb-2">
+          <div className="space-y-3">
               {activeDateKeys.map((dateKey) => (
-                <Card key={dateKey} className="border-border/80">
-                  <CardHeader className="pb-3">
+                <Card
+                  key={dateKey}
+                  className="w-full gap-3 border-border/80 py-4"
+                >
+                  <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold text-foreground">
                       {formatDateLabel(dateKey, {
                         weekday: 'short',
@@ -433,7 +634,7 @@ export function MealPlannerView() {
                       })}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                     {SLOTS.map((slot) => {
                       const key = `${dateKey}:${slot}`
                       const entry = slotMap.get(key)
@@ -441,54 +642,65 @@ export function MealPlannerView() {
                         entry?.selection === 'recipe' && entry.recipeId
                           ? getRecipeById(recipes, entry.recipeId)
                           : undefined
-                      const selectValue = entry
-                        ? entry.selection === 'recipe' && entry.recipeId
-                          ? `recipe:${entry.recipeId}`
-                          : `status:${entry.selection}`
-                        : '__empty'
 
                       return (
-                        <div key={slot} className="rounded-lg border border-border bg-muted/20 p-3">
-                          <div className="mb-2 flex items-center justify-between">
+                        <div
+                          key={slot}
+                          className="rounded-lg border border-border bg-muted/20 p-2.5"
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-1">
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               {SLOT_LABELS[slot]}
                             </p>
-                            {entry && entry.selection !== 'recipe' ? (
-                              <Badge variant="secondary" className="text-[11px]">
-                                {STATUS_LABELS[entry.selection as Exclude<MealSelection, 'recipe'>]}
-                              </Badge>
-                            ) : null}
+                            <div className="flex items-center gap-1">
+                              {entry && entry.selection !== 'recipe' ? (
+                                <Badge variant="secondary" className="text-[11px]">
+                                  {STATUS_LABELS[entry.selection as Exclude<MealSelection, 'recipe'>]}
+                                </Badge>
+                              ) : null}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-6"
+                                    aria-label={`${SLOT_LABELS[slot]} status options for ${dateKey}`}
+                                  >
+                                    <MoreHorizontal className="size-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                  {STATUS_VALUES.map((statusValue) => (
+                                    <DropdownMenuItem
+                                      key={`${dateKey}-${slot}-${statusValue}`}
+                                      onSelect={() =>
+                                        handleStatusSelection(dateKey, slot, statusValue)
+                                      }
+                                    >
+                                      {STATUS_LABELS[statusValue]}
+                                    </DropdownMenuItem>
+                                  ))}
+                                  <DropdownMenuItem
+                                    onSelect={() => handleClearSelection(dateKey, slot)}
+                                  >
+                                    No plan
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </div>
 
-                          <Select
-                            value={selectValue}
-                            onValueChange={(value) => {
-                              void handleSlotSelection(dateKey, slot, value)
-                            }}
-                          >
-                            <SelectTrigger className="h-9 text-xs bg-background">
-                              <SelectValue placeholder="Select meal" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__empty">No plan</SelectItem>
-                              {STATUS_VALUES.map((statusValue) => (
-                                <SelectItem
-                                  key={statusValue}
-                                  value={`status:${statusValue}`}
-                                >
-                                  {STATUS_LABELS[statusValue]}
-                                </SelectItem>
-                              ))}
-                              {recipes.map((recipeOption) => (
-                                <SelectItem
-                                  key={recipeOption.id}
-                                  value={`recipe:${recipeOption.id}`}
-                                >
-                                  {recipeOption.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <RecipeSearchField
+                            dateKey={dateKey}
+                            slotLabel={SLOT_LABELS[slot]}
+                            recipes={recipes}
+                            selectedRecipe={recipe ?? null}
+                            onSelectRecipe={(recipeId) =>
+                              handleRecipeSelection(dateKey, slot, recipeId)
+                            }
+                            onClearSelection={() => handleClearSelection(dateKey, slot)}
+                          />
 
                           {recipe ? (
                             <div className="mt-2 flex items-center justify-between gap-2">
@@ -512,8 +724,7 @@ export function MealPlannerView() {
                   </CardContent>
                 </Card>
               ))}
-            </div>
-          </ScrollArea>
+          </div>
         </div>
 
         <div className="xl:w-80 xl:shrink-0">

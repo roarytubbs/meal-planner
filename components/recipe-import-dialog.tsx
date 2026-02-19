@@ -241,7 +241,7 @@ export function RecipeImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Import Recipe</DialogTitle>
           <DialogDescription>
@@ -250,6 +250,7 @@ export function RecipeImportDialog({
         </DialogHeader>
 
         <Tabs
+          className="min-h-0 min-w-0 flex-1 overflow-hidden"
           value={importMode}
           onValueChange={(value) => {
             if (value === 'url' || value === 'provider') {
@@ -263,11 +264,11 @@ export function RecipeImportDialog({
             <TabsTrigger value="provider">Spoonacular</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="url" className="mt-3">
+          <TabsContent value="url" className="mt-3 min-w-0">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="import-url">Recipe URL</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
+              <div className="flex min-w-0 gap-2">
+                <div className="relative min-w-0 flex-1">
                   <LinkIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="import-url"
@@ -288,12 +289,12 @@ export function RecipeImportDialog({
             </div>
           </TabsContent>
 
-          <TabsContent value="provider" className="mt-3">
-            <div className="flex flex-col gap-3">
+          <TabsContent value="provider" className="mt-3 min-h-0 min-w-0">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="provider-query">Search recipes</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                  <div className="relative min-w-0 flex-1">
                     <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="provider-query"
@@ -312,6 +313,7 @@ export function RecipeImportDialog({
                   <Button
                     type="button"
                     variant="secondary"
+                    className="shrink-0"
                     onClick={() => void handleProviderSearch()}
                     disabled={!providerQuery.trim() || searchLoading}
                   >
@@ -321,7 +323,7 @@ export function RecipeImportDialog({
                 </div>
               </div>
 
-              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {providerResults.length === 0 && !searchLoading ? (
                   <p className="text-sm text-muted-foreground">
                     Search Spoonacular to import a recipe draft.
@@ -330,7 +332,7 @@ export function RecipeImportDialog({
                 {providerResults.map((result) => (
                   <div
                     key={result.id}
-                    className="flex items-center gap-3 rounded-md border border-border p-2"
+                    className="flex min-w-0 flex-col gap-3 rounded-md border border-border p-2 sm:flex-row sm:items-center"
                   >
                     {result.image ? (
                       <div
@@ -356,6 +358,7 @@ export function RecipeImportDialog({
                     <Button
                       type="button"
                       size="sm"
+                      className="w-full shrink-0 sm:w-auto"
                       onClick={() => void handleProviderImport(result.id)}
                       disabled={
                         importingProviderId !== null ||

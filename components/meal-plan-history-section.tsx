@@ -291,49 +291,49 @@ export function MealPlanHistorySection() {
 
   return (
     <>
-      <section className="mb-3 grid gap-3 lg:grid-cols-2">
-        <Card className="gap-0 py-0 shadow-none">
-          <CardHeader className="border-b py-2.5">
+      <section className="mb-3 grid gap-2 lg:grid-cols-2">
+        <Card className="gap-0 rounded-lg py-0 shadow-none">
+          <CardHeader className="border-b px-3 py-2">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <CardTitle className="text-sm">Current Meal Plan Draft</CardTitle>
-                <CardDescription className="text-xs">
+                <CardTitle className="text-xs">Current Meal Plan Draft</CardTitle>
+                <CardDescription className="text-[11px]">
                   Slots you are actively building.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
                   {draftMeals.length}
                 </Badge>
                 <Button
                   type="button"
                   size="sm"
-                  className="h-7 px-2 text-xs"
+                  className="h-6 px-2 text-[11px]"
                   onClick={openSaveDialog}
                   disabled={pendingAction !== null || draftMeals.length === 0}
                 >
                   {pendingAction === 'save' ? (
-                    <Loader2 className="size-3.5 animate-spin" />
+                    <Loader2 className="size-3 animate-spin" />
                   ) : (
-                    <Plus className="size-3.5" />
+                    <Plus className="size-3" />
                   )}
                   Save
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="py-2.5">
+          <CardContent className="px-3 py-2">
             {draftMeals.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No meal slots in draft yet.
               </p>
             ) : (
-              <ScrollArea className="max-h-44">
-                <div className="space-y-1 pr-3">
+              <ScrollArea className="max-h-36">
+                <div className="space-y-1 pr-2">
                   {draftMeals.map((meal) => (
                     <div
                       key={meal.key}
-                      className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-1.5"
+                      className="rounded-md border border-border/60 bg-muted/15 px-2 py-1"
                     >
                       <p className="text-[11px] font-medium text-muted-foreground">
                         {meal.meal}
@@ -347,21 +347,21 @@ export function MealPlanHistorySection() {
           </CardContent>
         </Card>
 
-        <Card className="gap-0 py-0 shadow-none">
-          <CardHeader className="border-b py-2.5">
-            <CardTitle className="text-sm">Previous Meal Plans</CardTitle>
-            <CardDescription className="text-xs">
+        <Card className="gap-0 rounded-lg py-0 shadow-none">
+          <CardHeader className="border-b px-3 py-2">
+            <CardTitle className="text-xs">Previous Meal Plans</CardTitle>
+            <CardDescription className="text-[11px]">
               Duplicate an old plan into your draft or delete saved plans.
             </CardDescription>
           </CardHeader>
-          <CardContent className="py-2.5">
+          <CardContent className="px-3 py-2">
             {sortedSnapshots.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No previous meal plans yet.
               </p>
             ) : (
-              <ScrollArea className="max-h-44">
-                <div className="space-y-2 pr-3">
+              <ScrollArea className="max-h-36">
+                <div className="space-y-1.5 pr-2">
                   {sortedSnapshots.map((snapshot) => {
                     const duplicateLoading =
                       pendingAction === `duplicate-${snapshot.id}`
@@ -369,34 +369,34 @@ export function MealPlanHistorySection() {
                     return (
                       <div
                         key={snapshot.id}
-                        className="rounded-md border border-border/60 bg-card p-2"
+                        className="rounded-md border border-border/60 bg-card p-1.5"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="text-xs font-semibold text-foreground">
+                            <p className="text-[11px] font-semibold text-foreground">
                               {snapshot.label}
                             </p>
                             <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
                               {snapshotDescription(snapshot)}
                             </p>
                           </div>
-                          <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                          <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
                             {snapshot.meals.length}
                           </Badge>
                         </div>
-                        <div className="mt-2 flex items-center gap-1.5">
+                        <div className="mt-1.5 flex items-center gap-1.5">
                           <Button
                             type="button"
                             size="sm"
                             variant="secondary"
-                            className="h-7 px-2 text-xs"
+                            className="h-6 px-2 text-[11px]"
                             onClick={() => void handleDuplicate(snapshot)}
                             disabled={pendingAction !== null}
                           >
                             {duplicateLoading ? (
-                              <Loader2 className="size-3.5 animate-spin" />
+                              <Loader2 className="size-3 animate-spin" />
                             ) : (
-                              <Copy className="size-3.5" />
+                              <Copy className="size-3" />
                             )}
                             Duplicate
                           </Button>
@@ -404,14 +404,14 @@ export function MealPlanHistorySection() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="h-7 px-2 text-xs"
+                            className="h-6 px-2 text-[11px]"
                             onClick={() => setDeleteTarget(snapshot)}
                             disabled={pendingAction !== null}
                           >
                             {deleteLoading ? (
-                              <Loader2 className="size-3.5 animate-spin" />
+                              <Loader2 className="size-3 animate-spin" />
                             ) : (
-                              <Trash2 className="size-3.5" />
+                              <Trash2 className="size-3" />
                             )}
                             Delete
                           </Button>

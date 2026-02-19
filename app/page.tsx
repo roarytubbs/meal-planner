@@ -155,7 +155,6 @@ export default function MealPlannerPage() {
           />
         ) : (
           <>
-            <MealPlanHistorySection />
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               <TabsList className="mb-4">
                 <TabsTrigger value="recipes">Recipes</TabsTrigger>
@@ -165,6 +164,7 @@ export default function MealPlannerPage() {
               </TabsList>
 
               <TabsContent value="recipes">
+                <MealPlanHistorySection />
                 <RecipeLibrary
                   onAddRecipe={handleAddRecipe}
                   onEditRecipe={handleEditRecipe}

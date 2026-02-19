@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { ArrowLeft, Plus, Trash2, GripVertical } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -201,10 +201,6 @@ export function RecipeForm({ mode, initialRecipe, onSave, onCancel }: RecipeForm
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-foreground">Steps</h3>
-              <Button type="button" variant="outline" size="sm" onClick={addStep}>
-                <Plus className="size-4" />
-                <span className="hidden sm:inline">Add Step</span>
-              </Button>
             </div>
 
             {recipe.steps.length === 0 && (
@@ -238,6 +234,13 @@ export function RecipeForm({ mode, initialRecipe, onSave, onCancel }: RecipeForm
                   </Button>
                 </div>
               ))}
+            </div>
+
+            <div className="flex items-center justify-start">
+              <Button type="button" variant="outline" size="sm" onClick={addStep}>
+                <Plus className="size-4" />
+                Add step
+              </Button>
             </div>
           </div>
         </CardContent>

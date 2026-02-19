@@ -338,21 +338,15 @@ export function IngredientTable({ ingredients, onChange }: IngredientTableProps)
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-foreground">Ingredients</h3>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowPaste(!showPaste)}
-          >
-            <ClipboardPaste className="size-4" />
-            <span className="hidden sm:inline">Paste</span>
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={addEmpty}>
-            <Plus className="size-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowPaste(!showPaste)}
+        >
+          <ClipboardPaste className="size-4" />
+          <span className="hidden sm:inline">Paste</span>
+        </Button>
       </div>
 
       {showPaste && (
@@ -553,6 +547,13 @@ export function IngredientTable({ ingredients, onChange }: IngredientTableProps)
             </div>
           )
         })}
+      </div>
+
+      <div className="flex items-center justify-start">
+        <Button type="button" variant="outline" size="sm" onClick={addEmpty}>
+          <Plus className="size-4" />
+          Add ingredients
+        </Button>
       </div>
     </div>
   )
