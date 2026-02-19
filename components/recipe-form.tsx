@@ -149,7 +149,7 @@ export function RecipeForm({ mode, initialRecipe, onSave, onCancel }: RecipeForm
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="meal-type">Meal Type</Label>
               <Select
-                value={recipe.mealType}
+                value={recipe.mealType || undefined}
                 onValueChange={(v) =>
                   updateField('mealType', v as Recipe['mealType'])
                 }

@@ -10,6 +10,7 @@ import {
   Phone,
   Plus,
   Store,
+  UtensilsCrossed,
   X,
   MoreVertical,
 } from 'lucide-react'
@@ -103,19 +104,28 @@ function formatSnapshotMeal(meal: MealPlanSnapshotMeal): string {
   return `${day} · ${meal.slot} · ${meal.recipeName}`
 }
 
+function getStoreLogoSrc(store: GroceryStore): string | undefined {
+  if (store.logoUrl && store.logoUrl.trim().length > 0) return store.logoUrl
+  if (store.placeId && store.placeId.trim().length > 0) {
+    return `/api/places/photo?placeId=${encodeURIComponent(store.placeId)}&maxHeightPx=200&maxWidthPx=200`
+  }
+  return undefined
+}
+
 function StoreIdentity({ store }: { store: GroceryStore }) {
   const [expandedHours, setExpandedHours] = useState(false)
   const todayHours = findTodayHours(store.hours)
   const allHours = store.hours ?? []
+  const logoSrc = getStoreLogoSrc(store)
 
   return (
     <Card>
       <CardContent className="p-5">
         <div className="flex gap-4">
           <div className="shrink-0">
-            {store.logoUrl ? (
+            {logoSrc ? (
               <img
-                src={store.logoUrl}
+                src={logoSrc}
                 alt={store.name}
                 className="size-16 rounded-lg object-cover bg-muted"
                 crossOrigin="anonymous"
@@ -272,6 +282,19 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
   if (!store) {
     return (
       <main className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card">
+          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+              <UtensilsCrossed className="size-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold leading-tight text-foreground">
+                Meal Planner
+              </h1>
+              <p className="text-xs text-muted-foreground">Stores</p>
+            </div>
+          </div>
+        </header>
         <div className="mx-auto max-w-5xl px-4 py-8">
           <Button asChild variant="ghost" className="mb-4">
             <Link href="/?tab=stores">
@@ -291,6 +314,19 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
 
   return (
     <main className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+            <UtensilsCrossed className="size-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold leading-tight text-foreground">
+              Meal Planner
+            </h1>
+            <p className="text-xs text-muted-foreground">Stores</p>
+          </div>
+        </div>
+      </header>
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <Button asChild variant="ghost">

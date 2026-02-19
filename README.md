@@ -11,7 +11,7 @@ The app now uses PostgreSQL (via Prisma) as the source of truth.
    - `DATABASE_URL=postgresql://...`
    - `GOOGLE_PLACES_API_KEY=<meal-planner-dev key>`
 4. Generate Prisma client: `npm run db:generate`.
-5. Push schema to your database: `npm run db:push`.
+5. Apply Prisma migrations to your database: `npm run db:migrate`.
 6. Start the app: `npm run dev`.
 
 ## Environment variables
@@ -37,6 +37,7 @@ Security rules:
 - `npm run db:generate`: Generate Prisma client.
 - `npm run db:push`: Push Prisma schema changes to Postgres.
 - `npm run db:migrate`: Create/apply local Prisma migrations.
+- `npm run db:migrate:deploy`: Apply committed migrations (used in deploy environments).
 
 ## Google key restrictions (required)
 
@@ -55,6 +56,10 @@ Set both variables in hosting provider environment settings:
 
 - `DATABASE_URL`
 - `GOOGLE_PLACES_API_KEY` (`meal-planner-prod` for hosted envs)
+
+Builds run a migration step before `next build`:
+- normal path: `prisma migrate deploy`
+- baseline path (one-time): if Prisma reports `P3005` (schema already exists without migration history), the initial migration is marked applied, then deploy continues.
 
 Do not place keys in repository files, client code, or build arguments.
 

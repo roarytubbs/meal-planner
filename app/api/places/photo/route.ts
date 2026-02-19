@@ -8,6 +8,7 @@ const API_KEY = getServerEnv(GOOGLE_PLACES_KEY)
 const DEFAULT_DIMENSION = 200
 const MIN_DIMENSION = 16
 const MAX_DIMENSION = 800
+const PLACE_DETAILS_URL = 'https://places.googleapis.com/v1/places'
 
 function parseDimension(raw: string | null): number {
   if (!raw) return DEFAULT_DIMENSION
@@ -23,8 +24,43 @@ function isValidPhotoName(name: string): boolean {
   return true
 }
 
+function isValidPlaceId(placeId: string): boolean {
+  if (placeId.length < 5 || placeId.length > 200) return false
+  if (/[?#/&\\]/.test(placeId)) return false
+  if (placeId.includes('..')) return false
+  return true
+}
+
 function encodePath(path: string): string {
   return path.split('/').map(encodeURIComponent).join('/')
+}
+
+async function resolvePhotoNameFromPlaceId(placeId: string): Promise<string | null> {
+  const detailsUrl = new URL(`${PLACE_DETAILS_URL}/${encodeURIComponent(placeId)}`)
+  detailsUrl.searchParams.set('languageCode', 'en')
+
+  const details = await fetch(detailsUrl, {
+    headers: {
+      'X-Goog-Api-Key': API_KEY ?? '',
+      'X-Goog-FieldMask': 'photos',
+    },
+    cache: 'force-cache',
+  })
+
+  if (!details.ok) {
+    console.error('Google Place details request failed.', {
+      status: details.status,
+      statusText: details.statusText,
+      placeId,
+    })
+    return null
+  }
+
+  const payload = (await details.json()) as {
+    photos?: Array<{ name?: string }>
+  }
+  const resolvedName = payload.photos?.[0]?.name?.trim() ?? ''
+  return isValidPhotoName(resolvedName) ? resolvedName : null
 }
 
 export async function GET(req: Request) {
@@ -36,13 +72,40 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url)
-  const name = (url.searchParams.get('name') || '').trim()
+  const placeId = (url.searchParams.get('placeId') || '').trim()
+  const directName = (url.searchParams.get('name') || '').trim()
   const maxHeightPx = parseDimension(url.searchParams.get('maxHeightPx'))
   const maxWidthPx = parseDimension(url.searchParams.get('maxWidthPx'))
 
-  if (!isValidPhotoName(name)) {
+  let name = ''
+  if (directName) {
+    if (!isValidPhotoName(directName)) {
+      return NextResponse.json(
+        { error: 'Invalid photo reference.' },
+        { status: 400 }
+      )
+    }
+    name = directName
+  } else if (placeId) {
+    if (!isValidPlaceId(placeId)) {
+      return NextResponse.json(
+        { error: 'Invalid place reference.' },
+        { status: 400 }
+      )
+    }
+    const resolvedName = await resolvePhotoNameFromPlaceId(placeId)
+    if (!resolvedName) {
+      return NextResponse.json(
+        { error: 'No photo available for this place.' },
+        { status: 404 }
+      )
+    }
+    name = resolvedName
+  }
+
+  if (!name) {
     return NextResponse.json(
-      { error: 'Invalid photo reference.' },
+      { error: 'Missing photo reference.' },
       { status: 400 }
     )
   }

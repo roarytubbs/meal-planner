@@ -68,7 +68,7 @@ function toPlaceResult(
   let photoUrl: string | undefined
   const photoRef = place.photos?.[0]?.name
   if (photoRef) {
-    photoUrl = `/api/places/photo?name=${encodeURIComponent(photoRef)}&maxHeightPx=200&maxWidthPx=200`
+    photoUrl = `/api/places/photo?placeId=${encodeURIComponent(placeId)}&maxHeightPx=200&maxWidthPx=200`
   }
 
   const name = place.displayName?.text ?? ''

@@ -53,6 +53,23 @@ function generateId() {
   return `store_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 }
 
+function findTodayHours(hours: string[] | undefined): string | null {
+  if (!hours || hours.length === 0) return null
+  const today = new Intl.DateTimeFormat(undefined, { weekday: 'long' })
+    .format(new Date())
+    .toLowerCase()
+  const exact = hours.find((line) => line.trim().toLowerCase().startsWith(`${today}:`))
+  return exact ?? hours[0] ?? null
+}
+
+function getStoreLogoSrc(store: GroceryStore): string | undefined {
+  if (store.logoUrl && store.logoUrl.trim().length > 0) return store.logoUrl
+  if (store.placeId && store.placeId.trim().length > 0) {
+    return `/api/places/photo?placeId=${encodeURIComponent(store.placeId)}&maxHeightPx=200&maxWidthPx=200`
+  }
+  return undefined
+}
+
 // ---- Place search result type ----
 interface PlaceResult {
   placeId: string
@@ -428,6 +445,10 @@ function StoreCard({
   onDelete: (id: string) => Promise<void> | void
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [expandedHours, setExpandedHours] = useState(false)
+  const todayHours = findTodayHours(store.hours)
+  const allHours = store.hours ?? []
+  const logoSrc = getStoreLogoSrc(store)
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-md">
@@ -435,9 +456,9 @@ function StoreCard({
         <div className="flex gap-4 p-4">
           {/* Logo / placeholder */}
           <div className="shrink-0">
-            {store.logoUrl ? (
+            {logoSrc ? (
               <img
-                src={store.logoUrl}
+                src={logoSrc}
                 alt={store.name}
                 className="size-14 rounded-lg object-cover bg-muted"
                 crossOrigin="anonymous"
@@ -469,10 +490,33 @@ function StoreCard({
                 <span>{store.phone}</span>
               </div>
             )}
-            {store.hours && store.hours.length > 0 && (
-              <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                <Clock className="size-3.5 shrink-0 mt-0.5" />
-                <span className="line-clamp-1">{store.hours[0]}</span>
+            {todayHours && (
+              <div className="space-y-1">
+                <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <Clock className="size-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    <span className="font-medium text-foreground">Today&apos;s hours:</span>{' '}
+                    {todayHours}
+                  </span>
+                </div>
+                {allHours.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedHours((prev) => !prev)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {expandedHours ? 'Show less' : 'Show more'}
+                  </button>
+                )}
+                {expandedHours && allHours.length > 1 && (
+                  <div className="rounded-md border border-border bg-muted/20 p-2 space-y-1">
+                    {allHours.map((line) => (
+                      <p key={line} className="text-xs text-muted-foreground">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

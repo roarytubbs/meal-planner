@@ -84,7 +84,7 @@ export default function MealPlannerPage() {
       id: partial.id || `recipe_${Date.now()}`,
       name: partial.name || '',
       description: partial.description || '',
-      mealType: partial.mealType || 'dinner',
+      mealType: partial.mealType ?? '',
       servings: partial.servings || 4,
       ingredients: partial.ingredients || [],
       steps: partial.steps || [''],

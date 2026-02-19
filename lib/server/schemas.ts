@@ -28,7 +28,7 @@ const optionalBoundedString = (
 
 export const daySchema = z.enum(DAY_OF_WEEK_VALUES)
 export const slotSchema = z.enum(MEAL_SLOT_VALUES)
-export const mealTypeSchema = z.enum(MEAL_TYPE_VALUES)
+export const mealTypeSchema = z.union([z.enum(MEAL_TYPE_VALUES), z.literal('')])
 
 export const ingredientSchema = z.object({
   id: idSchema,

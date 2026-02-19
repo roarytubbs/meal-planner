@@ -179,12 +179,14 @@ export function RecipeLibrary({
                   </p>
                 )}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge
-                    variant="secondary"
-                    className={`text-xs ${MEAL_TYPE_COLORS[recipe.mealType] || ''}`}
-                  >
-                    {recipe.mealType}
-                  </Badge>
+                  {recipe.mealType && (
+                    <Badge
+                      variant="secondary"
+                      className={`text-xs ${MEAL_TYPE_COLORS[recipe.mealType] || ''}`}
+                    >
+                      {recipe.mealType}
+                    </Badge>
+                  )}
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Users className="size-3" />
                     {recipe.servings}

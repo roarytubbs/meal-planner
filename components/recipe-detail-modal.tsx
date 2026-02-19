@@ -42,12 +42,14 @@ export function RecipeDetailModal({
             Full recipe details for {recipe.name}
           </DialogDescription>
           <div className="flex items-center gap-2 flex-wrap pt-1">
-            <Badge
-              variant="secondary"
-              className={`text-xs ${MEAL_TYPE_COLORS[recipe.mealType] || ''}`}
-            >
-              {recipe.mealType}
-            </Badge>
+            {recipe.mealType && (
+              <Badge
+                variant="secondary"
+                className={`text-xs ${MEAL_TYPE_COLORS[recipe.mealType] || ''}`}
+              >
+                {recipe.mealType}
+              </Badge>
+            )}
             <span className="flex items-center gap-1 text-sm text-muted-foreground">
               <Users className="size-3.5" />
               {recipe.servings} servings

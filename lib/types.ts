@@ -25,6 +25,7 @@ export const MEAL_TYPE_VALUES = [
 export type DayOfWeek = (typeof DAY_OF_WEEK_VALUES)[number]
 export type MealSlot = (typeof MEAL_SLOT_VALUES)[number]
 export type MealType = (typeof MEAL_TYPE_VALUES)[number]
+export type RecipeMealType = MealType | ''
 
 export interface GroceryStore {
   id: string
@@ -63,7 +64,7 @@ export interface Recipe {
   id: string
   name: string
   description: string
-  mealType: MealType
+  mealType: RecipeMealType
   servings: number
   ingredients: Ingredient[]
   steps: string[]
