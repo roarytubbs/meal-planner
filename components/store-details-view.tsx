@@ -48,6 +48,7 @@ import type {
   MealPlanSnapshot,
   MealPlanSnapshotMeal,
 } from '@/lib/types'
+import { formatDateLabel } from '@/lib/types'
 import {
   addIngredientEntry,
   deleteGroceryStore,
@@ -100,8 +101,13 @@ function findTodayHours(hours: string[] | undefined): string | null {
 }
 
 function formatSnapshotMeal(meal: MealPlanSnapshotMeal): string {
-  const day = DAY_LABELS[meal.day] ?? meal.day
-  return `${day} · ${meal.slot} · ${meal.recipeName}`
+  const day =
+    DAY_LABELS[meal.day as keyof typeof DAY_LABELS] ??
+    formatDateLabel(meal.day, { weekday: 'short', month: 'short', day: 'numeric' })
+  if (meal.selection !== 'recipe') {
+    return `${day} · ${meal.slot} · ${meal.selection.replace('_', ' ')}`
+  }
+  return `${day} · ${meal.slot} · ${meal.recipeName || 'Recipe removed'}`
 }
 
 function getStoreLogoSrc(store: GroceryStore): string | undefined {
@@ -482,6 +488,9 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
                         {new Date(snapshot.createdAt).toLocaleString()}
                       </p>
                     </div>
+                    {snapshot.description.trim().length > 0 && (
+                      <p className="text-xs text-muted-foreground">{snapshot.description}</p>
+                    )}
                     <div className="space-y-1">
                       {meals.map((meal) => (
                         <p key={`${snapshot.id}-${meal.day}-${meal.slot}-${meal.recipeId}`} className="text-xs text-muted-foreground">

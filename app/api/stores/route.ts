@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server'
 import { groceryStoreSchema } from '@/lib/server/schemas'
 import { createStore } from '@/lib/server/planner-service'
 import { normalizeErrorMessage } from '@/lib/server/http'
+import type { GroceryStore } from '@/lib/types'
 
 export async function POST(request: Request) {
   try {
     const raw = await request.json()
-    const payload = groceryStoreSchema.parse(raw)
+    const payload = groceryStoreSchema.parse(raw) as GroceryStore
     const store = await createStore(payload)
     return NextResponse.json(store)
   } catch (error) {

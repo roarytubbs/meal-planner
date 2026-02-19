@@ -4,18 +4,29 @@ import type {
   GroceryStore,
   Ingredient,
   IngredientEntry,
+  LegacyMealSlot,
   LocalStorageMigrationPayload,
   MealPlan,
+  MealPlanSlotEntry,
+  MealSelection,
   MealPlanSnapshot,
   MealSlot,
   PlannerBootstrapResponse,
   Recipe,
 } from './types'
-import { DAY_OF_WEEK_VALUES, MEAL_SLOT_VALUES, createEmptyMealPlan } from './types'
+import {
+  addDays,
+  DAY_OF_WEEK_VALUES,
+  LEGACY_MEAL_SLOT_VALUES,
+  MEAL_SELECTION_VALUES,
+  MEAL_SLOT_VALUES,
+  toDateKey,
+  createEmptyMealPlan,
+} from './types'
 
 interface StoreState {
   recipes: Recipe[]
-  mealPlan: MealPlan
+  mealPlanSlots: MealPlanSlotEntry[]
   mealPlanSnapshots: MealPlanSnapshot[]
   groceryStores: GroceryStore[]
   ingredientEntries: IngredientEntry[]
@@ -37,7 +48,7 @@ const MAX_LEGACY_SNAPSHOT_IMPORT = 50
 
 let store: StoreState = {
   recipes: [],
-  mealPlan: createEmptyMealPlan(),
+  mealPlanSlots: [],
   mealPlanSnapshots: [],
   groceryStores: [],
   ingredientEntries: [],
@@ -99,21 +110,94 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
-function normalizeMealPlan(input: unknown): MealPlan {
-  const next = createEmptyMealPlan()
-  if (!input || typeof input !== 'object') return next
-  const source = input as Record<string, unknown>
-  for (const day of DAY_OF_WEEK_VALUES) {
-    const daySource = source[day]
-    if (!daySource || typeof daySource !== 'object') continue
-    const dayRecord = daySource as Record<string, unknown>
-    for (const slot of MEAL_SLOT_VALUES) {
-      const recipeId = dayRecord[slot]
-      next[day][slot] =
-        typeof recipeId === 'string' && recipeId.trim().length > 0 ? recipeId : null
+async function refreshIngredientEntriesFromServer(): Promise<void> {
+  try {
+    const entries = await requestJson<IngredientEntry[]>('/api/ingredients')
+    store = {
+      ...store,
+      ingredientEntries: entries
+        .map((entry) => normalizeIngredientEntry(entry))
+        .filter((entry): entry is IngredientEntry => entry !== null),
     }
+    emitChange()
+  } catch {
+    // Preserve successful recipe saves even if ingredient entry refresh fails.
+  }
+}
+
+function normalizeMealPlanSelection(input: unknown): MealSelection {
+  const value = String(input || '')
+    .trim()
+    .toLowerCase()
+  return MEAL_SELECTION_VALUES.includes(value as MealSelection)
+    ? (value as MealSelection)
+    : 'recipe'
+}
+
+function getCurrentWeekDateKeyByDay(): Record<DayOfWeek, string> {
+  const now = new Date()
+  const weekday = (now.getDay() + 6) % 7
+  const monday = addDays(now, -weekday)
+  return DAY_OF_WEEK_VALUES.reduce<Record<DayOfWeek, string>>((map, day, index) => {
+    map[day] = toDateKey(addDays(monday, index))
+    return map
+  }, {} as Record<DayOfWeek, string>)
+}
+
+function toWeeklyMealPlan(mealPlanSlots: MealPlanSlotEntry[]): MealPlan {
+  const next = createEmptyMealPlan()
+  const dayByDateKey = new Map<string, DayOfWeek>()
+  const dateByDay = getCurrentWeekDateKeyByDay()
+  for (const day of DAY_OF_WEEK_VALUES) {
+    dayByDateKey.set(dateByDay[day], day)
+  }
+
+  for (const entry of mealPlanSlots) {
+    if (entry.selection !== 'recipe' || !entry.recipeId) continue
+    const day = dayByDateKey.get(entry.dateKey)
+    if (!day) continue
+    if (!LEGACY_MEAL_SLOT_VALUES.includes(entry.slot as LegacyMealSlot)) continue
+    next[day][entry.slot as LegacyMealSlot] = entry.recipeId
   }
   return next
+}
+
+function normalizeMealPlanSlots(input: unknown): MealPlanSlotEntry[] {
+  if (!Array.isArray(input)) return []
+  const slots = input
+    .map((value) => {
+      if (!value || typeof value !== 'object') return null
+      const source = value as Record<string, unknown>
+      const dateKey = String(source.dateKey || '').trim()
+      const slot = String(source.slot || '')
+        .trim()
+        .toLowerCase()
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateKey)) return null
+      if (!MEAL_SLOT_VALUES.includes(slot as MealSlot)) return null
+
+      const selection = normalizeMealPlanSelection(source.selection)
+      const recipeIdRaw = String(source.recipeId || '').trim()
+      const recipeId = selection === 'recipe' ? recipeIdRaw || null : null
+      if (selection === 'recipe' && !recipeId) return null
+
+      return {
+        dateKey,
+        slot: slot as MealSlot,
+        selection,
+        recipeId,
+        updatedAt:
+          typeof source.updatedAt === 'string' && source.updatedAt
+            ? source.updatedAt
+            : new Date().toISOString(),
+      }
+    })
+    .filter((value): value is MealPlanSlotEntry => value !== null)
+
+  slots.sort((a, b) => {
+    if (a.dateKey !== b.dateKey) return a.dateKey.localeCompare(b.dateKey)
+    return a.slot.localeCompare(b.slot)
+  })
+  return slots
 }
 
 function normalizeStore(value: unknown): GroceryStore | null {
@@ -128,6 +212,27 @@ function normalizeStore(value: unknown): GroceryStore | null {
     typeof source.createdAt === 'string' && source.createdAt ? source.createdAt : new Date().toISOString()
   const updatedAt =
     typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : createdAt
+  const onlineOrderingProvider =
+    typeof source.onlineOrderingProvider === 'string' &&
+    source.onlineOrderingProvider.trim().toLowerCase() === 'target'
+      ? 'target'
+      : undefined
+  const onlineOrderingSource =
+    source.onlineOrderingConfig &&
+    typeof source.onlineOrderingConfig === 'object' &&
+    !Array.isArray(source.onlineOrderingConfig)
+      ? (source.onlineOrderingConfig as Record<string, unknown>)
+      : null
+  const targetStoreId =
+    onlineOrderingSource && typeof onlineOrderingSource.targetStoreId === 'string'
+      ? onlineOrderingSource.targetStoreId.trim()
+      : ''
+  const onlineOrderingConfig = targetStoreId ? { targetStoreId } : undefined
+  const supportsOnlineOrdering = Boolean(
+    source.supportsOnlineOrdering === true &&
+      onlineOrderingProvider === 'target' &&
+      onlineOrderingConfig?.targetStoreId
+  )
 
   return {
     id,
@@ -152,6 +257,11 @@ function normalizeStore(value: unknown): GroceryStore | null {
       typeof source.logoUrl === 'string' && source.logoUrl.trim()
         ? source.logoUrl.trim()
         : undefined,
+    supportsOnlineOrdering,
+    onlineOrderingProvider: supportsOnlineOrdering
+      ? onlineOrderingProvider
+      : undefined,
+    onlineOrderingConfig: supportsOnlineOrdering ? onlineOrderingConfig : undefined,
     createdAt,
     updatedAt,
   }
@@ -253,6 +363,7 @@ function normalizeRecipe(value: unknown): Recipe | null {
     ingredients,
     steps,
     sourceUrl: String(source.sourceUrl || '').trim(),
+    imageUrl: String(source.imageUrl || '').trim() || undefined,
     createdAt,
     updatedAt,
   }
@@ -270,20 +381,23 @@ function normalizeSnapshot(value: unknown): MealPlanSnapshot | null {
     .map((meal) => {
       if (!meal || typeof meal !== 'object') return null
       const mealSource = meal as Record<string, unknown>
-      const day = String(mealSource.day || '').trim().toLowerCase()
+      const day = String(mealSource.day || '')
+        .trim()
+        .toLowerCase()
       const slot = String(mealSource.slot || '').trim().toLowerCase()
-      if (
-        !DAY_OF_WEEK_VALUES.includes(day as DayOfWeek) ||
-        !MEAL_SLOT_VALUES.includes(slot as MealSlot)
-      ) {
+      if (!day || !MEAL_SLOT_VALUES.includes(slot as MealSlot)) {
         return null
       }
-      const recipeId = String(mealSource.recipeId || '').trim()
-      const recipeName = String(mealSource.recipeName || '').trim()
-      if (!recipeId || !recipeName) return null
+      const selection = normalizeMealPlanSelection(mealSource.selection)
+      const recipeIdRaw = String(mealSource.recipeId || '').trim()
+      const recipeNameRaw = String(mealSource.recipeName || '').trim()
+      const recipeId = selection === 'recipe' ? recipeIdRaw || null : null
+      const recipeName = selection === 'recipe' ? recipeNameRaw || null : null
+      if (selection === 'recipe' && (!recipeId || !recipeName)) return null
       return {
-        day: day as DayOfWeek,
+        day,
         slot: slot as MealSlot,
+        selection,
         recipeId,
         recipeName,
         storeIds: Array.isArray(mealSource.storeIds)
@@ -304,6 +418,8 @@ function normalizeSnapshot(value: unknown): MealPlanSnapshot | null {
     id,
     createdAt,
     label,
+    description:
+      typeof source.description === 'string' ? source.description.trim() : '',
     meals,
   }
 }
@@ -313,7 +429,7 @@ function normalizeBootstrapPayload(payload: PlannerBootstrapResponse): StoreStat
     recipes: Array.isArray(payload.recipes)
       ? payload.recipes.map((item) => normalizeRecipe(item)).filter((item): item is Recipe => item !== null)
       : [],
-    mealPlan: normalizeMealPlan(payload.mealPlan),
+    mealPlanSlots: normalizeMealPlanSlots(payload.mealPlanSlots),
     mealPlanSnapshots: Array.isArray(payload.mealPlanSnapshots)
       ? payload.mealPlanSnapshots
           .map((item) => normalizeSnapshot(item))
@@ -360,7 +476,7 @@ function normalizeLegacyMealPlan(raw: unknown): MealPlan {
     const meals = daySource.meals && typeof daySource.meals === 'object'
       ? (daySource.meals as Record<string, unknown>)
       : daySource
-    for (const slot of MEAL_SLOT_VALUES) {
+    for (const slot of LEGACY_MEAL_SLOT_VALUES) {
       const slotValue = meals[slot]
       if (typeof slotValue === 'string' && slotValue.trim()) {
         next[day][slot] = slotValue.trim()
@@ -421,6 +537,7 @@ function normalizeLegacyStores(candidate: Record<string, unknown>): GroceryStore
       id,
       name,
       address: '',
+      supportsOnlineOrdering: false,
       createdAt: now,
       updatedAt: now,
     })
@@ -443,6 +560,7 @@ function normalizeLegacyStores(candidate: Record<string, unknown>): GroceryStore
       phone: String(source.phone || '').trim() || undefined,
       logoUrl: String(source.logoUrl || '').trim() || undefined,
       placeId: String(source.googlePlaceId || '').trim() || undefined,
+      supportsOnlineOrdering: false,
       createdAt: now,
       updatedAt: now,
     })
@@ -541,7 +659,7 @@ function normalizeLegacyIngredientEntries(
 
 function hasMeaningfulMealPlan(mealPlan: MealPlan): boolean {
   for (const day of DAY_OF_WEEK_VALUES) {
-    for (const slot of MEAL_SLOT_VALUES) {
+    for (const slot of LEGACY_MEAL_SLOT_VALUES) {
       if (mealPlan[day][slot]) return true
     }
   }
@@ -689,6 +807,7 @@ export async function addRecipe(recipe: Recipe): Promise<Recipe> {
     recipes: [...store.recipes.filter((item) => item.id !== created.id), created],
   }
   emitChange()
+  await refreshIngredientEntriesFromServer()
   return created
 }
 
@@ -703,6 +822,7 @@ export async function updateRecipe(recipe: Recipe): Promise<Recipe> {
     recipes: store.recipes.map((item) => (item.id === updated.id ? updated : item)),
   }
   emitChange()
+  await refreshIngredientEntriesFromServer()
   return updated
 }
 
@@ -712,59 +832,98 @@ export async function deleteRecipe(id: string): Promise<void> {
     method: 'DELETE',
   })
 
-  const mealPlan = normalizeMealPlan(store.mealPlan)
-  for (const day of DAY_OF_WEEK_VALUES) {
-    for (const slot of MEAL_SLOT_VALUES) {
-      if (mealPlan[day][slot] === id) {
-        mealPlan[day][slot] = null
-      }
-    }
-  }
-
   store = {
     ...store,
     recipes: store.recipes.filter((item) => item.id !== id),
-    mealPlan,
+    mealPlanSlots: store.mealPlanSlots.filter((slot) => slot.recipeId !== id),
   }
   emitChange()
 }
 
 export async function setMealSlot(
-  day: DayOfWeek,
+  dateKey: string,
   slot: MealSlot,
+  selection: MealSelection | null,
   recipeId: string | null
 ): Promise<void> {
   await hydrateStore()
-  const payload = await requestJson<{ mealPlan: MealPlan }>('/api/meal-plan/slot', {
+  const payload = await requestJson<{ mealPlanSlots: MealPlanSlotEntry[] }>('/api/meal-plan/slot', {
     method: 'PUT',
-    body: JSON.stringify({ day, slot, recipeId }),
+    body: JSON.stringify({ dateKey, slot, selection, recipeId }),
   })
   store = {
     ...store,
-    mealPlan: normalizeMealPlan(payload.mealPlan),
+    mealPlanSlots: normalizeMealPlanSlots(payload.mealPlanSlots),
   }
   emitChange()
 }
 
-export async function clearMealPlan(): Promise<void> {
+export async function replaceMealPlanSlots(slots: Array<{
+  dateKey: string
+  slot: MealSlot
+  selection: MealSelection | null
+  recipeId: string | null
+}>): Promise<void> {
   await hydrateStore()
-  const payload = await requestJson<{ mealPlan: MealPlan }>('/api/meal-plan/clear', {
-    method: 'POST',
-    body: '{}',
+  const payload = await requestJson<{ mealPlanSlots: MealPlanSlotEntry[] }>('/api/meal-plan', {
+    method: 'PUT',
+    body: JSON.stringify({ slots }),
   })
   store = {
     ...store,
-    mealPlan: normalizeMealPlan(payload.mealPlan),
+    mealPlanSlots: normalizeMealPlanSlots(payload.mealPlanSlots),
   }
   emitChange()
 }
 
-export async function saveMealPlanSnapshot(label?: string): Promise<MealPlanSnapshot | null> {
+export async function replaceMealPlan(mealPlan: MealPlan): Promise<void> {
+  const dateByDay = getCurrentWeekDateKeyByDay()
+  const slots = DAY_OF_WEEK_VALUES.flatMap((day) =>
+    MEAL_SLOT_VALUES.map((slot) => ({
+      dateKey: dateByDay[day],
+      slot,
+      selection: mealPlan[day][slot] ? ('recipe' as const) : null,
+      recipeId: mealPlan[day][slot],
+    }))
+  )
+  await replaceMealPlanSlots(slots)
+}
+
+export async function clearMealPlan(input?: {
+  startDate?: string
+  days?: number
+}): Promise<void> {
+  await hydrateStore()
+  const payload = await requestJson<{ mealPlanSlots: MealPlanSlotEntry[] }>('/api/meal-plan/clear', {
+    method: 'POST',
+    body: JSON.stringify({
+      startDate: input?.startDate,
+      days: input?.days,
+    }),
+  })
+  store = {
+    ...store,
+    mealPlanSlots: normalizeMealPlanSlots(payload.mealPlanSlots),
+  }
+  emitChange()
+}
+
+export async function saveMealPlanSnapshot(input?: {
+  label?: string
+  description?: string
+  startDate?: string
+  days?: number
+}): Promise<MealPlanSnapshot | null> {
   await hydrateStore()
   try {
     const snapshot = await requestJson<MealPlanSnapshot>('/api/meal-plan/snapshots', {
       method: 'POST',
-      body: JSON.stringify({ label }),
+      body: JSON.stringify({
+        label: input?.label,
+        description: input?.description,
+        startDate: input?.startDate,
+        days: input?.days,
+      }),
     })
     store = {
       ...store,
@@ -887,6 +1046,38 @@ export async function updateIngredientEntry(entry: IngredientEntry): Promise<Ing
   return updated
 }
 
+export async function bulkUpdateIngredientDefaultStore(
+  ingredientIds: string[],
+  defaultStoreId: string
+): Promise<IngredientEntry[]> {
+  await hydrateStore()
+  const payload = await requestJson<{ ingredientEntries?: IngredientEntry[] }>(
+    '/api/ingredients/default-store',
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        ingredientIds,
+        defaultStoreId,
+      }),
+    }
+  )
+
+  const updatedEntries = Array.isArray(payload.ingredientEntries)
+    ? payload.ingredientEntries
+    : []
+  if (updatedEntries.length === 0) return []
+
+  const byId = new Map(updatedEntries.map((entry) => [entry.id, entry]))
+  store = {
+    ...store,
+    ingredientEntries: store.ingredientEntries.map(
+      (item) => byId.get(item.id) ?? item
+    ),
+  }
+  emitChange()
+  return updatedEntries
+}
+
 export async function deleteIngredientEntry(id: string): Promise<void> {
   await hydrateStore()
   await requestJson<{ ok: boolean }>(`/api/ingredients/${encodeURIComponent(id)}`, {
@@ -920,7 +1111,15 @@ export function useRecipes() {
 }
 
 export function useMealPlan() {
-  return useStore().mealPlan
+  return useStore().mealPlanSlots
+}
+
+export function useMealPlanSlots() {
+  return useStore().mealPlanSlots
+}
+
+export function useWeeklyMealPlan() {
+  return toWeeklyMealPlan(useStore().mealPlanSlots)
 }
 
 export function useMealPlanSnapshots() {

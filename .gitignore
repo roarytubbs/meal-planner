@@ -20,6 +20,7 @@ tsconfig.tsbuildinfo
 data/*.db
 data/*.db-shm
 data/*.db-wal
+.nvmrc
 .env.example
 # Local/temporary automation and CI artifacts that should not be public
 .github/workflows/

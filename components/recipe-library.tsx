@@ -5,10 +5,9 @@ import {
   UtensilsCrossed,
   Plus,
   Search,
+  ChevronDown,
   MoreHorizontal,
-  Clock,
   Users,
-  Link as LinkIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +37,7 @@ interface RecipeLibraryProps {
   onAddRecipe: () => void
   onEditRecipe: (recipe: Recipe) => void
   onImportRecipe: () => void
+  onSearchRecipes: () => void
 }
 
 const MEAL_TYPE_COLORS: Record<string, string> = {
@@ -51,6 +51,7 @@ export function RecipeLibrary({
   onAddRecipe,
   onEditRecipe,
   onImportRecipe,
+  onSearchRecipes,
 }: RecipeLibraryProps) {
   const recipes = useRecipes()
   const [search, setSearch] = useState('')
@@ -81,15 +82,35 @@ export function RecipeLibrary({
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-foreground">Recipe Library</h2>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onImportRecipe}>
-            <LinkIcon className="size-4" />
-            <span className="hidden sm:inline">Import</span>
-          </Button>
-          <Button size="sm" onClick={onAddRecipe}>
+        <div className="inline-flex items-center">
+          <Button
+            size="sm"
+            onClick={onAddRecipe}
+            className="rounded-r-none border-r border-r-primary-foreground/25"
+          >
             <Plus className="size-4" />
             Add Recipe
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                className="rounded-l-none px-2.5"
+                aria-label="Add recipe options"
+              >
+                <ChevronDown className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onAddRecipe}>Manual</DropdownMenuItem>
+              <DropdownMenuItem onClick={onImportRecipe}>
+                Import From URL
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onSearchRecipes}>
+                Search
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -133,6 +154,19 @@ export function RecipeLibrary({
               className="group cursor-pointer transition-shadow hover:shadow-md"
               onClick={() => onEditRecipe(recipe)}
             >
+              {recipe.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={recipe.imageUrl}
+                  alt={recipe.name}
+                  className="h-36 w-full rounded-t-xl border-b border-border object-cover"
+                />
+              ) : (
+                <div className="flex h-36 w-full items-center justify-center rounded-t-xl border-b border-border bg-muted/30 text-xs text-muted-foreground">
+                  No image
+                </div>
+              )}
+
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-base leading-snug text-pretty">

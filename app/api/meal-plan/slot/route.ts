@@ -7,8 +7,10 @@ export async function PUT(request: Request) {
   try {
     const raw = await request.json()
     const payload = mealPlanSlotUpdateSchema.parse(raw)
-    const mealPlan = await setMealPlanSlot(payload.day, payload.slot, payload.recipeId)
-    return NextResponse.json({ mealPlan })
+
+    const slots = await setMealPlanSlot(payload.dateKey, payload.slot, payload.selection, payload.recipeId)
+
+    return NextResponse.json({ mealPlanSlots: slots })
   } catch (error) {
     return NextResponse.json(
       { error: normalizeErrorMessage(error) },

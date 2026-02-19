@@ -1,34 +1,40 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { UtensilsCrossed } from 'lucide-react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useRouter } from 'next/navigation'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Toaster } from '@/components/ui/sonner'
+import { AppHeader, type AppTab } from '@/components/app-header'
 import { RecipeLibrary } from '@/components/recipe-library'
 import { RecipeForm } from '@/components/recipe-form'
 import { MealPlannerView } from '@/components/meal-planner-view'
 import { RecipeImportDialog } from '@/components/recipe-import-dialog'
 import { StoreManager } from '@/components/store-manager'
 import { IngredientManager } from '@/components/ingredient-manager'
-import { addRecipe, updateRecipe, useStoreStatus } from '@/lib/meal-planner-store'
+import { MealPlanHistorySection } from '@/components/meal-plan-history-section'
+import { addRecipe, updateRecipe, useRecipes, useStoreStatus } from '@/lib/meal-planner-store'
 import { toast } from 'sonner'
 import type { Recipe, RecipeMode } from '@/lib/types'
 
 type View = 'library' | 'form' | 'planner'
 
 export default function MealPlannerPage() {
+  const router = useRouter()
   const [view, setView] = useState<View>('library')
-  const [activeTab, setActiveTab] = useState<string>('recipes')
+  const [activeTab, setActiveTab] = useState<AppTab>('recipes')
   const [formMode, setFormMode] = useState<RecipeMode>('add')
   const [editingRecipe, setEditingRecipe] = useState<Recipe | undefined>(
     undefined
   )
   const [importOpen, setImportOpen] = useState(false)
+  const [pendingRecipeId, setPendingRecipeId] = useState<string | null>(null)
   const { loading, error } = useStoreStatus()
+  const recipes = useRecipes()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const tab = params.get('tab')
+    const recipeId = String(params.get('recipeId') || '').trim()
     if (tab !== 'recipes' && tab !== 'ingredients' && tab !== 'stores' && tab !== 'planner') {
       return
     }
@@ -39,7 +45,24 @@ export default function MealPlannerPage() {
       if (tab === 'recipes') return prev === 'form' ? prev : 'library'
       return 'library'
     })
+
+    if (recipeId) {
+      setPendingRecipeId(recipeId)
+    }
   }, [])
+
+  useEffect(() => {
+    if (!pendingRecipeId) return
+    const matchingRecipe = recipes.find((recipe) => recipe.id === pendingRecipeId)
+    if (!matchingRecipe) return
+
+    setActiveTab('recipes')
+    setFormMode('edit')
+    setEditingRecipe(matchingRecipe)
+    setView('form')
+    setPendingRecipeId(null)
+    router.replace('/?tab=recipes')
+  }, [pendingRecipeId, recipes, router])
 
   const handleAddRecipe = useCallback(() => {
     setFormMode('add')
@@ -48,6 +71,7 @@ export default function MealPlannerPage() {
   }, [])
 
   const handleEditRecipe = useCallback((recipe: Recipe) => {
+    setActiveTab('recipes')
     setFormMode('edit')
     setEditingRecipe(recipe)
     setView('form')
@@ -63,6 +87,8 @@ export default function MealPlannerPage() {
           await updateRecipe(recipe)
           toast.success('Recipe updated', { description: recipe.name })
         }
+        setActiveTab('recipes')
+        router.replace('/?tab=recipes')
         setView('library')
         setEditingRecipe(undefined)
       } catch (saveError) {
@@ -71,13 +97,15 @@ export default function MealPlannerPage() {
         toast.error(message)
       }
     },
-    [formMode]
+    [formMode, router]
   )
 
   const handleCancelForm = useCallback(() => {
+    setActiveTab('recipes')
+    router.replace('/?tab=recipes')
     setView('library')
     setEditingRecipe(undefined)
-  }, [])
+  }, [router])
 
   const handleImport = useCallback((partial: Partial<Recipe>) => {
     const recipe: Recipe = {
@@ -89,6 +117,7 @@ export default function MealPlannerPage() {
       ingredients: partial.ingredients || [],
       steps: partial.steps || [''],
       sourceUrl: partial.sourceUrl || '',
+      imageUrl: partial.imageUrl || '',
       createdAt: partial.createdAt || new Date().toISOString(),
       updatedAt: partial.updatedAt || new Date().toISOString(),
     }
@@ -101,37 +130,25 @@ export default function MealPlannerPage() {
   }, [])
 
   const handleTabChange = useCallback(
-    (tab: string) => {
+    (tab: AppTab) => {
       setActiveTab(tab)
+      router.replace(`/?tab=${tab}`)
       if (tab === 'recipes' && view === 'form') {
         // Keep form view
       } else if (tab === 'recipes') {
         setView('library')
       } else if (tab === 'planner') {
         setView('planner')
+      } else {
+        setView('library')
       }
     },
-    [view]
+    [router, view]
   )
 
   return (
     <main className="min-h-screen bg-background">
-      {/* App header */}
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <UtensilsCrossed className="size-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold leading-tight text-foreground">
-              Meal Planner
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Plan your weekly meals with ease
-            </p>
-          </div>
-        </div>
-      </header>
+      <AppHeader activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6">
@@ -153,34 +170,31 @@ export default function MealPlannerPage() {
             onCancel={handleCancelForm}
           />
         ) : (
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="recipes">Recipes</TabsTrigger>
-              <TabsTrigger value="ingredients">Ingredients</TabsTrigger>
-              <TabsTrigger value="stores">Stores</TabsTrigger>
-              <TabsTrigger value="planner">Planner</TabsTrigger>
-            </TabsList>
+          <>
+            <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as AppTab)}>
+              <TabsContent value="recipes">
+                <MealPlanHistorySection />
+                <RecipeLibrary
+                  onAddRecipe={handleAddRecipe}
+                  onEditRecipe={handleEditRecipe}
+                  onImportRecipe={() => setImportOpen(true)}
+                  onSearchRecipes={() => router.push('/recipes/search')}
+                />
+              </TabsContent>
 
-            <TabsContent value="recipes">
-              <RecipeLibrary
-                onAddRecipe={handleAddRecipe}
-                onEditRecipe={handleEditRecipe}
-                onImportRecipe={() => setImportOpen(true)}
-              />
-            </TabsContent>
+              <TabsContent value="ingredients">
+                <IngredientManager />
+              </TabsContent>
 
-            <TabsContent value="ingredients">
-              <IngredientManager />
-            </TabsContent>
+              <TabsContent value="stores">
+                <StoreManager />
+              </TabsContent>
 
-            <TabsContent value="stores">
-              <StoreManager />
-            </TabsContent>
-
-            <TabsContent value="planner">
-              <MealPlannerView />
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="planner">
+                <MealPlannerView onEditRecipe={handleEditRecipe} />
+              </TabsContent>
+            </Tabs>
+          </>
         )}
       </div>
 

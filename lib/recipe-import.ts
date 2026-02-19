@@ -8,10 +8,13 @@ export interface ScrapedRecipe {
   steps: string[]
   servings: number
   mealType: Recipe['mealType']
+  imageUrl: string
 }
 
 const IMPORT_ERROR_TEXT_PATTERN =
   /(paramvalidationerror|could not be resolved|dns|access denied|forbidden|captcha|temporarily unavailable|request failed)/i
+const IMPORT_BLOCKED_CONTENT_PATTERN =
+  /(attention required|cloudflare|you have been blocked|cf-error-details|verify you are human|enable cookies)/i
 
 const RECIPE_HEADING_PATTERN =
   /^(?:#{1,6}\s*)?(recipe|ingredients?|instructions?|directions?|method|preparation|steps?)[:\s-]*$/i
@@ -79,6 +82,18 @@ function isLikelyErrorText(value: string): boolean {
   return false
 }
 
+export function isLikelyBlockedImportContent(value: string): boolean {
+  const text = String(value || '')
+  if (!text.trim()) return false
+  if (IMPORT_BLOCKED_CONTENT_PATTERN.test(text)) return true
+  if (
+    /<title[^>]*>\s*attention required!\s*\|\s*cloudflare\s*<\/title>/i.test(text)
+  ) {
+    return true
+  }
+  return false
+}
+
 function normalizeLines(lines: string[]): string[] {
   const result: string[] = []
   const seen = new Set<string>()
@@ -125,6 +140,39 @@ function asString(value: unknown): string {
     const source = value as Record<string, unknown>
     if (typeof source.text === 'string') return source.text
     if (typeof source.name === 'string') return source.name
+  }
+  return ''
+}
+
+function normalizeImageUrl(value: string): string {
+  const candidate = String(value || '').trim()
+  if (!candidate) return ''
+  try {
+    const parsed = new URL(candidate)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
+    return parsed.toString().slice(0, 1000)
+  } catch {
+    return ''
+  }
+}
+
+function extractImageFromUnknown(value: unknown): string {
+  if (!value) return ''
+  if (typeof value === 'string') return normalizeImageUrl(value)
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const resolved = extractImageFromUnknown(item)
+      if (resolved) return resolved
+    }
+    return ''
+  }
+  if (typeof value === 'object') {
+    const source = value as Record<string, unknown>
+    return (
+      extractImageFromUnknown(source.url) ||
+      extractImageFromUnknown(source.contentUrl) ||
+      extractImageFromUnknown(source.image)
+    )
   }
   return ''
 }
@@ -254,6 +302,111 @@ function htmlToLines(html: string): string[] {
     .filter(Boolean)
 }
 
+function cleanMarkdownLine(value: string): string {
+  return normalizeText(
+    value
+      .replace(/!\[[^\]]*]\([^)]*\)/g, '')
+      .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^[-*+]\s+/, '')
+  )
+}
+
+function extractTitleFromTextLines(lines: string[]): string {
+  for (const line of lines) {
+    const match = line.match(/^title:\s*(.+)$/i)
+    if (match?.[1]) return cleanMarkdownLine(match[1])
+  }
+  for (const line of lines) {
+    const match = line.match(/^#{1,6}\s+(.+)$/)
+    if (match?.[1]) return cleanMarkdownLine(match[1])
+  }
+  for (const line of lines) {
+    const cleaned = cleanMarkdownLine(line)
+    if (!cleaned) continue
+    if (/^(url source|published time|markdown content|bbq recipes)$/i.test(cleaned)) {
+      continue
+    }
+    return cleaned
+  }
+  return ''
+}
+
+function parseRecipeFromTextContent(text: string): ScrapedRecipe {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  const title = extractTitleFromTextLines(lines)
+  const descriptionLineIndex = lines.findIndex((line) =>
+    /^#{0,6}\s*description\b/i.test(cleanMarkdownLine(line))
+  )
+
+  let description = ''
+  if (descriptionLineIndex >= 0) {
+    for (let i = descriptionLineIndex + 1; i < lines.length; i += 1) {
+      const candidate = cleanMarkdownLine(lines[i])
+      if (!candidate || /^\*+\s*$/.test(candidate)) continue
+      if (/^(cook mode|for the |ingredients?:|steps?:|instructions?:)$/i.test(candidate)) {
+        continue
+      }
+      description = candidate
+      break
+    }
+  }
+
+  const scanStart = descriptionLineIndex >= 0 ? descriptionLineIndex + 1 : 0
+  const stepStart = lines.findIndex(
+    (line, index) => index >= scanStart && /^\d+[.)]\s+/.test(line)
+  )
+
+  const ingredientLines: string[] = []
+  const ingredientScanEnd = stepStart >= 0 ? stepStart : lines.length
+  for (let i = scanStart; i < ingredientScanEnd; i += 1) {
+    const line = lines[i]
+    if (!/^[-*+]\s+/.test(line)) continue
+    const cleaned = cleanMarkdownLine(line)
+    if (!cleaned) continue
+    if (
+      /^(what malcom used|print|cook mode|bbq recipes|see all|gift ideas|shop)/i.test(
+        cleaned
+      )
+    ) {
+      continue
+    }
+    if (cleaned === '*' || cleaned === '•') continue
+    if (/^image \d+/i.test(cleaned)) continue
+    ingredientLines.push(cleaned)
+  }
+
+  const stepLines: string[] = []
+  for (const line of lines) {
+    if (!/^\d+[.)]\s+/.test(line)) continue
+    const cleaned = cleanMarkdownLine(line.replace(/^\d+[.)]\s+/, ''))
+    if (!cleaned) continue
+    stepLines.push(cleaned)
+  }
+
+  const ingredients = toIngredientRows(normalizeLines(ingredientLines)).filter(
+    (ingredient) => ingredient.name.replace(/[*•\\s-]/g, '').length > 0
+  )
+  const steps = normalizeLines(stepLines)
+  const mealType = inferMealType([title, description])
+
+  return {
+    name: title,
+    description,
+    ingredients,
+    steps,
+    servings: 4,
+    mealType,
+    imageUrl: '',
+  }
+}
+
 function isLikelyStepLine(line: string): boolean {
   if (!line) return false
   if (/^\d+[.)]\s+/.test(line)) return true
@@ -369,6 +522,7 @@ function parseRecipeNode(node: Record<string, unknown>): ScrapedRecipe {
     name,
     description,
   ])
+  const imageUrl = extractImageFromUnknown(node.image)
 
   return {
     name,
@@ -377,6 +531,7 @@ function parseRecipeNode(node: Record<string, unknown>): ScrapedRecipe {
     steps,
     servings,
     mealType,
+    imageUrl,
   }
 }
 
@@ -430,6 +585,10 @@ function extractBasicRecipe(html: string): ScrapedRecipe {
   })
   const servings = parseServings(extractMetaContent(html, 'recipeYield'))
   const mealType = inferMealType([name, description])
+  const imageUrl =
+    normalizeImageUrl(extractMetaContent(html, 'og:image')) ||
+    normalizeImageUrl(extractMetaContent(html, 'twitter:image')) ||
+    normalizeImageUrl(extractMetaContent(html, 'image'))
 
   return {
     name,
@@ -438,6 +597,7 @@ function extractBasicRecipe(html: string): ScrapedRecipe {
     steps,
     servings,
     mealType,
+    imageUrl,
   }
 }
 
@@ -457,6 +617,7 @@ export function parseRecipeFromHtml(html: string): ScrapedRecipe {
       : fallbackRecipe.steps
   const servings = jsonLdRecipe?.servings || fallbackRecipe.servings || 4
   const mealType = jsonLdRecipe?.mealType || fallbackRecipe.mealType
+  const imageUrl = jsonLdRecipe?.imageUrl || fallbackRecipe.imageUrl || ''
 
   return {
     name,
@@ -465,18 +626,17 @@ export function parseRecipeFromHtml(html: string): ScrapedRecipe {
     steps,
     servings,
     mealType,
+    imageUrl,
   }
 }
 
+export function parseRecipeFromText(text: string): ScrapedRecipe {
+  return parseRecipeFromTextContent(text)
+}
+
 export function hasMeaningfulRecipeData(recipe: ScrapedRecipe): boolean {
-  const safeName = recipe.name && !isLikelyErrorText(recipe.name)
-  const safeDescription = recipe.description && !isLikelyErrorText(recipe.description)
-  return Boolean(
-    safeName ||
-      safeDescription ||
-      recipe.ingredients.length > 0 ||
-      recipe.steps.length > 0
-  )
+  if (isLikelyErrorText(recipe.name) || isLikelyErrorText(recipe.description)) return false
+  return recipe.ingredients.length > 0 || recipe.steps.length > 0
 }
 
 function isPrivateHostname(hostname: string): boolean {

@@ -25,6 +25,7 @@ import { useIngredientEntries, useGroceryStores } from '@/lib/meal-planner-store
 interface IngredientTableProps {
   ingredients: Ingredient[]
   onChange: (ingredients: Ingredient[]) => void
+  showTitle?: boolean
 }
 
 function generateId() {
@@ -207,7 +208,11 @@ function StoreSelect({
   )
 }
 
-export function IngredientTable({ ingredients, onChange }: IngredientTableProps) {
+export function IngredientTable({
+  ingredients,
+  onChange,
+  showTitle = true,
+}: IngredientTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Ingredient | null>(null)
   const [showPaste, setShowPaste] = useState(false)
@@ -337,22 +342,20 @@ export function IngredientTable({ ingredients, onChange }: IngredientTableProps)
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-foreground">Ingredients</h3>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowPaste(!showPaste)}
-          >
-            <ClipboardPaste className="size-4" />
-            <span className="hidden sm:inline">Paste</span>
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={addEmpty}>
-            <Plus className="size-4" />
-            <span className="hidden sm:inline">Add</span>
-          </Button>
-        </div>
+        {showTitle ? (
+          <h3 className="text-base font-semibold text-foreground">Ingredients</h3>
+        ) : (
+          <span />
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowPaste(!showPaste)}
+        >
+          <ClipboardPaste className="size-4" />
+          <span className="hidden sm:inline">Paste</span>
+        </Button>
       </div>
 
       {showPaste && (
@@ -553,6 +556,13 @@ export function IngredientTable({ ingredients, onChange }: IngredientTableProps)
             </div>
           )
         })}
+      </div>
+
+      <div className="flex items-center justify-start">
+        <Button type="button" variant="outline" size="sm" onClick={addEmpty}>
+          <Plus className="size-4" />
+          Add ingredients
+        </Button>
       </div>
     </div>
   )

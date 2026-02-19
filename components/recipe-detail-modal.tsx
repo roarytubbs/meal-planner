@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import { ExternalLink, Users } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -17,6 +19,7 @@ interface RecipeDetailModalProps {
   recipe: Recipe | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onEditRecipe?: (recipe: Recipe) => void
 }
 
 const MEAL_TYPE_COLORS: Record<string, string> = {
@@ -30,12 +33,35 @@ export function RecipeDetailModal({
   recipe,
   open,
   onOpenChange,
+  onEditRecipe,
 }: RecipeDetailModalProps) {
+  const [showFullDescription, setShowFullDescription] = useState(false)
+  const [showAllIngredients, setShowAllIngredients] = useState(false)
+  const [showAllSteps, setShowAllSteps] = useState(false)
+
+  useEffect(() => {
+    setShowFullDescription(false)
+    setShowAllIngredients(false)
+    setShowAllSteps(false)
+  }, [recipe?.id, open])
+
+  const filteredSteps = useMemo(
+    () => (recipe ? recipe.steps.map((step) => step.trim()).filter(Boolean) : []),
+    [recipe]
+  )
+
   if (!recipe) return null
+
+  const description = recipe.description.trim()
+  const hasLongDescription = description.length > 180
+  const visibleIngredients = showAllIngredients
+    ? recipe.ingredients
+    : recipe.ingredients.slice(0, 10)
+  const visibleSteps = showAllSteps ? filteredSteps : filteredSteps.slice(0, 5)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-xl h-[85vh] max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl text-balance">{recipe.name}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -54,16 +80,49 @@ export function RecipeDetailModal({
               <Users className="size-3.5" />
               {recipe.servings} servings
             </span>
+            {onEditRecipe ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
+                onClick={() => onEditRecipe(recipe)}
+              >
+                Edit Recipe
+              </Button>
+            ) : null}
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="min-h-0 flex-1 -mx-6 px-6">
           <div className="flex flex-col gap-5 pb-4">
+            {recipe.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={recipe.imageUrl}
+                alt={recipe.name}
+                className="h-52 w-full rounded-lg border border-border object-cover"
+              />
+            ) : null}
+
             {/* Description */}
-            {recipe.description && (
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {recipe.description}
-              </p>
+            {description && (
+              <div className="space-y-1">
+                <p
+                  className={`text-sm text-muted-foreground leading-relaxed ${showFullDescription ? '' : 'line-clamp-2'}`}
+                >
+                  {description}
+                </p>
+                {hasLongDescription ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary hover:underline"
+                    onClick={() => setShowFullDescription((prev) => !prev)}
+                  >
+                    {showFullDescription ? 'Show less' : 'Read more'}
+                  </button>
+                ) : null}
+              </div>
             )}
 
             <Separator />
@@ -74,23 +133,36 @@ export function RecipeDetailModal({
               {recipe.ingredients.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No ingredients listed.</p>
               ) : (
-                <ul className="flex flex-col gap-1">
-                  {recipe.ingredients.map((ing) => (
-                    <li
-                      key={ing.id}
-                      className="flex items-baseline gap-2 text-sm"
+                <>
+                  <ul className="flex flex-col gap-1">
+                    {visibleIngredients.map((ing) => (
+                      <li
+                        key={ing.id}
+                        className="flex items-baseline gap-2 text-sm"
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/40 mt-1.5" />
+                        <span className="text-foreground">
+                          {ing.qty !== null && (
+                            <span className="font-medium">{ing.qty}</span>
+                          )}{' '}
+                          {ing.unit && <span className="text-muted-foreground">{ing.unit}</span>}{' '}
+                          {ing.name}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {recipe.ingredients.length > 10 ? (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-primary hover:underline"
+                      onClick={() => setShowAllIngredients((prev) => !prev)}
                     >
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/40 mt-1.5" />
-                      <span className="text-foreground">
-                        {ing.qty !== null && (
-                          <span className="font-medium">{ing.qty}</span>
-                        )}{' '}
-                        {ing.unit && <span className="text-muted-foreground">{ing.unit}</span>}{' '}
-                        {ing.name}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                      {showAllIngredients
+                        ? 'Show fewer ingredients'
+                        : `Show all ingredients (${recipe.ingredients.length})`}
+                    </button>
+                  ) : null}
+                </>
               )}
             </div>
 
@@ -99,13 +171,12 @@ export function RecipeDetailModal({
             {/* Steps */}
             <div className="flex flex-col gap-2">
               <h3 className="text-sm font-semibold text-foreground">Steps</h3>
-              {recipe.steps.filter(Boolean).length === 0 ? (
+              {filteredSteps.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No steps listed.</p>
               ) : (
-                <ol className="flex flex-col gap-3">
-                  {recipe.steps
-                    .filter(Boolean)
-                    .map((step, i) => (
+                <>
+                  <ol className="flex flex-col gap-3">
+                    {visibleSteps.map((step, i) => (
                       <li key={i} className="flex gap-3 text-sm">
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
                           {i + 1}
@@ -115,7 +186,19 @@ export function RecipeDetailModal({
                         </span>
                       </li>
                     ))}
-                </ol>
+                  </ol>
+                  {filteredSteps.length > 5 ? (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-primary hover:underline"
+                      onClick={() => setShowAllSteps((prev) => !prev)}
+                    >
+                      {showAllSteps
+                        ? 'Show fewer steps'
+                        : `Show all steps (${filteredSteps.length})`}
+                    </button>
+                  ) : null}
+                </>
               )}
             </div>
 

@@ -8,19 +8,22 @@ datasource db {
 }
 
 model GroceryStore {
-  id            String             @id @db.VarChar(128)
-  name          String             @db.VarChar(200)
-  address       String             @db.VarChar(300)
-  placeId       String?            @unique @map("place_id") @db.VarChar(200)
-  lat           Float?
-  lng           Float?
-  phone         String?            @db.VarChar(80)
-  hours         String[]
-  logoUrl       String?            @map("logo_url") @db.VarChar(500)
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
-  ingredients   IngredientEntry[]
-  recipeLinks   RecipeIngredient[]
+  id                     String             @id @db.VarChar(128)
+  name                   String             @db.VarChar(200)
+  address                String             @db.VarChar(300)
+  placeId                String?            @unique @map("place_id") @db.VarChar(200)
+  lat                    Float?
+  lng                    Float?
+  phone                  String?            @db.VarChar(80)
+  hours                  String[]
+  logoUrl                String?            @map("logo_url") @db.VarChar(500)
+  supportsOnlineOrdering Boolean            @default(false) @map("supports_online_ordering")
+  onlineOrderingProvider String?            @map("online_ordering_provider") @db.VarChar(50)
+  onlineOrderingConfig   Json?              @map("online_ordering_config")
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+  ingredients            IngredientEntry[]
+  recipeLinks            RecipeIngredient[]
 
   @@index([name])
   @@map("grocery_stores")
@@ -48,6 +51,7 @@ model Recipe {
   mealType    String           @map("meal_type") @db.VarChar(32)
   servings    Int
   sourceUrl   String           @map("source_url") @db.VarChar(500)
+  imageUrl    String?          @map("image_url") @db.VarChar(1000)
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
   ingredients RecipeIngredient[]
@@ -89,13 +93,14 @@ model RecipeStep {
 }
 
 model MealPlanSlot {
-  day       String   @db.VarChar(16)
+  dateKey   String   @map("day") @db.VarChar(16)
   slot      String   @db.VarChar(16)
+  selection String   @default("recipe") @db.VarChar(16)
   recipeId  String?  @map("recipe_id") @db.VarChar(128)
   updatedAt DateTime @updatedAt @map("updated_at")
   recipe    Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
-  @@id([day, slot])
+  @@id([dateKey, slot])
   @@index([recipeId])
   @@map("meal_plan_slots")
 }
@@ -104,6 +109,7 @@ model MealPlanSnapshot {
   id        String                 @id @db.VarChar(128)
   createdAt DateTime               @default(now()) @map("created_at")
   label     String                 @db.VarChar(200)
+  description String               @db.VarChar(1000)
   meals     MealPlanSnapshotMeal[]
 
   @@index([createdAt(sort: Desc)])
@@ -113,10 +119,11 @@ model MealPlanSnapshot {
 model MealPlanSnapshotMeal {
   id         String           @id @default(cuid()) @db.VarChar(128)
   snapshotId String           @map("snapshot_id") @db.VarChar(128)
-  day        String           @db.VarChar(16)
+  dateKey    String           @map("day") @db.VarChar(16)
   slot       String           @db.VarChar(16)
-  recipeId   String           @map("recipe_id") @db.VarChar(128)
-  recipeName String           @map("recipe_name") @db.VarChar(200)
+  selection  String           @default("recipe") @db.VarChar(16)
+  recipeId   String?          @map("recipe_id") @db.VarChar(128)
+  recipeName String?          @map("recipe_name") @db.VarChar(200)
   storeIds   String[]         @map("store_ids")
   storeNames String[]         @map("store_names")
   snapshot   MealPlanSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade, onUpdate: Cascade)

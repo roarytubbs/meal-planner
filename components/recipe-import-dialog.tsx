@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import type { Recipe } from '@/lib/types'
+import { toast } from 'sonner'
 
 interface RecipeImportDialogProps {
   open: boolean
@@ -49,6 +50,7 @@ interface ImportResponse {
   servings?: number
   mealType?: Recipe['mealType']
   sourceUrl?: string
+  imageUrl?: string
 }
 
 export function RecipeImportDialog({
@@ -60,25 +62,8 @@ export function RecipeImportDialog({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleImport = useCallback(async () => {
-    if (!url.trim()) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      // Use the API route to scrape the recipe
-      const res = await fetch('/api/import-recipe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
-      })
-
-      if (!res.ok) {
-        throw new Error('Failed to import recipe')
-      }
-
-      const data = (await res.json()) as ImportResponse
+  const createDraftFromImport = useCallback(
+    (data: ImportResponse, fallbackSourceUrl = '') => {
       const ingredients = Array.isArray(data.ingredients) ? data.ingredients : []
       const steps = Array.isArray(data.steps)
         ? data.steps.map((step) => String(step || '').trim()).filter(Boolean)
@@ -90,87 +75,129 @@ export function RecipeImportDialog({
         description: data.description || '',
         ingredients,
         steps: steps.length > 0 ? steps : [''],
-        sourceUrl: data.sourceUrl || url.trim(),
+        sourceUrl: data.sourceUrl || fallbackSourceUrl,
+        imageUrl: data.imageUrl || '',
         mealType: normalizeMealType(data.mealType),
         servings: data.servings || 4,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
+    },
+    [onImport]
+  )
+
+  const handleUrlImport = useCallback(async () => {
+    const normalizedUrl = url.trim()
+    if (!normalizedUrl) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/import-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: normalizedUrl }),
+      })
+
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(payload.error || 'Failed to import recipe.')
+      }
+
+      const data = (await res.json()) as ImportResponse
+      createDraftFromImport(data, normalizedUrl)
       setUrl('')
       onOpenChange(false)
-    } catch {
-      // Fallback: open recipe form with URL prefilled
-      setError(
-        'Could not import recipe automatically. A draft will be created with the URL prefilled.'
-      )
+    } catch (importError) {
+      const message =
+        importError instanceof Error
+          ? importError.message
+          : 'Could not import this URL automatically.'
+      toast.warning('Import needs manual review', {
+        description: message,
+      })
       onImport({
         id: generateId(),
         name: '',
         description: '',
         ingredients: [],
         steps: [''],
-        sourceUrl: url.trim(),
+        sourceUrl: normalizedUrl,
+        imageUrl: '',
         mealType: '',
         servings: 4,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
       setUrl('')
-      setError(null)
+      setError(message)
       onOpenChange(false)
     } finally {
       setLoading(false)
     }
-  }, [url, onImport, onOpenChange])
+  }, [createDraftFromImport, onImport, onOpenChange, url])
+
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        setError(null)
+        setUrl('')
+        setLoading(false)
+      }
+      onOpenChange(nextOpen)
+    },
+    [onOpenChange]
+  )
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Import Recipe from URL</DialogTitle>
+          <DialogTitle>Import Recipe</DialogTitle>
           <DialogDescription>
-            Paste a recipe URL and we will try to extract the title, description,
-            ingredients, and steps.
+            Paste a public recipe URL and we&apos;ll parse it into a draft recipe.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="import-url">Recipe URL</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <LinkIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="import-url"
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com/recipe"
-                  className="pl-9"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleImport()
-                    }
-                  }}
-                />
-              </div>
-            </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="import-url">Recipe URL</Label>
+          <div className="relative">
+            <LinkIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="import-url"
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://example.com/recipe"
+              className="pl-9"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void handleUrlImport()
+                }
+              }}
+            />
           </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
         </div>
 
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleImport} disabled={!url.trim() || loading}>
-            {loading && <Loader2 className="size-4 animate-spin" />}
+          <Button
+            onClick={() => {
+              void handleUrlImport()
+            }}
+            disabled={!url.trim() || loading}
+          >
+            {loading ? <Loader2 className="size-4 animate-spin" /> : null}
             Import
           </Button>
         </DialogFooter>

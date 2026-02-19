@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -107,6 +116,11 @@ export function StoreDialog({
   const [placeId, setPlaceId] = useState<string | undefined>()
   const [lat, setLat] = useState<number | undefined>()
   const [lng, setLng] = useState<number | undefined>()
+  const [supportsOnlineOrdering, setSupportsOnlineOrdering] = useState(false)
+  const [onlineOrderingProvider, setOnlineOrderingProvider] = useState<'target'>(
+    'target'
+  )
+  const [targetStoreId, setTargetStoreId] = useState('')
 
   const stores = useGroceryStores()
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -123,6 +137,9 @@ export function StoreDialog({
         setPlaceId(editingStore.placeId)
         setLat(editingStore.lat)
         setLng(editingStore.lng)
+        setSupportsOnlineOrdering(editingStore.supportsOnlineOrdering ?? false)
+        setOnlineOrderingProvider(editingStore.onlineOrderingProvider ?? 'target')
+        setTargetStoreId(editingStore.onlineOrderingConfig?.targetStoreId ?? '')
         setQuery(editingStore.address ?? '')
         setResults([])
         setSelectedPlace(null)
@@ -135,6 +152,9 @@ export function StoreDialog({
         setPlaceId(undefined)
         setLat(undefined)
         setLng(undefined)
+        setSupportsOnlineOrdering(false)
+        setOnlineOrderingProvider('target')
+        setTargetStoreId('')
         setQuery('')
         setResults([])
         setSelectedPlace(null)
@@ -213,6 +233,10 @@ export function StoreDialog({
       toast.error('Store address is required')
       return
     }
+    if (supportsOnlineOrdering && onlineOrderingProvider === 'target' && !targetStoreId.trim()) {
+      toast.error('Target store ID is required when online ordering is enabled')
+      return
+    }
 
     const normalizedLogoUrl = logoUrl.trim()
     const safeLogoUrl =
@@ -246,6 +270,12 @@ export function StoreDialog({
       phone: phone.trim() || undefined,
       hours: hours.length > 0 ? hours : undefined,
       logoUrl: safeLogoUrl,
+      supportsOnlineOrdering,
+      onlineOrderingProvider: supportsOnlineOrdering ? onlineOrderingProvider : undefined,
+      onlineOrderingConfig:
+        supportsOnlineOrdering && onlineOrderingProvider === 'target'
+          ? { targetStoreId: targetStoreId.trim() }
+          : undefined,
       createdAt: editingStore?.createdAt ?? now,
       updatedAt: now,
     }
@@ -264,7 +294,22 @@ export function StoreDialog({
         error instanceof Error ? error.message : 'Unable to save store.'
       toast.error(message)
     }
-  }, [name, address, phone, hours, logoUrl, placeId, lat, lng, editingStore, onOpenChange, stores])
+  }, [
+    name,
+    address,
+    phone,
+    hours,
+    logoUrl,
+    placeId,
+    lat,
+    lng,
+    supportsOnlineOrdering,
+    onlineOrderingProvider,
+    targetStoreId,
+    editingStore,
+    onOpenChange,
+    stores,
+  ])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -403,6 +448,53 @@ export function StoreDialog({
               />
             </div>
 
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="store-online-ordering">Online ordering</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Allow Build Shopping List to create a cart session for this store.
+                  </p>
+                </div>
+                <Switch
+                  id="store-online-ordering"
+                  checked={supportsOnlineOrdering}
+                  onCheckedChange={setSupportsOnlineOrdering}
+                />
+              </div>
+
+              {supportsOnlineOrdering && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="store-order-provider">Provider</Label>
+                    <Select
+                      value={onlineOrderingProvider}
+                      onValueChange={(value) =>
+                        setOnlineOrderingProvider(value as 'target')
+                      }
+                    >
+                      <SelectTrigger id="store-order-provider">
+                        <SelectValue placeholder="Select provider" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="target">Target</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="store-target-id">Target store ID</Label>
+                    <Input
+                      id="store-target-id"
+                      value={targetStoreId}
+                      onChange={(event) => setTargetStoreId(event.target.value)}
+                      placeholder="e.g. 3342"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {hours.length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <Label>Hours</Label>
@@ -480,6 +572,13 @@ function StoreCard({
                 {store.name}
               </Link>
             </h3>
+            {store.supportsOnlineOrdering && store.onlineOrderingProvider === 'target' && (
+              <div>
+                <Badge variant="secondary" className="h-5 text-[11px]">
+                  Online ordering: Target
+                </Badge>
+              </div>
+            )}
             <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
               <MapPin className="size-3.5 shrink-0 mt-0.5" />
               <span className="line-clamp-2">{store.address}</span>
