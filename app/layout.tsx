@@ -14,8 +14,9 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Meal Planner - Plan Your Weekly Meals',
-  description: 'A meal planner app for managing recipes, ingredients, and weekly meal plans. Import recipes from URLs, edit ingredients inline, and plan your meals with ease.',
+  title: 'Meal Planner - Plan Meals by Date',
+  description:
+    'A meal planner app for managing recipes, ingredients, and date-based meal plans. Import recipes from URLs and build flexible plans by start date and day count.',
   generator: 'v0.app',
   icons: {
     icon: [

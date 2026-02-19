@@ -10,6 +10,7 @@ import { MealPlannerView } from '@/components/meal-planner-view'
 import { RecipeImportDialog } from '@/components/recipe-import-dialog'
 import { StoreManager } from '@/components/store-manager'
 import { IngredientManager } from '@/components/ingredient-manager'
+import { MealPlanHistorySection } from '@/components/meal-plan-history-section'
 import { addRecipe, updateRecipe, useStoreStatus } from '@/lib/meal-planner-store'
 import { toast } from 'sonner'
 import type { Recipe, RecipeMode } from '@/lib/types'
@@ -127,7 +128,7 @@ export default function MealPlannerPage() {
               Meal Planner
             </h1>
             <p className="text-xs text-muted-foreground">
-              Plan your weekly meals with ease
+              Plan meals by date with flexible ranges
             </p>
           </div>
         </div>
@@ -153,34 +154,37 @@ export default function MealPlannerPage() {
             onCancel={handleCancelForm}
           />
         ) : (
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="recipes">Recipes</TabsTrigger>
-              <TabsTrigger value="ingredients">Ingredients</TabsTrigger>
-              <TabsTrigger value="stores">Stores</TabsTrigger>
-              <TabsTrigger value="planner">Planner</TabsTrigger>
-            </TabsList>
+          <>
+            <MealPlanHistorySection />
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
+              <TabsList className="mb-4">
+                <TabsTrigger value="recipes">Recipes</TabsTrigger>
+                <TabsTrigger value="ingredients">Ingredients</TabsTrigger>
+                <TabsTrigger value="stores">Stores</TabsTrigger>
+                <TabsTrigger value="planner">Meal Planner</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="recipes">
-              <RecipeLibrary
-                onAddRecipe={handleAddRecipe}
-                onEditRecipe={handleEditRecipe}
-                onImportRecipe={() => setImportOpen(true)}
-              />
-            </TabsContent>
+              <TabsContent value="recipes">
+                <RecipeLibrary
+                  onAddRecipe={handleAddRecipe}
+                  onEditRecipe={handleEditRecipe}
+                  onImportRecipe={() => setImportOpen(true)}
+                />
+              </TabsContent>
 
-            <TabsContent value="ingredients">
-              <IngredientManager />
-            </TabsContent>
+              <TabsContent value="ingredients">
+                <IngredientManager />
+              </TabsContent>
 
-            <TabsContent value="stores">
-              <StoreManager />
-            </TabsContent>
+              <TabsContent value="stores">
+                <StoreManager />
+              </TabsContent>
 
-            <TabsContent value="planner">
-              <MealPlannerView />
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="planner">
+                <MealPlannerView />
+              </TabsContent>
+            </Tabs>
+          </>
         )}
       </div>
 

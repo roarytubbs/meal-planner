@@ -12,6 +12,8 @@ export interface ScrapedRecipe {
 
 const IMPORT_ERROR_TEXT_PATTERN =
   /(paramvalidationerror|could not be resolved|dns|access denied|forbidden|captcha|temporarily unavailable|request failed)/i
+const IMPORT_BLOCKED_CONTENT_PATTERN =
+  /(attention required|cloudflare|you have been blocked|cf-error-details|verify you are human|enable cookies)/i
 
 const RECIPE_HEADING_PATTERN =
   /^(?:#{1,6}\s*)?(recipe|ingredients?|instructions?|directions?|method|preparation|steps?)[:\s-]*$/i
@@ -74,6 +76,18 @@ function isLikelyErrorText(value: string): boolean {
   if (!text) return false
   if (IMPORT_ERROR_TEXT_PATTERN.test(text)) return true
   if (/^\{.+\}$/.test(text) && text.includes('"code"') && text.includes('"message"')) {
+    return true
+  }
+  return false
+}
+
+export function isLikelyBlockedImportContent(value: string): boolean {
+  const text = String(value || '')
+  if (!text.trim()) return false
+  if (IMPORT_BLOCKED_CONTENT_PATTERN.test(text)) return true
+  if (
+    /<title[^>]*>\s*attention required!\s*\|\s*cloudflare\s*<\/title>/i.test(text)
+  ) {
     return true
   }
   return false
@@ -252,6 +266,110 @@ function htmlToLines(html: string): string[] {
     .split('\n')
     .map((line) => normalizeText(line))
     .filter(Boolean)
+}
+
+function cleanMarkdownLine(value: string): string {
+  return normalizeText(
+    value
+      .replace(/!\[[^\]]*]\([^)]*\)/g, '')
+      .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/__(.*?)__/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^[-*+]\s+/, '')
+  )
+}
+
+function extractTitleFromTextLines(lines: string[]): string {
+  for (const line of lines) {
+    const match = line.match(/^title:\s*(.+)$/i)
+    if (match?.[1]) return cleanMarkdownLine(match[1])
+  }
+  for (const line of lines) {
+    const match = line.match(/^#{1,6}\s+(.+)$/)
+    if (match?.[1]) return cleanMarkdownLine(match[1])
+  }
+  for (const line of lines) {
+    const cleaned = cleanMarkdownLine(line)
+    if (!cleaned) continue
+    if (/^(url source|published time|markdown content|bbq recipes)$/i.test(cleaned)) {
+      continue
+    }
+    return cleaned
+  }
+  return ''
+}
+
+function parseRecipeFromTextContent(text: string): ScrapedRecipe {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  const title = extractTitleFromTextLines(lines)
+  const descriptionLineIndex = lines.findIndex((line) =>
+    /^#{0,6}\s*description\b/i.test(cleanMarkdownLine(line))
+  )
+
+  let description = ''
+  if (descriptionLineIndex >= 0) {
+    for (let i = descriptionLineIndex + 1; i < lines.length; i += 1) {
+      const candidate = cleanMarkdownLine(lines[i])
+      if (!candidate || /^\*+\s*$/.test(candidate)) continue
+      if (/^(cook mode|for the |ingredients?:|steps?:|instructions?:)$/i.test(candidate)) {
+        continue
+      }
+      description = candidate
+      break
+    }
+  }
+
+  const scanStart = descriptionLineIndex >= 0 ? descriptionLineIndex + 1 : 0
+  const stepStart = lines.findIndex(
+    (line, index) => index >= scanStart && /^\d+[.)]\s+/.test(line)
+  )
+
+  const ingredientLines: string[] = []
+  const ingredientScanEnd = stepStart >= 0 ? stepStart : lines.length
+  for (let i = scanStart; i < ingredientScanEnd; i += 1) {
+    const line = lines[i]
+    if (!/^[-*+]\s+/.test(line)) continue
+    const cleaned = cleanMarkdownLine(line)
+    if (!cleaned) continue
+    if (
+      /^(what malcom used|print|cook mode|bbq recipes|see all|gift ideas|shop)/i.test(
+        cleaned
+      )
+    ) {
+      continue
+    }
+    if (cleaned === '*' || cleaned === '•') continue
+    if (/^image \d+/i.test(cleaned)) continue
+    ingredientLines.push(cleaned)
+  }
+
+  const stepLines: string[] = []
+  for (const line of lines) {
+    if (!/^\d+[.)]\s+/.test(line)) continue
+    const cleaned = cleanMarkdownLine(line.replace(/^\d+[.)]\s+/, ''))
+    if (!cleaned) continue
+    stepLines.push(cleaned)
+  }
+
+  const ingredients = toIngredientRows(normalizeLines(ingredientLines)).filter(
+    (ingredient) => ingredient.name.replace(/[*•\\s-]/g, '').length > 0
+  )
+  const steps = normalizeLines(stepLines)
+  const mealType = inferMealType([title, description])
+
+  return {
+    name: title,
+    description,
+    ingredients,
+    steps,
+    servings: 4,
+    mealType,
+  }
 }
 
 function isLikelyStepLine(line: string): boolean {
@@ -468,15 +586,13 @@ export function parseRecipeFromHtml(html: string): ScrapedRecipe {
   }
 }
 
+export function parseRecipeFromText(text: string): ScrapedRecipe {
+  return parseRecipeFromTextContent(text)
+}
+
 export function hasMeaningfulRecipeData(recipe: ScrapedRecipe): boolean {
-  const safeName = recipe.name && !isLikelyErrorText(recipe.name)
-  const safeDescription = recipe.description && !isLikelyErrorText(recipe.description)
-  return Boolean(
-    safeName ||
-      safeDescription ||
-      recipe.ingredients.length > 0 ||
-      recipe.steps.length > 0
-  )
+  if (isLikelyErrorText(recipe.name) || isLikelyErrorText(recipe.description)) return false
+  return recipe.ingredients.length > 0 || recipe.steps.length > 0
 }
 
 function isPrivateHostname(hostname: string): boolean {

@@ -4,8 +4,10 @@ import {
   fetchRecipeHtml,
   fetchRecipeHtmlFallback,
   hasMeaningfulRecipeData,
+  isLikelyBlockedImportContent,
   normalizeRecipeImportUrl,
   parseRecipeFromHtml,
+  parseRecipeFromText,
 } from '@/lib/recipe-import'
 
 const importRequestSchema = z.object({
@@ -36,17 +38,30 @@ export async function POST(request: Request) {
 
     try {
       const html = await fetchRecipeHtml(normalizedUrl)
-      const parsedRecipe = parseRecipeFromHtml(html)
-      if (hasMeaningfulRecipeData(parsedRecipe)) {
-        recipe = parsedRecipe
+      if (!isLikelyBlockedImportContent(html)) {
+        const parsedRecipe = parseRecipeFromHtml(html)
+        if (hasMeaningfulRecipeData(parsedRecipe)) {
+          recipe = parsedRecipe
+        }
       }
     } catch {
       // Fallback parser below handles primary fetch failures.
     }
 
+    let fallbackHtml: string | null = null
+
     if (!recipe) {
-      const fallbackHtml = await fetchRecipeHtmlFallback(normalizedUrl)
+      fallbackHtml = await fetchRecipeHtmlFallback(normalizedUrl)
       if (fallbackHtml) {
+        const fallbackRecipeFromText = parseRecipeFromText(fallbackHtml)
+        if (hasMeaningfulRecipeData(fallbackRecipeFromText)) {
+          recipe = fallbackRecipeFromText
+        }
+      }
+    }
+
+    if (!recipe) {
+      if (fallbackHtml && !isLikelyBlockedImportContent(fallbackHtml)) {
         const fallbackRecipe = parseRecipeFromHtml(fallbackHtml)
         if (hasMeaningfulRecipeData(fallbackRecipe)) {
           recipe = fallbackRecipe

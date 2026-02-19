@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { groceryStoreSchema } from '@/lib/server/schemas'
 import { deleteStore, updateStore } from '@/lib/server/planner-service'
 import { normalizeErrorMessage } from '@/lib/server/http'
+import type { GroceryStore } from '@/lib/types'
 
 export async function PUT(
   request: Request,
@@ -10,7 +11,7 @@ export async function PUT(
   try {
     const { id } = await context.params
     const raw = await request.json()
-    const payload = groceryStoreSchema.parse(raw)
+    const payload = groceryStoreSchema.parse(raw) as GroceryStore
     const store = await updateStore(id, payload)
     return NextResponse.json(store)
   } catch (error) {

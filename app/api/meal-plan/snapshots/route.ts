@@ -7,7 +7,12 @@ export async function POST(request: Request) {
   try {
     const raw = await request.json().catch(() => ({}))
     const payload = snapshotCreateSchema.parse(raw)
-    const snapshot = await createMealPlanSnapshot(payload.label)
+    const snapshot = await createMealPlanSnapshot({
+      label: payload.label,
+      description: payload.description,
+      startDate: payload.startDate,
+      days: payload.days,
+    })
     if (!snapshot) {
       return NextResponse.json({ error: 'No meals to snapshot.' }, { status: 400 })
     }
