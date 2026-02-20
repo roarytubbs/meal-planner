@@ -29,8 +29,20 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { IngredientTable } from '@/components/ingredient-table'
 import { setMealSlot } from '@/lib/meal-planner-store'
-import type { Recipe, Ingredient, RecipeMode, MealSlot } from '@/lib/types'
-import { formatDateLabel, getModeLabel, toDateKey } from '@/lib/types'
+import type {
+  Recipe,
+  Ingredient,
+  RecipeMode,
+  MealSlot,
+  RecipeTimeWindow,
+} from '@/lib/types'
+import {
+  formatDateLabel,
+  getModeLabel,
+  getRecipeTimeWindow,
+  getRecipeTimeWindowLabel,
+  toDateKey,
+} from '@/lib/types'
 import { toast } from 'sonner'
 
 interface RecipeFormProps {
@@ -43,6 +55,8 @@ interface RecipeFormProps {
 function generateId() {
   return `recipe_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 }
+
+const TIME_WINDOW_OPTIONS: RecipeTimeWindow[] = ['under_30', '30_to_60', 'over_60']
 
 export function RecipeForm({ mode, initialRecipe, onSave, onCancel }: RecipeFormProps) {
   const [recipe, setRecipe] = useState<Recipe>(
@@ -242,6 +256,102 @@ export function RecipeForm({ mode, initialRecipe, onSave, onCancel }: RecipeForm
                       onChange={(e) =>
                         updateField('servings', parseInt(e.target.value) || 1)
                       }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="recipe-rating">Rating</Label>
+                    <Input
+                      id="recipe-rating"
+                      type="number"
+                      min={0}
+                      max={5}
+                      step={0.1}
+                      value={typeof recipe.rating === 'number' ? recipe.rating : ''}
+                      onChange={(e) => {
+                        const value = e.target.value.trim()
+                        if (!value) {
+                          updateField('rating', undefined)
+                          return
+                        }
+                        const parsed = Number(value)
+                        if (!Number.isFinite(parsed)) return
+                        updateField('rating', Math.max(0, Math.min(5, Math.round(parsed * 10) / 10)))
+                      }}
+                      placeholder="e.g., 4.5"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="recipe-time-window">Time Window</Label>
+                    <Select
+                      value={getRecipeTimeWindow(recipe.totalMinutes) || 'unset'}
+                      onValueChange={(value) => {
+                        if (value === 'unset') {
+                          updateField('totalMinutes', undefined)
+                          return
+                        }
+                        const window = value as RecipeTimeWindow
+                        const currentMinutes =
+                          typeof recipe.totalMinutes === 'number' &&
+                          Number.isFinite(recipe.totalMinutes) &&
+                          recipe.totalMinutes > 0
+                            ? Math.round(recipe.totalMinutes)
+                            : null
+                        if (
+                          (window === 'under_30' && currentMinutes && currentMinutes <= 30) ||
+                          (window === '30_to_60' &&
+                            currentMinutes &&
+                            currentMinutes >= 30 &&
+                            currentMinutes <= 60) ||
+                          (window === 'over_60' && currentMinutes && currentMinutes > 60)
+                        ) {
+                          updateField('totalMinutes', currentMinutes)
+                          return
+                        }
+                        if (window === 'under_30') updateField('totalMinutes', 25)
+                        else if (window === '30_to_60') updateField('totalMinutes', 45)
+                        else updateField('totalMinutes', 75)
+                      }}
+                    >
+                      <SelectTrigger id="recipe-time-window">
+                        <SelectValue placeholder="Select window" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unset">Not set</SelectItem>
+                        {TIME_WINDOW_OPTIONS.map((window) => (
+                          <SelectItem key={window} value={window}>
+                            {getRecipeTimeWindowLabel(window)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="total-minutes">Total Minutes</Label>
+                    <Input
+                      id="total-minutes"
+                      type="number"
+                      min={1}
+                      max={1440}
+                      step={1}
+                      value={
+                        typeof recipe.totalMinutes === 'number' ? recipe.totalMinutes : ''
+                      }
+                      onChange={(e) => {
+                        const value = e.target.value.trim()
+                        if (!value) {
+                          updateField('totalMinutes', undefined)
+                          return
+                        }
+                        const parsed = Number.parseInt(value, 10)
+                        if (!Number.isFinite(parsed) || parsed <= 0) return
+                        updateField('totalMinutes', Math.max(1, Math.min(1440, parsed)))
+                      }}
+                      placeholder="e.g., 35"
                     />
                   </div>
                 </div>

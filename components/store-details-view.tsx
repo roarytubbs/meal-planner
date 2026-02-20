@@ -7,25 +7,14 @@ import {
   ArrowLeft,
   Clock,
   MapPin,
+  MoreVertical,
   Phone,
-  Plus,
   Store,
   UtensilsCrossed,
-  X,
-  MoreVertical,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,54 +31,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import type {
-  GroceryStore,
-  IngredientEntry,
-  MealPlanSnapshot,
-  MealPlanSnapshotMeal,
-} from '@/lib/types'
-import { formatDateLabel } from '@/lib/types'
+import type { GroceryStore } from '@/lib/types'
 import {
-  addIngredientEntry,
   deleteGroceryStore,
-  updateIngredientEntry,
   useGroceryStores,
-  useIngredientEntries,
   useMealPlanSnapshots,
 } from '@/lib/meal-planner-store'
 import { StoreDialog } from '@/components/store-manager'
+import { IngredientManager } from '@/components/ingredient-manager'
 import { toast } from 'sonner'
-
-const CATEGORIES = [
-  'Produce',
-  'Dairy',
-  'Meat',
-  'Pantry',
-  'Bakery',
-  'Spices',
-  'Frozen',
-  'Beverages',
-  'Other',
-]
-
-const DAY_LABELS: Record<string, string> = {
-  monday: 'Monday',
-  tuesday: 'Tuesday',
-  wednesday: 'Wednesday',
-  thursday: 'Thursday',
-  friday: 'Friday',
-  saturday: 'Saturday',
-  sunday: 'Sunday',
-}
-
-interface RelatedSnapshot {
-  snapshot: MealPlanSnapshot
-  meals: MealPlanSnapshotMeal[]
-}
-
-function generateIngredientId() {
-  return `ie_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-}
 
 function findTodayHours(hours: string[] | undefined): string | null {
   if (!hours || hours.length === 0) return null
@@ -98,16 +48,6 @@ function findTodayHours(hours: string[] | undefined): string | null {
     .toLowerCase()
   const exact = hours.find((line) => line.trim().toLowerCase().startsWith(`${today}:`))
   return exact ?? hours[0] ?? null
-}
-
-function formatSnapshotMeal(meal: MealPlanSnapshotMeal): string {
-  const day =
-    DAY_LABELS[meal.day as keyof typeof DAY_LABELS] ??
-    formatDateLabel(meal.day, { weekday: 'short', month: 'short', day: 'numeric' })
-  if (meal.selection !== 'recipe') {
-    return `${day} · ${meal.slot} · ${meal.selection.replace('_', ' ')}`
-  }
-  return `${day} · ${meal.slot} · ${meal.recipeName || 'Recipe removed'}`
 }
 
 function getStoreLogoSrc(store: GroceryStore): string | undefined {
@@ -211,12 +151,8 @@ function StoreIdentity({ store }: { store: GroceryStore }) {
 export function StoreDetailsView({ storeId }: { storeId: string }) {
   const router = useRouter()
   const stores = useGroceryStores()
-  const ingredientEntries = useIngredientEntries()
   const snapshots = useMealPlanSnapshots()
 
-  const [name, setName] = useState('')
-  const [defaultUnit, setDefaultUnit] = useState('')
-  const [category, setCategory] = useState('Pantry')
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -225,70 +161,25 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
     [stores, storeId]
   )
 
-  const defaultIngredients = useMemo(
-    () =>
-      ingredientEntries
-        .filter((entry) => entry.defaultStoreId === storeId)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [ingredientEntries, storeId]
-  )
-
-  const relatedSnapshots = useMemo<RelatedSnapshot[]>(() => {
+  const relatedSnapshots = useMemo(() => {
     if (!store) return []
+
     const normalizedName = store.name.trim().toLowerCase()
+
     return snapshots
-      .map((snapshot) => {
-        const meals = snapshot.meals.filter((meal) => {
+      .filter((snapshot) =>
+        snapshot.meals.some((meal) => {
           if (meal.storeIds.includes(store.id)) return true
           return meal.storeNames.some(
             (storeName) => storeName.trim().toLowerCase() === normalizedName
           )
         })
-        if (meals.length === 0) return null
-        return { snapshot, meals }
-      })
-      .filter((value): value is RelatedSnapshot => value !== null)
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
   }, [snapshots, store])
-
-  const handleAddIngredient = async () => {
-    if (!store || !name.trim()) return
-    const now = new Date().toISOString()
-    const entry: IngredientEntry = {
-      id: generateIngredientId(),
-      name: name.trim().toLowerCase(),
-      defaultUnit: defaultUnit.trim(),
-      defaultStoreId: store.id,
-      category,
-      createdAt: now,
-      updatedAt: now,
-    }
-    try {
-      await addIngredientEntry(entry)
-      setName('')
-      setDefaultUnit('')
-      setCategory('Pantry')
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to add ingredient.'
-      toast.error(message)
-    }
-  }
-
-  const handleRemoveIngredientFromStore = async (entry: IngredientEntry) => {
-    try {
-      await updateIngredientEntry({
-        ...entry,
-        defaultStoreId: '',
-        updatedAt: new Date().toISOString(),
-      })
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Unable to unassign ingredient from store.'
-      toast.error(message)
-    }
-  }
 
   const handleDeleteStore = async () => {
     if (!store) return
@@ -297,8 +188,7 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
       toast.success('Store removed', { description: store.name })
       router.push('/?tab=stores')
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to delete store.'
+      const message = error instanceof Error ? error.message : 'Unable to delete store.'
       toast.error(message)
     }
   }
@@ -312,9 +202,7 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
               <UtensilsCrossed className="size-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight text-foreground">
-                Meal Planner
-              </h1>
+              <h1 className="text-lg font-bold leading-tight text-foreground">Meal Planner</h1>
               <p className="text-xs text-muted-foreground">Stores</p>
             </div>
           </div>
@@ -344,13 +232,12 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
             <UtensilsCrossed className="size-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight text-foreground">
-              Meal Planner
-            </h1>
+            <h1 className="text-lg font-bold leading-tight text-foreground">Meal Planner</h1>
             <p className="text-xs text-muted-foreground">Stores</p>
           </div>
         </div>
       </header>
+
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <Button asChild variant="ghost">
@@ -366,9 +253,7 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => setEditDialogOpen(true)}>
-                Edit
-              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setEditDialogOpen(true)}>Edit</DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onSelect={() => setDeleteOpen(true)}
@@ -381,143 +266,57 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
 
         <StoreIdentity store={store} />
 
-        <Card>
-          <CardContent className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Default Ingredients
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Ingredients assigned to this store by default.
-                </p>
-              </div>
-              <Badge variant="secondary">{defaultIngredients.length}</Badge>
-            </div>
-
-            <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 md:grid-cols-[2fr_1fr_1fr_auto]">
-              <div className="space-y-1">
-                <Label htmlFor="store-ing-name">Name</Label>
-                <Input
-                  id="store-ing-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="e.g. baby spinach"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="store-ing-unit">Default unit</Label>
-                <Input
-                  id="store-ing-unit"
-                  value={defaultUnit}
-                  onChange={(event) => setDefaultUnit(event.target.value)}
-                  placeholder="optional"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="store-ing-category">Category</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger id="store-ing-category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-end">
-                <Button onClick={handleAddIngredient} disabled={!name.trim()}>
-                  <Plus className="size-4" />
-                  Add
-                </Button>
-              </div>
-            </div>
-
-            {defaultIngredients.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No ingredients are currently assigned to this store.
-              </p>
-            ) : (
-              <div className="divide-y divide-border rounded-lg border border-border">
-                {defaultIngredients.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center gap-3 px-3 py-2.5"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {entry.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.category}
-                        {entry.defaultUnit ? ` · ${entry.defaultUnit}` : ''}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleRemoveIngredientFromStore(entry)}
-                    >
-                      <X className="size-4" />
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <IngredientManager
+          title="Ingredients"
+          subtitle={null}
+          showIcon={false}
+          initialFilterStoreId={store.id}
+        />
 
         <Card>
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Previous Meal Plans
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Meals from saved snapshots that reference this store.
-                </p>
-              </div>
+              <h2 className="text-lg font-semibold text-foreground">Previous Meal Plans</h2>
               <Badge variant="secondary">{relatedSnapshots.length}</Badge>
             </div>
 
             {relatedSnapshots.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No saved snapshots reference this store yet.
+                No previous meal plans reference this store.
               </p>
             ) : (
-              <div className="space-y-3">
-                {relatedSnapshots.map(({ snapshot, meals }) => (
-                  <div
-                    key={snapshot.id}
-                    className="rounded-lg border border-border p-3 space-y-2"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-foreground">
-                        {snapshot.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(snapshot.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    {snapshot.description.trim().length > 0 && (
-                      <p className="text-xs text-muted-foreground">{snapshot.description}</p>
-                    )}
-                    <div className="space-y-1">
-                      {meals.map((meal) => (
-                        <p key={`${snapshot.id}-${meal.day}-${meal.slot}-${meal.recipeId}`} className="text-xs text-muted-foreground">
-                          {formatSnapshotMeal(meal)}
-                        </p>
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Plan Name</th>
+                        <th className="px-3 py-2 text-left font-medium">Description</th>
+                        <th className="px-3 py-2 text-left font-medium">Meals</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {relatedSnapshots.map((snapshot) => (
+                        <tr key={snapshot.id} className="hover:bg-muted/20">
+                          <td className="px-3 py-2.5 align-middle">
+                            <Link
+                              href={`/plans/${encodeURIComponent(snapshot.id)}`}
+                              className="font-medium text-foreground hover:underline underline-offset-2"
+                            >
+                              {snapshot.label}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-muted-foreground">
+                            {snapshot.description.trim() || '—'}
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-muted-foreground">
+                            {snapshot.meals.length}
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  </div>
-                ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </CardContent>
@@ -540,9 +339,7 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteStore}>
-                Delete
-              </AlertDialogAction>
+              <AlertDialogAction onClick={handleDeleteStore}>Delete</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

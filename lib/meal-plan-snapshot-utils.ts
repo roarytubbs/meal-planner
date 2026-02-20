@@ -2,6 +2,7 @@ import {
   DAY_OF_WEEK_VALUES,
   MEAL_SLOT_VALUES,
   addDays,
+  buildDateRange,
   parseDateKey,
   toDateKey,
   type DayOfWeek,
@@ -131,4 +132,50 @@ export function snapshotToSlotUpdates(
   }
 
   return { slots, skippedMeals }
+}
+
+export function remapSnapshotToDateRange(
+  snapshot: MealPlanSnapshot,
+  validRecipeIds: Set<string>,
+  startDate: string,
+  days: number
+): SnapshotToSlotsResult {
+  const targetDateKeys = buildDateRange(startDate, days)
+  if (targetDateKeys.length === 0) {
+    return { slots: [], skippedMeals: snapshot.meals.length }
+  }
+
+  const sourceDateKeys = Array.from(
+    new Set(
+      snapshot.meals
+        .map((meal) => meal.day)
+        .filter((day) => Boolean(parseDateKey(day)))
+        .sort((a, b) => a.localeCompare(b))
+    )
+  )
+
+  const sourceToTarget = new Map<string, string>()
+  const pairedDays = Math.min(sourceDateKeys.length, targetDateKeys.length)
+  for (let index = 0; index < pairedDays; index += 1) {
+    sourceToTarget.set(sourceDateKeys[index], targetDateKeys[index])
+  }
+
+  const remappedSnapshot: MealPlanSnapshot = {
+    ...snapshot,
+    meals: snapshot.meals.map((meal) => ({
+      ...meal,
+      day: sourceToTarget.get(meal.day) ?? meal.day,
+    })),
+  }
+  const fallbackAnchor = parseDateKey(targetDateKeys[0]) ?? new Date()
+  const fallbackMap = getCurrentWeekDateKeyByDay(fallbackAnchor)
+  const mapped = snapshotToSlotUpdates(remappedSnapshot, validRecipeIds, fallbackMap)
+  const targetDateSet = new Set(targetDateKeys)
+  const filteredSlots = mapped.slots.filter((slot) => targetDateSet.has(slot.dateKey))
+  const skippedOutsideRange = mapped.slots.length - filteredSlots.length
+
+  return {
+    slots: filteredSlots,
+    skippedMeals: mapped.skippedMeals + skippedOutsideRange,
+  }
 }

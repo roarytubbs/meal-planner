@@ -1,15 +1,36 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo } from 'react'
-import { ArrowLeft, CalendarDays, ClipboardList } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { CalendarDays, CheckCircle2, ClipboardList, Copy, MoreHorizontal, Pencil } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
 } from '@/components/ui/card'
-import { useMealPlanSnapshots, useStoreStatus } from '@/lib/meal-planner-store'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
+import {
+  activateMealPlanSnapshot,
+  duplicateMealPlanSnapshot,
+  useMealPlanSnapshots,
+  useStoreStatus,
+} from '@/lib/meal-planner-store'
 import {
   formatDateLabel,
   parseDateKey,
@@ -73,8 +94,10 @@ function formatSnapshotRange(meals: MealPlanSnapshotMeal[]): string {
 }
 
 export function MealPlanSnapshotView({ snapshotId }: { snapshotId: string }) {
+  const router = useRouter()
   const { loading, error } = useStoreStatus()
   const snapshots = useMealPlanSnapshots()
+  const [pendingAction, setPendingAction] = useState<'copy' | 'current' | null>(null)
 
   const snapshot = useMemo(
     () => snapshots.find((candidate) => candidate.id === snapshotId),
@@ -103,6 +126,44 @@ export function MealPlanSnapshotView({ snapshotId }: { snapshotId: string }) {
           ),
       }))
   }, [snapshot])
+  const editInPlannerHref = useMemo(
+    () => `/plans/${encodeURIComponent(snapshotId)}/edit`,
+    [snapshotId]
+  )
+  const handleSetCurrent = useCallback(async () => {
+    if (!snapshot || snapshot.isActive) return
+    setPendingAction('current')
+    try {
+      await activateMealPlanSnapshot(snapshot.id)
+      toast.success('Current plan updated', { description: snapshot.label })
+    } catch (actionError) {
+      const message =
+        actionError instanceof Error ? actionError.message : 'Unable to set current plan.'
+      toast.error(message)
+    } finally {
+      setPendingAction(null)
+    }
+  }, [snapshot])
+
+  const handleCopy = useCallback(async () => {
+    if (!snapshot) return
+    setPendingAction('copy')
+    try {
+      const copied = await duplicateMealPlanSnapshot(snapshot.id, {
+        label: `${snapshot.label} (Copy)`,
+        description: snapshot.description,
+        markActive: false,
+      })
+      toast.success('Plan copied', { description: copied.label })
+      router.push(`/plans/${encodeURIComponent(copied.id)}`)
+    } catch (actionError) {
+      const message =
+        actionError instanceof Error ? actionError.message : 'Unable to copy plan.'
+      toast.error(message)
+    } finally {
+      setPendingAction(null)
+    }
+  }, [router, snapshot])
 
   if (error) {
     return (
@@ -124,27 +185,48 @@ export function MealPlanSnapshotView({ snapshotId }: { snapshotId: string }) {
 
   if (!snapshot) {
     return (
-      <Card>
-        <CardContent className="flex flex-col gap-3 pt-6">
-          <p className="text-sm font-medium text-foreground">Plan not found</p>
-          <p className="text-xs text-muted-foreground">
-            The requested plan may have been deleted.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/plans">Back to Saved Plans</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/?tab=planner">Open Planner</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/plans">Meal Plans</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Plan</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <Card>
+          <CardContent className="flex flex-col gap-3 pt-6">
+            <p className="text-sm font-medium text-foreground">Plan not found</p>
+            <p className="text-xs text-muted-foreground">
+              The requested plan may have been deleted.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   return (
     <div className="space-y-4">
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/plans">Meal Plans</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{snapshot.label}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       <section className="rounded-xl border border-border/60 bg-card/35 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
@@ -153,17 +235,50 @@ export function MealPlanSnapshotView({ snapshotId }: { snapshotId: string }) {
               {snapshot.description.trim() || 'No description provided.'}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/plans">
-                <ArrowLeft className="size-3.5" />
-                Back to Plans
-              </Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/?tab=planner">Open Planner</Link>
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                disabled={pendingAction !== null}
+                aria-label="Plan actions"
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem asChild>
+                <Link href={editInPlannerHref}>
+                  <Pencil className="size-4" />
+                  Edit
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={pendingAction !== null}
+                onSelect={(event) => {
+                  event.preventDefault()
+                  void handleCopy()
+                }}
+              >
+                <Copy className="size-4" />
+                Copy
+              </DropdownMenuItem>
+              {!snapshot.isActive ? (
+                <DropdownMenuItem
+                  disabled={pendingAction !== null}
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    void handleSetCurrent()
+                  }}
+                >
+                  <CheckCircle2 className="size-4" />
+                  Set Current
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -175,6 +290,11 @@ export function MealPlanSnapshotView({ snapshotId }: { snapshotId: string }) {
           <Badge variant="secondary" className="text-xs">
             {snapshot.meals.length} meal{snapshot.meals.length === 1 ? '' : 's'}
           </Badge>
+          {snapshot.isActive ? (
+            <Badge variant="default" className="text-xs">
+              Current
+            </Badge>
+          ) : null}
         </div>
       </section>
 

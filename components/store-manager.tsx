@@ -12,7 +12,6 @@ import {
   Loader2,
   Store,
   X,
-  MoreVertical,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,16 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -44,19 +33,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import type { GroceryStore } from '@/lib/types'
 import {
   useGroceryStores,
   addGroceryStore,
   updateGroceryStore,
-  deleteGroceryStore,
 } from '@/lib/meal-planner-store'
 
 function generateId() {
@@ -538,12 +520,9 @@ export function StoreDialog({
 // ---- Store Card ----
 function StoreCard({
   store,
-  onDelete,
 }: {
   store: GroceryStore
-  onDelete: (id: string) => Promise<void> | void
 }) {
-  const [deleteOpen, setDeleteOpen] = useState(false)
   const [expandedHours, setExpandedHours] = useState(false)
   const todayHours = findTodayHours(store.hours)
   const allHours = store.hours ?? []
@@ -627,48 +606,6 @@ function StoreCard({
             )}
           </div>
 
-          {/* Actions */}
-          <div className="shrink-0">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  aria-label={`Open actions for ${store.name}`}
-                >
-                  <MoreVertical className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onSelect={() => setDeleteOpen(true)}
-                >
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete {store.name}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will remove the store from your list. Existing recipe
-                  ingredients referencing this store will keep their store name
-                  but lose the link.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(store.id)}>
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </CardContent>
     </Card>
@@ -693,21 +630,6 @@ export function StoreManager() {
       }
     },
     [router]
-  )
-
-  const handleDelete = useCallback(
-    async (id: string) => {
-      const store = stores.find((s) => s.id === id)
-      try {
-        await deleteGroceryStore(id)
-        toast.success('Store removed', { description: store?.name })
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unable to delete store.'
-        toast.error(message)
-      }
-    },
-    [stores]
   )
 
   const filtered = search.trim()
@@ -781,7 +703,6 @@ export function StoreManager() {
             <StoreCard
               key={store.id}
               store={store}
-              onDelete={handleDelete}
             />
           ))}
         </div>

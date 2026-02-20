@@ -41,6 +41,7 @@ interface StoreStatus {
   loading: boolean
   hydrated: boolean
   error: string | null
+  shoppingCartProviderConfigured: boolean
 }
 
 type Listener = () => void
@@ -63,6 +64,7 @@ let status: StoreStatus = {
   loading: true,
   hydrated: false,
   error: null,
+  shoppingCartProviderConfigured: false,
 }
 
 let hydratePromise: Promise<void> | null = null
@@ -350,6 +352,16 @@ function normalizeRecipe(value: unknown): Recipe | null {
 
   const servingsRaw = Number(source.servings)
   const servings = Number.isFinite(servingsRaw) && servingsRaw > 0 ? Math.round(servingsRaw) : 1
+  const ratingRaw = Number(source.rating)
+  const rating =
+    Number.isFinite(ratingRaw) && ratingRaw >= 0 && ratingRaw <= 5
+      ? Math.round(ratingRaw * 10) / 10
+      : undefined
+  const totalMinutesRaw = Number(source.totalMinutes)
+  const totalMinutes =
+    Number.isFinite(totalMinutesRaw) && totalMinutesRaw > 0
+      ? Math.round(totalMinutesRaw)
+      : undefined
   const createdAt =
     typeof source.createdAt === 'string' && source.createdAt ? source.createdAt : new Date().toISOString()
   const updatedAt =
@@ -402,6 +414,8 @@ function normalizeRecipe(value: unknown): Recipe | null {
     description: String(source.description || '').trim(),
     mealType: normalizedMealType,
     servings,
+    rating,
+    totalMinutes,
     ingredients,
     steps,
     sourceUrl: String(source.sourceUrl || '').trim(),
@@ -823,13 +837,23 @@ async function bootstrapFromBackend(): Promise<void> {
   }
 
   store = normalizeBootstrapPayload(bootstrap)
-  status = { loading: false, hydrated: true, error: null }
+  status = {
+    loading: false,
+    hydrated: true,
+    error: null,
+    shoppingCartProviderConfigured: bootstrap.meta.shoppingCartProviderConfigured === true,
+  }
   emitChange()
 }
 
 async function hydrateStore(): Promise<void> {
   if (typeof window === 'undefined') {
-    status = { loading: false, hydrated: true, error: null }
+    status = {
+      loading: false,
+      hydrated: true,
+      error: null,
+      shoppingCartProviderConfigured: false,
+    }
     return
   }
   if (!hydratePromise) {
@@ -838,6 +862,7 @@ async function hydrateStore(): Promise<void> {
         loading: false,
         hydrated: true,
         error: normalizeErrorMessage(error),
+        shoppingCartProviderConfigured: false,
       }
       emitChange()
       throw error
@@ -975,6 +1000,7 @@ export async function saveMealPlanSnapshot(input?: {
   description?: string
   startDate?: string
   days?: number
+  markActive?: boolean
 }): Promise<MealPlanSnapshot | null> {
   await hydrateStore()
   try {
@@ -985,6 +1011,7 @@ export async function saveMealPlanSnapshot(input?: {
         description: input?.description,
         startDate: input?.startDate,
         days: input?.days,
+        markActive: input?.markActive,
       }),
     })
     applySnapshotToStore(snapshot)
@@ -1005,6 +1032,56 @@ export async function activateMealPlanSnapshot(id: string): Promise<MealPlanSnap
     {
       method: 'PATCH',
       body: JSON.stringify({ action: 'activate' }),
+    }
+  )
+  applySnapshotToStore(snapshot)
+  return snapshot
+}
+
+export async function updateMealPlanSnapshot(
+  id: string,
+  input?: {
+    label?: string
+    description?: string
+    markActive?: boolean
+  }
+): Promise<MealPlanSnapshot> {
+  await hydrateStore()
+  const snapshot = await requestJson<MealPlanSnapshot>(
+    `/api/meal-plan/snapshots/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        action: 'update',
+        label: input?.label,
+        description: input?.description,
+        markActive: input?.markActive,
+      }),
+    }
+  )
+  applySnapshotToStore(snapshot)
+  return snapshot
+}
+
+export async function duplicateMealPlanSnapshot(
+  id: string,
+  input?: {
+    label?: string
+    description?: string
+    markActive?: boolean
+  }
+): Promise<MealPlanSnapshot> {
+  await hydrateStore()
+  const snapshot = await requestJson<MealPlanSnapshot>(
+    `/api/meal-plan/snapshots/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        action: 'duplicate',
+        label: input?.label,
+        description: input?.description,
+        markActive: input?.markActive,
+      }),
     }
   )
   applySnapshotToStore(snapshot)

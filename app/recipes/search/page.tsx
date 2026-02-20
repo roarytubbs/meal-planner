@@ -78,6 +78,8 @@ interface ImportedRecipeDetails {
   ingredients: Ingredient[]
   steps: string[]
   servings: number
+  rating?: number
+  totalMinutes?: number
   mealType: Recipe['mealType']
   sourceUrl: string
   imageUrl: string
@@ -450,6 +452,26 @@ function RecipeSearchContent() {
           description: details.description || result.summary || '',
           mealType: details.mealType || result.mealType || '',
           servings: details.servings || result.servings || 4,
+          rating:
+            typeof details.rating === 'number' && Number.isFinite(details.rating)
+              ? Math.max(0, Math.min(5, Math.round(details.rating * 10) / 10))
+              : typeof result.spoonacularScore === 'number' &&
+                  Number.isFinite(result.spoonacularScore)
+                ? Math.max(
+                    0,
+                    Math.min(5, Math.round((result.spoonacularScore / 20) * 10) / 10)
+                  )
+                : undefined,
+          totalMinutes:
+            typeof details.totalMinutes === 'number' &&
+            Number.isFinite(details.totalMinutes) &&
+            details.totalMinutes > 0
+              ? Math.round(details.totalMinutes)
+              : typeof result.readyInMinutes === 'number' &&
+                  Number.isFinite(result.readyInMinutes) &&
+                  result.readyInMinutes > 0
+                ? Math.round(result.readyInMinutes)
+                : undefined,
           ingredients: Array.isArray(details.ingredients) ? details.ingredients : [],
           steps:
             Array.isArray(details.steps) && details.steps.length > 0

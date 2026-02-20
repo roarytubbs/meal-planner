@@ -53,6 +53,8 @@ export interface SpoonacularRecipeImport {
   ingredients: Ingredient[]
   steps: string[]
   servings: number
+  rating?: number
+  totalMinutes?: number
   mealType: Recipe['mealType']
   sourceUrl: string
   imageUrl: string
@@ -151,6 +153,19 @@ function toBoundedQty(value: unknown): number | null {
 function toNullableNumber(value: unknown): number | null {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function toBoundedMinutes(value: unknown): number | undefined {
+  const minutes = Number(value)
+  if (!Number.isFinite(minutes) || minutes <= 0) return undefined
+  return Math.max(1, Math.min(1440, Math.round(minutes)))
+}
+
+function toRecipeRating(value: unknown): number | undefined {
+  const score = Number(value)
+  if (!Number.isFinite(score)) return undefined
+  const normalized = Math.max(0, Math.min(5, score / 20))
+  return Math.round(normalized * 10) / 10
 }
 
 function toStringArray(value: unknown): string[] {
@@ -336,6 +351,8 @@ function parseRecipeDetails(payload: unknown): SpoonacularRecipeImport {
   const ingredients = toIngredients(source, recipeId)
   const steps = toInstructions(source)
   const servings = toBoundedServings(source.servings)
+  const rating = toRecipeRating(source.spoonacularScore)
+  const totalMinutes = toBoundedMinutes(source.readyInMinutes)
   const mealType = toMealTypeFromPayload(source)
   const sourceUrl = normalizeSourceUrl(source)
   const imageUrl = normalizeImageUrl(source.image)
@@ -346,6 +363,8 @@ function parseRecipeDetails(payload: unknown): SpoonacularRecipeImport {
     ingredients,
     steps,
     servings,
+    rating,
+    totalMinutes,
     mealType,
     sourceUrl,
     imageUrl,

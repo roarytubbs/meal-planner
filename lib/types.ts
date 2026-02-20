@@ -32,6 +32,7 @@ export const MEAL_SELECTION_VALUES = [
 ] as const
 
 export const ONLINE_ORDER_PROVIDER_VALUES = ['target'] as const
+export const RECIPE_TIME_WINDOW_VALUES = ['under_30', '30_to_60', 'over_60'] as const
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
@@ -42,6 +43,7 @@ export type MealType = (typeof MEAL_TYPE_VALUES)[number]
 export type MealSelection = (typeof MEAL_SELECTION_VALUES)[number]
 export type RecipeMealType = MealType | ''
 export type OnlineOrderProvider = (typeof ONLINE_ORDER_PROVIDER_VALUES)[number]
+export type RecipeTimeWindow = (typeof RECIPE_TIME_WINDOW_VALUES)[number]
 
 export interface OnlineOrderingConfig {
   targetStoreId: string
@@ -89,6 +91,8 @@ export interface Recipe {
   description: string
   mealType: RecipeMealType
   servings: number
+  rating?: number
+  totalMinutes?: number
   ingredients: Ingredient[]
   steps: string[]
   sourceUrl: string
@@ -129,6 +133,7 @@ export interface MealPlanSnapshot {
 
 export interface PlannerBootstrapMeta {
   isEmpty: boolean
+  shoppingCartProviderConfigured: boolean
   counts: {
     recipes: number
     stores: number
@@ -228,4 +233,19 @@ export function formatDateLabel(dateKey: string, options?: Intl.DateTimeFormatOp
     day: 'numeric',
     ...(options || {}),
   }).format(parsed)
+}
+
+export function getRecipeTimeWindow(totalMinutes?: number): RecipeTimeWindow | null {
+  if (typeof totalMinutes !== 'number' || !Number.isFinite(totalMinutes) || totalMinutes <= 0) {
+    return null
+  }
+  if (totalMinutes <= 30) return 'under_30'
+  if (totalMinutes <= 60) return '30_to_60'
+  return 'over_60'
+}
+
+export function getRecipeTimeWindowLabel(value: RecipeTimeWindow): string {
+  if (value === 'under_30') return 'Under 30 min'
+  if (value === '30_to_60') return '30 to 60 min'
+  return 'Over 60 min'
 }

@@ -1,14 +1,28 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { CalendarRange, CheckCircle2, Loader2, Trash2 } from 'lucide-react'
+import {
+  CheckCircle2,
+  Eye,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { AppHeader } from '@/components/app-header'
 import { Toaster } from '@/components/ui/sonner'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,24 +36,10 @@ import {
 import {
   activateMealPlanSnapshot,
   deleteMealPlanSnapshot,
-  replaceMealPlanSlots,
   useMealPlanSnapshots,
-  useRecipes,
+  useStoreStatus,
 } from '@/lib/meal-planner-store'
-import { formatDateLabel, type MealPlanSnapshot } from '@/lib/types'
-import {
-  getSnapshotDateRange,
-  partitionSnapshotsByRecency,
-  snapshotToSlotUpdates,
-} from '@/lib/meal-plan-snapshot-utils'
-
-function formatSnapshotRange(snapshot: MealPlanSnapshot): string {
-  const range = getSnapshotDateRange(snapshot)
-  if (!range) return 'Unknown date range'
-  const start = formatDateLabel(range.startDateKey, { month: 'short', day: 'numeric' })
-  const end = formatDateLabel(range.endDateKey, { month: 'short', day: 'numeric' })
-  return `${start} - ${end}`
-}
+import type { MealPlanSnapshot } from '@/lib/types'
 
 function formatCreatedAt(value: string): string {
   const parsed = new Date(value)
@@ -51,110 +51,13 @@ function formatCreatedAt(value: string): string {
   }).format(parsed)
 }
 
-interface SnapshotSectionProps {
-  title: string
-  snapshots: MealPlanSnapshot[]
-  pendingAction: string | null
-  onLoad: (snapshot: MealPlanSnapshot) => Promise<void>
-  onActivate: (snapshot: MealPlanSnapshot) => Promise<void>
-  onDelete: (snapshot: MealPlanSnapshot) => void
-}
-
-function SnapshotSection({
-  title,
-  snapshots,
-  pendingAction,
-  onLoad,
-  onActivate,
-  onDelete,
-}: SnapshotSectionProps) {
-  if (snapshots.length === 0) return null
-
-  return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h2>
-      <div className="grid gap-3">
-        {snapshots.map((snapshot) => {
-          const loadingLoad = pendingAction === `load-${snapshot.id}`
-          const loadingActivate = pendingAction === `activate-${snapshot.id}`
-          const loadingDelete = pendingAction === `delete-${snapshot.id}`
-
-          return (
-            <Card key={snapshot.id} className="py-4">
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-base font-semibold text-foreground">{snapshot.label}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {snapshot.description.trim() || 'No description'}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <CalendarRange className="size-3.5" />
-                        {formatSnapshotRange(snapshot)}
-                      </span>
-                      <span>Saved {formatCreatedAt(snapshot.createdAt)}</span>
-                      <span>{snapshot.meals.length} meals</span>
-                    </div>
-                  </div>
-                  {snapshot.isActive ? (
-                    <Badge variant="secondary" className="h-6">
-                      <CheckCircle2 className="size-3.5" />
-                      Active
-                    </Badge>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void onLoad(snapshot)}
-                    disabled={pendingAction !== null}
-                  >
-                    {loadingLoad ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                    Load Into Draft
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void onActivate(snapshot)}
-                    disabled={pendingAction !== null || snapshot.isActive}
-                  >
-                    {loadingActivate ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                    {snapshot.isActive ? 'Active' : 'Set Active'}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onDelete(snapshot)}
-                    disabled={pendingAction !== null}
-                  >
-                    {loadingDelete ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                    <Trash2 className="size-3.5" />
-                    Delete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-export default function SavedPlansPage() {
-  const router = useRouter()
-  const recipes = useRecipes()
+export default function MealPlansPage() {
+  const { loading, error } = useStoreStatus()
   const snapshots = useMealPlanSnapshots()
+
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<MealPlanSnapshot | null>(null)
 
-  const recipeIdSet = useMemo(() => new Set(recipes.map((recipe) => recipe.id)), [recipes])
   const sortedSnapshots = useMemo(
     () =>
       [...snapshots].sort(
@@ -162,47 +65,17 @@ export default function SavedPlansPage() {
       ),
     [snapshots]
   )
-  const { current: currentSnapshots, previous: previousSnapshots } = useMemo(
-    () => partitionSnapshotsByRecency(sortedSnapshots),
-    [sortedSnapshots]
-  )
-
-  const handleLoad = useCallback(
-    async (snapshot: MealPlanSnapshot) => {
-      setPendingAction(`load-${snapshot.id}`)
-      try {
-        const { slots, skippedMeals } = snapshotToSlotUpdates(snapshot, recipeIdSet)
-        if (slots.length === 0) {
-          toast.error('No valid meals available to load from this plan.')
-          return
-        }
-        await replaceMealPlanSlots(slots)
-        await activateMealPlanSnapshot(snapshot.id)
-        toast.success('Meal plan loaded', {
-          description:
-            skippedMeals > 0
-              ? `${snapshot.label} loaded with ${skippedMeals} skipped meal${skippedMeals === 1 ? '' : 's'}.`
-              : snapshot.label,
-        })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to load meal plan.'
-        toast.error(message)
-      } finally {
-        setPendingAction(null)
-      }
-    },
-    [recipeIdSet]
-  )
-
   const handleActivate = useCallback(async (snapshot: MealPlanSnapshot) => {
-    if (snapshot.isActive) return
-    setPendingAction(`activate-${snapshot.id}`)
+    const actionKey = `activate-${snapshot.id}`
+    setPendingAction(actionKey)
     try {
       await activateMealPlanSnapshot(snapshot.id)
-      toast.success('Active plan updated', { description: snapshot.label })
-    } catch (error) {
+      toast.success('Current plan updated', { description: snapshot.label })
+    } catch (activateError) {
       const message =
-        error instanceof Error ? error.message : 'Unable to set active plan.'
+        activateError instanceof Error
+          ? activateError.message
+          : 'Unable to set current meal plan.'
       toast.error(message)
     } finally {
       setPendingAction(null)
@@ -211,14 +84,16 @@ export default function SavedPlansPage() {
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return
-    setPendingAction(`delete-${deleteTarget.id}`)
+
+    const actionKey = `delete-${deleteTarget.id}`
+    setPendingAction(actionKey)
     try {
       await deleteMealPlanSnapshot(deleteTarget.id)
       toast.success('Meal plan deleted', { description: deleteTarget.label })
       setDeleteTarget(null)
-    } catch (error) {
+    } catch (deleteError) {
       const message =
-        error instanceof Error ? error.message : 'Unable to delete meal plan.'
+        deleteError instanceof Error ? deleteError.message : 'Unable to delete meal plan.'
       toast.error(message)
     } finally {
       setPendingAction(null)
@@ -228,47 +103,141 @@ export default function SavedPlansPage() {
   return (
     <main className="min-h-screen bg-background">
       <AppHeader activeTab="planner" />
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6">
+
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-7 sm:py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Saved Plans</h1>
+            <h1 className="text-xl font-semibold text-foreground">Meal Plans</h1>
             <p className="text-sm text-muted-foreground">
-              Browse, load, activate, and manage your saved meal plans.
+              Browse saved plans, set the current one, and open a plan in planner mode.
             </p>
           </div>
-          <Button type="button" variant="outline" onClick={() => router.push('/?tab=planner')}>
-            Open Meal Planner
-          </Button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild type="button" variant="outline">
+              <Link href="/?tab=planner">
+                <Plus className="size-4" />
+                New Plan
+              </Link>
+            </Button>
+          </div>
         </div>
 
-        {sortedSnapshots.length === 0 ? (
-          <Card className="py-10">
-            <CardHeader className="text-center">
-              <CardTitle className="text-base">No Saved Plans Yet</CardTitle>
+        {error ? (
+          <Card className="border-destructive/40">
+            <CardContent className="pt-6 text-sm text-destructive">{error}</CardContent>
+          </Card>
+        ) : null}
+
+        {loading && sortedSnapshots.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6 text-sm text-muted-foreground">
+              Loading meal plans...
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {!loading && sortedSnapshots.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">No meal plans yet</CardTitle>
               <CardDescription>
-                Save a plan from Meal Planner to manage it here.
+                Save a plan from the planner to start managing plan history.
               </CardDescription>
             </CardHeader>
           </Card>
         ) : (
-          <div className="space-y-6">
-            <SnapshotSection
-              title="Current / Upcoming"
-              snapshots={currentSnapshots}
-              pendingAction={pendingAction}
-              onLoad={handleLoad}
-              onActivate={handleActivate}
-              onDelete={setDeleteTarget}
-            />
-            <SnapshotSection
-              title="Previous"
-              snapshots={previousSnapshots}
-              pendingAction={pendingAction}
-              onLoad={handleLoad}
-              onActivate={handleActivate}
-              onDelete={setDeleteTarget}
-            />
-          </div>
+          <Card>
+            <CardContent className="px-0 pb-0">
+              <div className="divide-y divide-border">
+                {sortedSnapshots.map((snapshot) => {
+                  const activating = pendingAction === `activate-${snapshot.id}`
+                  const deleting = pendingAction === `delete-${snapshot.id}`
+                  const editingHref = `/?tab=planner&snapshotId=${encodeURIComponent(snapshot.id)}&loadSnapshot=1`
+
+                  return (
+                    <div
+                      key={snapshot.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0 space-y-0.5">
+                        <Link
+                          href={`/plans/${encodeURIComponent(snapshot.id)}`}
+                          className="inline-flex max-w-full items-center gap-2 text-sm font-medium text-foreground hover:underline"
+                        >
+                          <span className="truncate">{snapshot.label}</span>
+                          {snapshot.isActive ? (
+                            <Badge variant="default" className="h-5 text-[10px]">
+                              Current
+                            </Badge>
+                          ) : null}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">
+                          Saved {formatCreatedAt(snapshot.createdAt)}
+                        </p>
+                      </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            disabled={pendingAction !== null}
+                            aria-label={`Actions for ${snapshot.label}`}
+                          >
+                            {activating || deleting ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <MoreHorizontal className="size-4" />
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/plans/${encodeURIComponent(snapshot.id)}`}>
+                              <Eye className="size-4" />
+                              View
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={editingHref}>
+                              <Pencil className="size-4" />
+                              Edit
+                            </Link>
+                          </DropdownMenuItem>
+                          {!snapshot.isActive ? (
+                            <DropdownMenuItem
+                              disabled={pendingAction !== null}
+                              onSelect={(event) => {
+                                event.preventDefault()
+                                void handleActivate(snapshot)
+                              }}
+                            >
+                              <CheckCircle2 className="size-4" />
+                              Set Current
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuItem
+                            disabled={pendingAction !== null}
+                            className="text-destructive focus:text-destructive"
+                            onSelect={(event) => {
+                              event.preventDefault()
+                              setDeleteTarget(snapshot)
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -280,7 +249,7 @@ export default function SavedPlansPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Saved Plan</AlertDialogTitle>
+            <AlertDialogTitle>Delete Meal Plan</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete{' '}
               <span className="font-medium text-foreground">

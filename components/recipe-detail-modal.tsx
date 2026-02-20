@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Users } from 'lucide-react'
+import { Clock3, ExternalLink, Star, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -80,6 +80,18 @@ export function RecipeDetailModal({
               <Users className="size-3.5" />
               {recipe.servings} servings
             </span>
+            {typeof recipe.totalMinutes === 'number' && recipe.totalMinutes > 0 ? (
+              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Clock3 className="size-3.5" />
+                {Math.round(recipe.totalMinutes)} min
+              </span>
+            ) : null}
+            {typeof recipe.rating === 'number' && Number.isFinite(recipe.rating) ? (
+              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Star className="size-3.5 fill-amber-500 text-amber-500" />
+                {Math.max(0, Math.min(5, Math.round(recipe.rating * 10) / 10)).toFixed(1)}
+              </span>
+            ) : null}
             {onEditRecipe ? (
               <Button
                 type="button"

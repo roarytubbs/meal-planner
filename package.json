@@ -4,7 +4,7 @@
   "private": true,
   "description": "Family-first weekly meal planner with store-specific grocery lists.",
   "scripts": {
-    "predev": "node scripts/check-node-version.mjs",
+    "predev": "node scripts/check-node-version.mjs && prisma generate",
     "prebuild": "node scripts/check-node-version.mjs",
     "pretest": "node scripts/check-node-version.mjs",
     "dev": "next dev",

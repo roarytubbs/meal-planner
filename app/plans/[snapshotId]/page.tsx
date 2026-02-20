@@ -11,7 +11,7 @@ export default async function MealPlanSnapshotPage({
   return (
     <main className="min-h-screen bg-background">
       <AppHeader activeTab="planner" />
-      <div className="mx-auto max-w-7xl px-4 py-6">
+      <div className="mx-auto max-w-7xl px-4 py-7 sm:py-8">
         <MealPlanSnapshotView snapshotId={snapshotId} />
       </div>
     </main>
