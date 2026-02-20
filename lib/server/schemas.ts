@@ -42,7 +42,7 @@ export const mealSelectionSchema = z.enum(MEAL_SELECTION_VALUES)
 export const ingredientSchema = z.object({
   id: idSchema,
   name: boundedString(200).min(1),
-  qty: z.number().finite().nullable(),
+  qty: z.number().positive().finite().nullable(),
   unit: boundedString(64),
   store: boundedString(200),
   storeId: optionalBoundedString(128),
@@ -134,6 +134,15 @@ export const ingredientEntrySchema = z.object({
 export const ingredientDefaultStoreBulkSchema = z.object({
   ingredientIds: z.array(idSchema).min(1).max(1000),
   defaultStoreId: z.string().trim().max(128),
+})
+
+export const ingredientCategoryBulkSchema = z.object({
+  ingredientIds: z.array(idSchema).min(1).max(1000),
+  category: boundedString(80).min(1),
+})
+
+export const ingredientBulkDeleteSchema = z.object({
+  ingredientIds: z.array(idSchema).min(1).max(1000),
 })
 
 export const mealPlanSlotUpdateSchema = z
@@ -241,6 +250,8 @@ export const snapshotSchema = z.object({
   createdAt: isoDateSchema,
   label: boundedString(200).min(1),
   description: boundedString(1000).default(''),
+  isActive: z.boolean().default(false),
+  activatedAt: isoDateSchema.optional(),
   meals: z.array(snapshotMealSchema).max(500),
 })
 

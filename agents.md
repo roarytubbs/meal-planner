@@ -18,9 +18,10 @@
 - Prefer secure defaults and least-privilege access patterns.
 
 ## Validation Gates
-- Before finalizing, run `npm run test` and `npm run build`.
-- If `lint` and `typecheck` scripts exist, run them and require passing results.
-- If any required check fails, do not proceed without user approval.
+- Default workflow is fast iteration: focus on implementation and local validation needed for the active task.
+- Use full verification only when explicitly requested by the user, before merge/release, or when risk is high.
+- Full verification command is `npm run codex:verify` (runs `lint`, `typecheck`, `test`, `build`).
+- If explicit full verification fails, do not proceed without user approval.
 
 ## Database Safety
 - Never run `prisma db push` against production.

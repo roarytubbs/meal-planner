@@ -35,6 +35,7 @@ import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  activateMealPlanSnapshot,
   deleteMealPlanSnapshot,
   replaceMealPlanSlots,
   saveMealPlanSnapshot,
@@ -43,17 +44,16 @@ import {
   useRecipes,
 } from '@/lib/meal-planner-store'
 import {
-  DAY_OF_WEEK_VALUES,
-  MEAL_SLOT_VALUES,
-  addDays,
   formatDateLabel,
-  parseDateKey,
-  toDateKey,
-  type DayOfWeek,
   type MealSelection,
   type MealPlanSnapshot,
   type MealSlot,
 } from '@/lib/types'
+import {
+  partitionSnapshotsByRecency,
+  snapshotToSlotUpdates,
+  getCurrentWeekDateKeyByDay,
+} from '@/lib/meal-plan-snapshot-utils'
 
 interface DraftMealRow {
   key: string
@@ -93,16 +93,6 @@ function snapshotDescription(snapshot: MealPlanSnapshot): string {
   const suffix = count > 2 ? `, +${count - 2} more` : ''
   const previewText = preview.length > 0 ? `${preview.join(', ')}${suffix}` : 'No recipes'
   return `${count} meals saved on ${formatSnapshotDate(snapshot.createdAt)}. ${previewText}.`
-}
-
-function getCurrentWeekDateKeyByDay(): Record<DayOfWeek, string> {
-  const now = new Date()
-  const weekday = (now.getDay() + 6) % 7
-  const monday = addDays(now, -weekday)
-  return DAY_OF_WEEK_VALUES.reduce<Record<DayOfWeek, string>>((map, day, index) => {
-    map[day] = toDateKey(addDays(monday, index))
-    return map
-  }, {} as Record<DayOfWeek, string>)
 }
 
 export function MealPlanHistorySection() {
@@ -159,6 +149,10 @@ export function MealPlanHistorySection() {
       ),
     [snapshots]
   )
+  const { current: currentSnapshots, previous: previousSnapshots } = useMemo(
+    () => partitionSnapshotsByRecency(sortedSnapshots),
+    [sortedSnapshots]
+  )
 
   const openSaveDialog = useCallback(() => {
     const defaultLabel = `Plan ${new Intl.DateTimeFormat(undefined, {
@@ -203,54 +197,14 @@ export function MealPlanHistorySection() {
     async (snapshot: MealPlanSnapshot) => {
       setPendingAction(`duplicate-${snapshot.id}`)
       try {
-        const slots: Array<{
-          dateKey: string
-          slot: MealSlot
-          selection: MealSelection | null
-          recipeId: string | null
-        }> = []
-        let skippedMeals = 0
-
-        for (const meal of snapshot.meals) {
-          if (!MEAL_SLOT_VALUES.includes(meal.slot as MealSlot)) {
-            skippedMeals += 1
-            continue
-          }
-
-          const dateKey = parseDateKey(meal.day)
-            ? meal.day
-            : DAY_OF_WEEK_VALUES.includes(meal.day as DayOfWeek)
-              ? weekDateByDay[meal.day as DayOfWeek]
-              : null
-
-          if (!dateKey) {
-            skippedMeals += 1
-            continue
-          }
-
-          if (meal.selection === 'recipe') {
-            if (!meal.recipeId || !recipesById.has(meal.recipeId)) {
-              skippedMeals += 1
-              continue
-            }
-            slots.push({
-              dateKey,
-              slot: meal.slot as MealSlot,
-              selection: 'recipe',
-              recipeId: meal.recipeId,
-            })
-            continue
-          }
-
-          slots.push({
-            dateKey,
-            slot: meal.slot as MealSlot,
-            selection: meal.selection,
-            recipeId: null,
-          })
-        }
+        const { slots, skippedMeals } = snapshotToSlotUpdates(
+          snapshot,
+          new Set(recipesById.keys()),
+          weekDateByDay
+        )
 
         await replaceMealPlanSlots(slots)
+        await activateMealPlanSnapshot(snapshot.id)
 
         if (skippedMeals > 0) {
           toast.success('Meal plan duplicated to draft', {
@@ -349,20 +303,25 @@ export function MealPlanHistorySection() {
 
         <Card className="gap-0 rounded-lg py-0 shadow-none">
           <CardHeader className="border-b px-3 py-2">
-            <CardTitle className="text-xs">Previous Meal Plans</CardTitle>
+            <CardTitle className="text-xs">Saved Meal Plans</CardTitle>
             <CardDescription className="text-[11px]">
-              Duplicate an old plan into your draft or delete saved plans.
+              Load a saved plan into draft or delete plans you no longer need.
             </CardDescription>
           </CardHeader>
           <CardContent className="px-3 py-2">
             {sortedSnapshots.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No previous meal plans yet.
+                No saved meal plans yet.
               </p>
             ) : (
               <ScrollArea className="max-h-36">
                 <div className="space-y-1.5 pr-2">
-                  {sortedSnapshots.map((snapshot) => {
+                  {currentSnapshots.length > 0 ? (
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Current / Upcoming
+                    </p>
+                  ) : null}
+                  {currentSnapshots.map((snapshot) => {
                     const duplicateLoading =
                       pendingAction === `duplicate-${snapshot.id}`
                     const deleteLoading = pendingAction === `delete-${snapshot.id}`
@@ -376,6 +335,79 @@ export function MealPlanHistorySection() {
                             <p className="text-[11px] font-semibold text-foreground">
                               {snapshot.label}
                             </p>
+                            {snapshot.isActive ? (
+                              <Badge variant="secondary" className="mt-1 h-4 px-1.5 text-[10px]">
+                                Active
+                              </Badge>
+                            ) : null}
+                            <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                              {snapshotDescription(snapshot)}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                            {snapshot.meals.length}
+                          </Badge>
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => void handleDuplicate(snapshot)}
+                            disabled={pendingAction !== null}
+                          >
+                            {duplicateLoading ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <Copy className="size-3" />
+                            )}
+                            Duplicate
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setDeleteTarget(snapshot)}
+                            disabled={pendingAction !== null}
+                          >
+                            {deleteLoading ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-3" />
+                            )}
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {currentSnapshots.length > 0 && previousSnapshots.length > 0 ? (
+                    <p className="pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Previous
+                    </p>
+                  ) : null}
+                  {previousSnapshots.map((snapshot) => {
+                    const duplicateLoading =
+                      pendingAction === `duplicate-${snapshot.id}`
+                    const deleteLoading = pendingAction === `delete-${snapshot.id}`
+                    return (
+                      <div
+                        key={snapshot.id}
+                        className="rounded-md border border-border/60 bg-card p-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-[11px] font-semibold text-foreground">
+                              {snapshot.label}
+                            </p>
+                            {snapshot.isActive ? (
+                              <Badge variant="secondary" className="mt-1 h-4 px-1.5 text-[10px]">
+                                Active
+                              </Badge>
+                            ) : null}
                             <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
                               {snapshotDescription(snapshot)}
                             </p>

@@ -23,6 +23,11 @@ import {
   toDateKey,
   createEmptyMealPlan,
 } from './types'
+import {
+  applyDefaultStoresToIngredients,
+  buildDefaultStoreIdByIngredientName,
+  buildStoreNameById,
+} from './ingredient-store-mapping'
 
 interface StoreState {
   recipes: Recipe[]
@@ -85,6 +90,34 @@ function getStatusSnapshot(): StoreStatus {
 function normalizeErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message
   return 'Unexpected error.'
+}
+
+function applyIngredientEntryStoreDefaultsToRecipes(
+  recipes: Recipe[],
+  entries: IngredientEntry[],
+  stores: GroceryStore[]
+): Recipe[] {
+  const defaultStoreIdByName = buildDefaultStoreIdByIngredientName(entries)
+  if (defaultStoreIdByName.size === 0) return recipes
+
+  const storeNameById = buildStoreNameById(stores)
+  let changed = false
+
+  const nextRecipes = recipes.map((recipe) => {
+    const nextIngredients = applyDefaultStoresToIngredients(
+      recipe.ingredients,
+      defaultStoreIdByName,
+      storeNameById
+    )
+    if (nextIngredients === recipe.ingredients) return recipe
+    changed = true
+    return {
+      ...recipe,
+      ingredients: nextIngredients,
+    }
+  })
+
+  return changed ? nextRecipes : recipes
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -329,7 +362,16 @@ function normalizeRecipe(value: unknown): Recipe | null {
       const ingredient = item as Record<string, unknown>
       const ingredientName = String(ingredient.name || '').trim()
       if (!ingredientName) return null
-      const qtyNum = Number(ingredient.qty)
+      const rawQty = ingredient.qty
+      let qty: number | null = null
+      if (typeof rawQty === 'number' && Number.isFinite(rawQty) && rawQty > 0) {
+        qty = Math.round(rawQty * 1000) / 1000
+      } else if (typeof rawQty === 'string' && rawQty.trim().length > 0) {
+        const parsedQty = Number(rawQty)
+        if (Number.isFinite(parsedQty) && parsedQty > 0) {
+          qty = Math.round(parsedQty * 1000) / 1000
+        }
+      }
       const storeId =
         typeof ingredient.storeId === 'string' && ingredient.storeId.trim()
           ? ingredient.storeId.trim()
@@ -341,7 +383,7 @@ function normalizeRecipe(value: unknown): Recipe | null {
             ? ingredient.id.trim()
             : `${id}_ing_${index}`,
         name: ingredientName,
-        qty: Number.isFinite(qtyNum) ? qtyNum : null,
+        qty,
         unit: String(ingredient.unit || '').trim(),
         store: String(ingredient.store || '').trim(),
         ...(storeId ? { storeId } : {}),
@@ -420,8 +462,28 @@ function normalizeSnapshot(value: unknown): MealPlanSnapshot | null {
     label,
     description:
       typeof source.description === 'string' ? source.description.trim() : '',
+    isActive: source.isActive === true,
+    activatedAt:
+      typeof source.activatedAt === 'string' && source.activatedAt.trim()
+        ? source.activatedAt.trim()
+        : undefined,
     meals,
   }
+}
+
+function applySnapshotToStore(snapshot: MealPlanSnapshot): void {
+  const normalizedSnapshot = normalizeSnapshot(snapshot)
+  if (!normalizedSnapshot) return
+  const nextSnapshots = store.mealPlanSnapshots
+    .filter((item) => item.id !== normalizedSnapshot.id)
+    .map((item) =>
+      normalizedSnapshot.isActive ? { ...item, isActive: false } : item
+    )
+  store = {
+    ...store,
+    mealPlanSnapshots: [normalizedSnapshot, ...nextSnapshots],
+  }
+  emitChange()
 }
 
 function normalizeBootstrapPayload(payload: PlannerBootstrapResponse): StoreState {
@@ -925,11 +987,7 @@ export async function saveMealPlanSnapshot(input?: {
         days: input?.days,
       }),
     })
-    store = {
-      ...store,
-      mealPlanSnapshots: [snapshot, ...store.mealPlanSnapshots.filter((item) => item.id !== snapshot.id)],
-    }
-    emitChange()
+    applySnapshotToStore(snapshot)
     return snapshot
   } catch (error) {
     const message = normalizeErrorMessage(error)
@@ -940,14 +998,36 @@ export async function saveMealPlanSnapshot(input?: {
   }
 }
 
+export async function activateMealPlanSnapshot(id: string): Promise<MealPlanSnapshot> {
+  await hydrateStore()
+  const snapshot = await requestJson<MealPlanSnapshot>(
+    `/api/meal-plan/snapshots/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'activate' }),
+    }
+  )
+  applySnapshotToStore(snapshot)
+  return snapshot
+}
+
 export async function deleteMealPlanSnapshot(id: string): Promise<void> {
   await hydrateStore()
-  await requestJson<{ ok: boolean }>(`/api/meal-plan/snapshots/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-  })
+  const payload = await requestJson<{ ok: boolean; nextActiveSnapshotId?: string | null }>(
+    `/api/meal-plan/snapshots/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+    }
+  )
+  const nextActiveSnapshotId = payload.nextActiveSnapshotId || null
   store = {
     ...store,
-    mealPlanSnapshots: store.mealPlanSnapshots.filter((item) => item.id !== id),
+    mealPlanSnapshots: store.mealPlanSnapshots
+      .filter((item) => item.id !== id)
+      .map((item) => ({
+        ...item,
+        isActive: Boolean(nextActiveSnapshotId && item.id === nextActiveSnapshotId),
+      })),
   }
   emitChange()
 }
@@ -1041,6 +1121,11 @@ export async function updateIngredientEntry(entry: IngredientEntry): Promise<Ing
     ingredientEntries: store.ingredientEntries.map((item) =>
       item.id === updated.id ? updated : item
     ),
+    recipes: applyIngredientEntryStoreDefaultsToRecipes(
+      store.recipes,
+      [updated],
+      store.groceryStores
+    ),
   }
   emitChange()
   return updated
@@ -1073,9 +1158,74 @@ export async function bulkUpdateIngredientDefaultStore(
     ingredientEntries: store.ingredientEntries.map(
       (item) => byId.get(item.id) ?? item
     ),
+    recipes: applyIngredientEntryStoreDefaultsToRecipes(
+      store.recipes,
+      updatedEntries,
+      store.groceryStores
+    ),
   }
   emitChange()
   return updatedEntries
+}
+
+export async function bulkUpdateIngredientCategory(
+  ingredientIds: string[],
+  category: string
+): Promise<IngredientEntry[]> {
+  await hydrateStore()
+  const payload = await requestJson<{ ingredientEntries?: IngredientEntry[] }>(
+    '/api/ingredients/category',
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        ingredientIds,
+        category,
+      }),
+    }
+  )
+
+  const updatedEntries = Array.isArray(payload.ingredientEntries)
+    ? payload.ingredientEntries
+    : []
+  if (updatedEntries.length === 0) return []
+
+  const byId = new Map(updatedEntries.map((entry) => [entry.id, entry]))
+  store = {
+    ...store,
+    ingredientEntries: store.ingredientEntries.map(
+      (item) => byId.get(item.id) ?? item
+    ),
+  }
+  emitChange()
+  return updatedEntries
+}
+
+export async function bulkDeleteIngredientEntries(
+  ingredientIds: string[]
+): Promise<number> {
+  await hydrateStore()
+  const payload = await requestJson<{ deletedCount?: number }>(
+    '/api/ingredients/bulk-delete',
+    {
+      method: 'POST',
+      body: JSON.stringify({ ingredientIds }),
+    }
+  )
+
+  const ids = new Set(
+    ingredientIds
+      .map((id) => String(id || '').trim())
+      .filter((id) => id.length > 0)
+  )
+  if (ids.size > 0) {
+    store = {
+      ...store,
+      ingredientEntries: store.ingredientEntries.filter((item) => !ids.has(item.id)),
+    }
+    emitChange()
+  }
+
+  return Number(payload.deletedCount || 0)
 }
 
 export async function deleteIngredientEntry(id: string): Promise<void> {

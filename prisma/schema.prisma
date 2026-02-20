@@ -106,13 +106,16 @@ model MealPlanSlot {
 }
 
 model MealPlanSnapshot {
-  id        String                 @id @db.VarChar(128)
-  createdAt DateTime               @default(now()) @map("created_at")
-  label     String                 @db.VarChar(200)
-  description String               @db.VarChar(1000)
-  meals     MealPlanSnapshotMeal[]
+  id          String                 @id @db.VarChar(128)
+  createdAt   DateTime               @default(now()) @map("created_at")
+  label       String                 @db.VarChar(200)
+  description String                 @db.VarChar(1000)
+  isActive    Boolean                @default(false) @map("is_active")
+  activatedAt DateTime?              @map("activated_at")
+  meals       MealPlanSnapshotMeal[]
 
   @@index([createdAt(sort: Desc)])
+  @@index([isActive])
   @@map("meal_plan_snapshots")
 }
 

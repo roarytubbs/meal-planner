@@ -22,13 +22,13 @@
 
 ## Quality Bar
 - Prefer correctness, maintainability, and clear implementation over clever shortcuts.
-- Run relevant validation checks when possible (lint/tests/type checks).
+- Use fast iteration by default; reserve full validation for explicit verify workflow.
 - Summarize outcomes with notable risks and follow-up actions.
 
 ## Project-Specific Rules
-- Run `npm run test` and `npm run build` before finalizing changes.
-- If available, also run `npm run lint` and `npm run typecheck`.
-- Do not proceed with failed required checks unless explicitly approved.
+- Default workflow: `fast_iteration` (do not run full suite on every change).
+- Explicit workflow: `full_verify` via `npm run codex:verify` before merge/release or when user asks to verify.
+- Do not proceed past explicit `full_verify` with failed required checks unless explicitly approved.
 - Never run `prisma db push` against production.
 - Ask before migrations that alter existing tables or data.
 - Require a rollback plan for schema changes.
@@ -51,6 +51,8 @@
 
 ### Execution Preference
 - Prefer repo-native watch scripts over ad-hoc one-off session commands.
+- Prefer `npm run codex:run` to start local development in Codex sessions.
+- Prefer `npm run codex:verify` only when verification is explicitly requested.
 - Continue honoring approval gates for deploy, production-impacting changes, and destructive operations.
 
 ### Preference Contract Directives
@@ -59,6 +61,8 @@
 - `dev_server_policy=separate_port`
 - `workflow=repo_watch_scripts`
 - `auto_fix_surface=app_and_tests`
+- `default_workflow=fast_iteration`
+- `explicit_workflow=full_verify`
 
 ### Known Baseline Blockers
 - Typecheck currently fails in `/Users/rtubbs/Dev/meal-planner/components/ui/chart.tsx`.
@@ -68,6 +72,8 @@
 
 ## Build Scripts & Process
 - Canonical scripts are defined in `/Users/rtubbs/Dev/meal-planner/package.json` and should be used consistently:
+  - `npm run codex:run`
+  - `npm run codex:verify`
   - `npm run dev`
   - `npm run build`
   - `npm run start`
@@ -77,11 +83,9 @@
   - `npm run db:generate`
   - `npm run db:migrate`
   - `npm run db:push`
-- Standard local validation process before finalizing code:
-  - `npm run typecheck`
-  - `npm run lint`
-  - `npm run test`
-  - `npm run build`
+- Standard local process:
+  - Fast iteration: `npm run codex:run`
+  - Full verification (explicit): `npm run codex:verify`
 - Do not interrupt a user-owned active dev server process; run verification commands separately.
 - For database work, run `npm run db:generate` after schema changes and use migrations intentionally. Never run `db:push` against production.
 

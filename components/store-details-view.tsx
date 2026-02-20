@@ -144,6 +144,24 @@ function StoreIdentity({ store }: { store: GroceryStore }) {
           </div>
           <div className="flex-1 min-w-0 space-y-2">
             <h1 className="text-2xl font-bold text-foreground">{store.name}</h1>
+            {store.supportsOnlineOrdering ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="h-5 text-[11px]">
+                  Online ordering enabled
+                </Badge>
+                {store.onlineOrderingProvider ? (
+                  <Badge variant="outline" className="h-5 text-[11px]">
+                    Provider: {store.onlineOrderingProvider}
+                  </Badge>
+                ) : null}
+                {store.onlineOrderingProvider === 'target' &&
+                store.onlineOrderingConfig?.targetStoreId ? (
+                  <Badge variant="outline" className="h-5 text-[11px]">
+                    Target ID: {store.onlineOrderingConfig.targetStoreId}
+                  </Badge>
+                ) : null}
+              </div>
+            ) : null}
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <MapPin className="size-4 shrink-0 mt-0.5" />
               <span>{store.address}</span>
