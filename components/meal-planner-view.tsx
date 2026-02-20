@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import {
   Calendar,
   ChevronDown,
+  ExternalLink,
   Loader2,
   MoreHorizontal,
   ShoppingCart,
@@ -47,6 +49,7 @@ import {
 } from '@/lib/shopping-list'
 import type {
   GroceryStore,
+  MealPlanSnapshot,
   MealSelection,
   MealSlot,
   Recipe,
@@ -58,14 +61,22 @@ import {
   toDateKey,
 } from '@/lib/types'
 import {
+  activateMealPlanSnapshot,
   useRecipes,
   useMealPlanSlots,
+  useMealPlanSnapshots,
   useGroceryStores,
   setMealSlot,
   clearMealPlan,
   saveMealPlanSnapshot,
   getRecipeById,
+  replaceMealPlanSlots,
 } from '@/lib/meal-planner-store'
+import {
+  getSnapshotDateRange,
+  partitionSnapshotsByRecency,
+  snapshotToSlotUpdates,
+} from '@/lib/meal-plan-snapshot-utils'
 import { RecipeDetailModal } from '@/components/recipe-detail-modal'
 import { toast } from 'sonner'
 
@@ -108,9 +119,11 @@ function RecipeSearchField({
   onSelectRecipe,
   onViewRecipe,
 }: RecipeSearchFieldProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [highlightIndex, setHighlightIndex] = useState(-1)
+  const [menuPlacement, setMenuPlacement] = useState<'top' | 'bottom'>('bottom')
 
   const suggestions = useMemo(() => {
     const slotScopedRecipes = recipes.filter(
@@ -168,8 +181,37 @@ function RecipeSearchField({
     setQuery('')
   }, [disabled, onSelectRecipe, query, recipes])
 
+  const updateMenuPlacement = useCallback(() => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const estimatedMenuHeight = Math.min(260, 56 + Math.max(1, suggestions.length) * 34)
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    if (spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow) {
+      setMenuPlacement('top')
+      return
+    }
+    setMenuPlacement('bottom')
+  }, [suggestions.length])
+
+  useEffect(() => {
+    if (!open) return
+    updateMenuPlacement()
+
+    const handleViewportChange = () => {
+      updateMenuPlacement()
+    }
+
+    window.addEventListener('resize', handleViewportChange)
+    window.addEventListener('scroll', handleViewportChange, true)
+    return () => {
+      window.removeEventListener('resize', handleViewportChange)
+      window.removeEventListener('scroll', handleViewportChange, true)
+    }
+  }, [open, updateMenuPlacement])
+
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <Input
         disabled={disabled}
         value={query}
@@ -235,7 +277,9 @@ function RecipeSearchField({
 
       {open ? (
         <div
-          className="absolute left-0 top-full z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md"
+          className={`absolute left-0 z-50 w-full rounded-md border border-border bg-popover shadow-md ${
+            menuPlacement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
           role="listbox"
         >
           <p className="border-b border-border px-2 py-1.5 text-[11px] text-muted-foreground">
@@ -293,6 +337,19 @@ interface OptimisticSlotState {
   recipeId: string | null
 }
 
+interface CreatedCartSession {
+  key: string
+  storeName: string
+  checkoutUrl: string
+  unmatchedItems: number
+}
+
+interface CartBuildFailure {
+  key: string
+  storeName: string
+  message: string
+}
+
 interface MealPlannerViewProps {
   onEditRecipe?: (recipe: Recipe) => void
 }
@@ -307,18 +364,35 @@ function buildDefaultPlanLabel(dateKeys: string[]): string {
   return dateKeys.length === 1 ? `Plan ${start}` : `Plan ${start} - ${end}`
 }
 
+function formatSnapshotRangeSummary(snapshot: MealPlanSnapshot | null): string {
+  if (!snapshot) return ''
+  const range = getSnapshotDateRange(snapshot)
+  if (!range) return ''
+  return `${formatDateLabel(range.startDateKey, { month: 'short', day: 'numeric' })} - ${formatDateLabel(range.endDateKey, { month: 'short', day: 'numeric' })}`
+}
+
 export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
   const recipes = useRecipes()
+  const snapshots = useMealPlanSnapshots()
   const stores = useGroceryStores()
   const mealPlanSlots = useMealPlanSlots()
   const [viewRecipe, setViewRecipe] = useState<Recipe | null>(null)
   const [startDate, setStartDate] = useState<string>(() => toDateKey(new Date()))
   const [dayCount, setDayCount] = useState<number>(7)
   const [buildingStoreId, setBuildingStoreId] = useState<string | null>(null)
+  const [buildingAllCarts, setBuildingAllCarts] = useState(false)
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveLabel, setSaveLabel] = useState('')
   const [saveDescription, setSaveDescription] = useState('')
   const [savingSnapshot, setSavingSnapshot] = useState(false)
+  const [createdCarts, setCreatedCarts] = useState<CreatedCartSession[]>([])
+  const [cartBuildFailures, setCartBuildFailures] = useState<CartBuildFailure[]>([])
+  const [cartResultsDialogOpen, setCartResultsDialogOpen] = useState(false)
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string>('')
+  const [loadingSnapshotId, setLoadingSnapshotId] = useState<string | null>(null)
+  const [cartUnavailableStoreIds, setCartUnavailableStoreIds] = useState<Set<string>>(
+    () => new Set()
+  )
   const [openStoreKeys, setOpenStoreKeys] = useState<Set<string>>(() => new Set())
   const [optimisticSlots, setOptimisticSlots] = useState<Map<string, OptimisticSlotState>>(
     () => new Map()
@@ -403,10 +477,51 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
     return map
   }, [stores])
 
+  const recipeIdSet = useMemo(() => new Set(recipes.map((recipe) => recipe.id)), [recipes])
+
+  const sortedSnapshots = useMemo(
+    () =>
+      [...snapshots].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [snapshots]
+  )
+
+  const { current: currentSnapshots, previous: previousSnapshots } = useMemo(
+    () => partitionSnapshotsByRecency(sortedSnapshots),
+    [sortedSnapshots]
+  )
+
+  const selectedSnapshot = useMemo(
+    () =>
+      sortedSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) || null,
+    [selectedSnapshotId, sortedSnapshots]
+  )
+  const selectedSnapshotRangeSummary = useMemo(
+    () => formatSnapshotRangeSummary(selectedSnapshot),
+    [selectedSnapshot]
+  )
+
+  useEffect(() => {
+    if (!selectedSnapshotId) return
+    if (sortedSnapshots.some((snapshot) => snapshot.id === selectedSnapshotId)) return
+    setSelectedSnapshotId('')
+  }, [selectedSnapshotId, sortedSnapshots])
+
+  useEffect(() => {
+    if (selectedSnapshotId) return
+    const active = sortedSnapshots.find((snapshot) => snapshot.isActive)
+    if (!active) return
+    setSelectedSnapshotId(active.id)
+  }, [selectedSnapshotId, sortedSnapshots])
+
   const getBuildDisabledReason = useCallback(
     (bucket: ShoppingStoreBucket): string | null => {
       if (!bucket.storeId) {
         return 'Items must be assigned to a saved store to build an online cart.'
+      }
+      if (cartUnavailableStoreIds.has(bucket.storeId)) {
+        return 'Online cart integration is unavailable for this store right now.'
       }
       const store = storesById.get(bucket.storeId)
       if (!store) return 'Store no longer exists.'
@@ -421,81 +536,216 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
       }
       return null
     },
-    [storesById]
+    [cartUnavailableStoreIds, storesById]
+  )
+
+  const creatableCartBucketCount = useMemo(
+    () =>
+      shoppingBuckets.reduce(
+        (count, bucket) => count + (getBuildDisabledReason(bucket) ? 0 : 1),
+        0
+      ),
+    [getBuildDisabledReason, shoppingBuckets]
+  )
+
+  const toCartSessionItems = useCallback((bucket: ShoppingStoreBucket) => {
+    return bucket.items
+      .map((item) => ({
+        name: item.name,
+        qty: typeof item.qty === 'number' && item.qty > 0 ? item.qty : null,
+        unit: item.unit,
+      }))
+      .filter((item) => item.name.trim().length > 0)
+  }, [])
+
+  const requestCartSession = useCallback(
+    async (
+      bucket: ShoppingStoreBucket
+    ): Promise<{ checkoutUrl: string; unmatchedItems: number }> => {
+      const disabledReason = getBuildDisabledReason(bucket)
+      if (disabledReason) {
+        throw new Error(disabledReason)
+      }
+      if (!bucket.storeId) {
+        throw new Error('Items must be assigned to a saved store to build an online cart.')
+      }
+
+      const items = toCartSessionItems(bucket)
+      if (items.length === 0) {
+        throw new Error('No valid items available for cart creation.')
+      }
+
+      const response = await fetch('/api/shopping/cart-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId: bucket.storeId, items }),
+      })
+
+      const raw = await response.text()
+      let payload: Record<string, unknown> = {}
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw)
+          if (parsed && typeof parsed === 'object') {
+            payload = parsed as Record<string, unknown>
+          }
+        } catch {
+          payload = {}
+        }
+      }
+
+      if (!response.ok) {
+        const message =
+          typeof payload.error === 'string' && payload.error.trim()
+            ? payload.error
+            : 'Unable to build shopping cart session.'
+        throw new Error(message)
+      }
+
+      const checkoutUrl =
+        typeof payload.checkoutUrl === 'string' ? payload.checkoutUrl.trim() : ''
+      if (!checkoutUrl) {
+        throw new Error('Cart session created without checkout URL.')
+      }
+
+      return {
+        checkoutUrl,
+        unmatchedItems: Array.isArray(payload.unmatchedItems)
+          ? payload.unmatchedItems.length
+          : 0,
+      }
+    },
+    [getBuildDisabledReason, toCartSessionItems]
   )
 
   const handleBuildShoppingList = useCallback(
     async (bucket: ShoppingStoreBucket) => {
-      const disabledReason = getBuildDisabledReason(bucket)
-      if (disabledReason) {
-        toast.error(disabledReason)
-        return
-      }
       if (!bucket.storeId) return
-
-      const items = bucket.items
-        .map((item) => ({
-          name: item.name,
-          qty: typeof item.qty === 'number' && item.qty > 0 ? item.qty : null,
-          unit: item.unit,
-        }))
-        .filter((item) => item.name.trim().length > 0)
-
-      if (items.length === 0) {
-        toast.error('No valid items available for cart creation.')
-        return
-      }
 
       setBuildingStoreId(bucket.storeId)
       try {
-        const response = await fetch('/api/shopping/cart-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storeId: bucket.storeId, items }),
-        })
+        const session = await requestCartSession(bucket)
 
-        const raw = await response.text()
-        const payload = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
-
-        if (!response.ok) {
-          const message =
-            typeof payload.error === 'string' && payload.error.trim()
-              ? payload.error
-              : 'Unable to build shopping cart session.'
-          throw new Error(message)
-        }
-
-        const checkoutUrl =
-          typeof payload.checkoutUrl === 'string' ? payload.checkoutUrl.trim() : ''
-        if (!checkoutUrl) {
-          throw new Error('Cart session created without checkout URL.')
-        }
-
-        const popup = window.open(checkoutUrl, '_blank', 'noopener,noreferrer')
+        const popup = window.open(session.checkoutUrl, '_blank', 'noopener,noreferrer')
         if (!popup) {
-          window.location.href = checkoutUrl
-          return
+          window.location.href = session.checkoutUrl
         }
 
-        const unmatchedItems = Array.isArray(payload.unmatchedItems)
-          ? payload.unmatchedItems.length
-          : 0
-        toast.success('Cart ready at Target', {
+        toast.success(`Cart ready for ${bucket.storeName}`, {
           description:
-            unmatchedItems > 0
-              ? `${unmatchedItems} item${unmatchedItems === 1 ? '' : 's'} need manual review.`
+            session.unmatchedItems > 0
+              ? `${session.unmatchedItems} item${session.unmatchedItems === 1 ? '' : 's'} need manual review.`
               : 'Your shopping cart session was created successfully.',
         })
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Unable to build shopping cart.'
+        if (
+          bucket.storeId &&
+          /integration is not configured|provider is not configured|provider unavailable/i.test(
+            message
+          )
+        ) {
+          setCartUnavailableStoreIds((previous) => {
+            if (previous.has(bucket.storeId as string)) return previous
+            const next = new Set(previous)
+            next.add(bucket.storeId as string)
+            return next
+          })
+        }
         toast.error(message)
       } finally {
         setBuildingStoreId(null)
       }
     },
-    [getBuildDisabledReason]
+    [requestCartSession]
   )
+
+  const handleBuildAllShoppingCarts = useCallback(async () => {
+    if (pendingSlotKeysRef.current.size > 0) {
+      toast.info('Please wait for meal slot updates to finish syncing.')
+      return
+    }
+    if (buildingAllCarts || buildingStoreId) return
+
+    const eligibleBuckets = shoppingBuckets.filter(
+      (bucket) => !getBuildDisabledReason(bucket)
+    )
+    if (eligibleBuckets.length === 0) {
+      toast.error('No eligible stores are ready for online cart creation.')
+      return
+    }
+
+    setBuildingAllCarts(true)
+    const successes: CreatedCartSession[] = []
+    const failures: CartBuildFailure[] = []
+
+    try {
+      for (const bucket of eligibleBuckets) {
+        if (!bucket.storeId) continue
+        setBuildingStoreId(bucket.storeId)
+        try {
+          const session = await requestCartSession(bucket)
+          successes.push({
+            key: bucket.key,
+            storeName: bucket.storeName,
+            checkoutUrl: session.checkoutUrl,
+            unmatchedItems: session.unmatchedItems,
+          })
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : 'Unable to create shopping cart for this store.'
+          if (
+            bucket.storeId &&
+            /integration is not configured|provider is not configured|provider unavailable/i.test(
+              message
+            )
+          ) {
+            setCartUnavailableStoreIds((previous) => {
+              if (previous.has(bucket.storeId as string)) return previous
+              const next = new Set(previous)
+              next.add(bucket.storeId as string)
+              return next
+            })
+          }
+          failures.push({
+            key: bucket.key,
+            storeName: bucket.storeName,
+            message,
+          })
+        }
+      }
+    } finally {
+      setBuildingStoreId(null)
+      setBuildingAllCarts(false)
+    }
+
+    setCreatedCarts(successes)
+    setCartBuildFailures(failures)
+
+    if (successes.length > 0) {
+      setCartResultsDialogOpen(true)
+      toast.success(
+        `Created ${successes.length} cart${successes.length === 1 ? '' : 's'}.`,
+        failures.length > 0
+          ? {
+              description: `${failures.length} store${failures.length === 1 ? '' : 's'} could not be created.`,
+            }
+          : undefined
+      )
+      return
+    }
+
+    toast.error('Unable to create carts for the selected stores.')
+  }, [
+    buildingAllCarts,
+    buildingStoreId,
+    getBuildDisabledReason,
+    requestCartSession,
+    shoppingBuckets,
+  ])
 
   const updateSlot = useCallback(
     async (
@@ -581,11 +831,12 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
     setSaveDialogOpen(true)
   }, [activeDateKeys])
 
-  const handleConfirmSavePlan = useCallback(async () => {
+  const handleConfirmSavePlan = useCallback(async (options?: { createCarts?: boolean }) => {
     if (pendingSlotKeysRef.current.size > 0) {
       toast.info('Please wait for meal slot updates to finish syncing.')
       return
     }
+    const shouldCreateCarts = options?.createCarts === true
     try {
       setSavingSnapshot(true)
       const snapshot = await saveMealPlanSnapshot({
@@ -604,6 +855,9 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
       }
       toast.success('Meal plan snapshot saved', { description: snapshot.label })
       setSaveDialogOpen(false)
+      if (shouldCreateCarts) {
+        void handleBuildAllShoppingCarts()
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to save meal plan snapshot.'
@@ -611,7 +865,14 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
     } finally {
       setSavingSnapshot(false)
     }
-  }, [dayCount, saveDescription, saveLabel, startDate, totalPlanned])
+  }, [
+    dayCount,
+    handleBuildAllShoppingCarts,
+    saveDescription,
+    saveLabel,
+    startDate,
+    totalPlanned,
+  ])
 
   const handleClearRange = useCallback(() => {
     void clearMealPlan({ startDate, days: dayCount })
@@ -626,6 +887,49 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
         toast.error(message)
       })
   }, [dayCount, startDate])
+
+  const handleLoadSnapshot = useCallback(async () => {
+    if (!selectedSnapshot) {
+      toast.error('Select a saved meal plan to load.')
+      return
+    }
+    if (pendingSlotKeysRef.current.size > 0) {
+      toast.info('Please wait for meal slot updates to finish syncing.')
+      return
+    }
+
+    setLoadingSnapshotId(selectedSnapshot.id)
+    try {
+      const { slots, skippedMeals } = snapshotToSlotUpdates(selectedSnapshot, recipeIdSet)
+      if (slots.length === 0) {
+        toast.error('No valid meals available to load from this plan.')
+        return
+      }
+
+      await replaceMealPlanSlots(slots)
+      await activateMealPlanSnapshot(selectedSnapshot.id)
+
+      const range = getSnapshotDateRange(selectedSnapshot)
+      if (range) {
+        setStartDate(range.startDateKey)
+        setDayCount(Math.max(1, Math.min(14, range.days)))
+      }
+
+      if (skippedMeals > 0) {
+        toast.success('Meal plan loaded', {
+          description: `${selectedSnapshot.label} loaded with ${skippedMeals} skipped meal${skippedMeals === 1 ? '' : 's'}.`,
+        })
+      } else {
+        toast.success('Meal plan loaded', { description: selectedSnapshot.label })
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to load meal plan.'
+      toast.error(message)
+    } finally {
+      setLoadingSnapshotId(null)
+    }
+  }, [recipeIdSet, selectedSnapshot])
 
   const setStoreSectionOpen = useCallback((bucketKey: string, open: boolean) => {
     setOpenStoreKeys((previous) => {
@@ -649,10 +953,18 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
               <p className="text-xs text-muted-foreground">
                 {totalPlanned} slot{totalPlanned !== 1 ? 's' : ''} planned in this range
               </p>
+              {selectedSnapshot ? (
+                <p className="text-xs text-muted-foreground">
+                  Selected plan: {selectedSnapshot.label}
+                  {selectedSnapshotRangeSummary
+                    ? ` (${selectedSnapshotRangeSummary})`
+                    : ''}
+                </p>
+              ) : null}
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-[12rem_7rem_auto_auto]">
+          <div className="grid gap-2 sm:grid-cols-[12rem_7rem_minmax(0,1fr)_auto_auto_auto_auto]">
             <Input
               type="date"
               value={startDate}
@@ -674,6 +986,59 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                 ))}
               </SelectContent>
             </Select>
+            <Select
+              value={selectedSnapshotId}
+              onValueChange={setSelectedSnapshotId}
+            >
+              <SelectTrigger aria-label="Saved meal plans">
+                <SelectValue placeholder="Select saved plan" />
+              </SelectTrigger>
+              <SelectContent>
+                {currentSnapshots.length > 0 ? (
+                  <>
+                    {currentSnapshots.map((snapshot) => (
+                      <SelectItem key={`current-${snapshot.id}`} value={snapshot.id}>
+                        {snapshot.label}
+                        {snapshot.isActive ? ' (Active)' : ''}
+                      </SelectItem>
+                    ))}
+                  </>
+                ) : null}
+                {previousSnapshots.length > 0 ? (
+                  <>
+                    {previousSnapshots.map((snapshot) => (
+                      <SelectItem key={`previous-${snapshot.id}`} value={snapshot.id}>
+                        {snapshot.label}
+                        {snapshot.isActive ? ' (Active)' : ' (Previous)'}
+                      </SelectItem>
+                    ))}
+                  </>
+                ) : null}
+                {sortedSnapshots.length === 0 ? (
+                  <SelectItem value="__none" disabled>
+                    No saved meal plans
+                  </SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleLoadSnapshot()}
+              disabled={!selectedSnapshot || loadingSnapshotId !== null}
+            >
+              {loadingSnapshotId ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                'Load Plan'
+              )}
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <Link href="/plans">Saved Plans</Link>
+            </Button>
             <Button
               variant="secondary"
               onClick={handleClearRange}
@@ -694,7 +1059,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
 
       <div className="flex flex-col gap-5 xl:flex-row">
         <div className="min-w-0 flex-1">
-          <div className="overflow-hidden rounded-xl border border-border/60 bg-card/25">
+          <div className="overflow-visible rounded-xl border border-border/60 bg-card/25">
             {activeDateKeys.map((dateKey) => (
               <section
                 key={dateKey}
@@ -830,9 +1195,32 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
             <div className="flex items-center gap-2.5 border-b border-border/60 bg-muted/20 px-4 py-3">
               <ShoppingCart className="size-4 text-foreground" />
               <h3 className="text-sm font-semibold text-foreground">Shopping List</h3>
-              <span className="ml-auto rounded-md border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
-                {shoppingBuckets.reduce((sum, bucket) => sum + bucket.items.length, 0)} items
-              </span>
+              <div className="ml-auto flex items-center gap-2">
+                {creatableCartBucketCount > 0 ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 px-2 text-[11px]"
+                    disabled={buildingAllCarts}
+                    onClick={() => {
+                      void handleBuildAllShoppingCarts()
+                    }}
+                  >
+                    {buildingAllCarts ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create All Carts'
+                    )}
+                  </Button>
+                ) : null}
+                <span className="rounded-md border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
+                  {shoppingBuckets.reduce((sum, bucket) => sum + bucket.items.length, 0)} items
+                </span>
+              </div>
             </div>
             <div className="p-3">
               {shoppingBuckets.length === 0 ? (
@@ -881,29 +1269,25 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="border-t border-border/60 px-1 py-2">
-                              <div className="mb-2 flex items-center justify-end">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="secondary"
-                                  className="h-7 px-2 text-[11px]"
-                                  disabled={Boolean(disabledReason) || isBuilding}
-                                  onClick={() => {
-                                    void handleBuildShoppingList(bucket)
-                                  }}
-                                  title={disabledReason || undefined}
-                                >
-                                  {isBuilding ? (
-                                    <Loader2 className="size-3.5 animate-spin" />
-                                  ) : (
-                                    'Build Shopping List'
-                                  )}
-                                </Button>
-                              </div>
-                              {disabledReason ? (
-                                <p className="mb-2 text-[11px] text-muted-foreground">
-                                  {disabledReason}
-                                </p>
+                              {!disabledReason ? (
+                                <div className="mb-2 flex items-center justify-end">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    className="h-7 px-2 text-[11px]"
+                                    disabled={isBuilding || buildingAllCarts}
+                                    onClick={() => {
+                                      void handleBuildShoppingList(bucket)
+                                    }}
+                                  >
+                                    {isBuilding ? (
+                                      <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                      'Create Cart'
+                                    )}
+                                  </Button>
+                                </div>
                               ) : null}
                               <ul className="list-disc space-y-1 pl-4">
                                 {bucket.items.map((item, index) => (
@@ -969,6 +1353,15 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
             </div>
           </div>
           <DialogFooter>
+            {creatableCartBucketCount > 0 ? (
+              <Button
+                variant="secondary"
+                onClick={() => void handleConfirmSavePlan({ createCarts: true })}
+                disabled={savingSnapshot || buildingAllCarts}
+              >
+                Save + Create Carts
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               onClick={() => setSaveDialogOpen(false)}
@@ -985,6 +1378,75 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
               ) : (
                 'Save Plan'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cartResultsDialogOpen} onOpenChange={setCartResultsDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Shopping Cart Sessions</DialogTitle>
+            <DialogDescription>
+              Review each store cart and open checkout links in new tabs.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {createdCarts.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Ready carts ({createdCarts.length})
+                </p>
+                <div className="space-y-2">
+                  {createdCarts.map((session) => (
+                    <div
+                      key={session.key}
+                      className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {session.storeName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {session.unmatchedItems > 0
+                            ? `${session.unmatchedItems} unmatched item${session.unmatchedItems === 1 ? '' : 's'}`
+                            : 'All ingredients matched'}
+                        </p>
+                      </div>
+                      <Button asChild type="button" size="sm" variant="outline">
+                        <a
+                          href={session.checkoutUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open Cart
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {cartBuildFailures.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Couldn&apos;t create ({cartBuildFailures.length})
+                </p>
+                <div className="space-y-1">
+                  {cartBuildFailures.map((failure) => (
+                    <p key={failure.key} className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{failure.storeName}:</span>{' '}
+                      {failure.message}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCartResultsDialogOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

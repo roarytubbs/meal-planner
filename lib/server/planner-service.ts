@@ -1,5 +1,6 @@
 import { db } from '@/lib/server/db'
 import { Prisma } from '@prisma/client'
+import { parseIngredients } from '@/lib/ingredient-parser'
 import {
   buildDateRange,
   DAY_OF_WEEK_VALUES,
@@ -24,6 +25,12 @@ import {
   type PlannerBootstrapResponse,
   type Recipe,
 } from '@/lib/types'
+import {
+  applyDefaultStoresToIngredients,
+  buildDefaultStoreIdByIngredientName,
+  buildStoreNameById,
+  normalizeIngredientNameForLookup,
+} from '@/lib/ingredient-store-mapping'
 
 function toIsoString(value: Date | string): string {
   if (value instanceof Date) return value.toISOString()
@@ -41,6 +48,64 @@ function sanitizeStringArray(value: string[] | null | undefined): string[] | und
 
 function sanitizeStoreId(value: string | undefined): string {
   return value ? value.trim() : ''
+}
+
+const LEADING_INGREDIENT_MEASUREMENT_PATTERN =
+  /^\s*(?:\d+(?:\.\d+)?|\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d+[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])(?:\s|$)/
+
+function sanitizeIngredientQty(value: number | null | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  const rounded = Math.round(value * 1000) / 1000
+  return rounded > 0 ? rounded : null
+}
+
+function parseIngredientMeasurementFromName(rawName: string): {
+  name: string
+  qty: number | null
+  unit: string
+} | null {
+  if (!LEADING_INGREDIENT_MEASUREMENT_PATTERN.test(rawName)) return null
+  const parsed = parseIngredients(rawName)
+  const first = parsed[0]
+  if (!first) return null
+
+  const name = String(first.name || '').trim()
+  const unit = String(first.unit || '').trim()
+  const qty = sanitizeIngredientQty(first.qty)
+  if (!name) return null
+  if (!unit && qty === null && name === rawName.trim()) return null
+
+  return { name, qty, unit }
+}
+
+function normalizeRecipeIngredientForStorage(
+  ingredient: Recipe['ingredients'][number]
+): Recipe['ingredients'][number] {
+  const rawName = String(ingredient.name || '').trim()
+  const rawUnit = String(ingredient.unit || '').trim()
+  const parsedFromName =
+    sanitizeIngredientQty(ingredient.qty) === null && rawUnit.length === 0
+      ? parseIngredientMeasurementFromName(rawName)
+      : null
+
+  const normalizedStoreId = sanitizeStoreId(ingredient.storeId)
+  return {
+    ...ingredient,
+    name: parsedFromName?.name || rawName,
+    qty: parsedFromName ? parsedFromName.qty : sanitizeIngredientQty(ingredient.qty),
+    unit: parsedFromName?.unit || rawUnit,
+    store: String(ingredient.store || '').trim(),
+    storeId: normalizedStoreId || undefined,
+  }
+}
+
+function normalizeRecipeForStorage(recipe: Recipe): Recipe {
+  return {
+    ...recipe,
+    ingredients: recipe.ingredients.map((ingredient) =>
+      normalizeRecipeIngredientForStorage(ingredient)
+    ),
+  }
 }
 
 function sanitizeMealSlot(value: string | null | undefined): MealSlot | null {
@@ -167,10 +232,6 @@ function mapIngredientEntry(row: {
   }
 }
 
-function normalizeIngredientEntryName(value: string): string {
-  return value.trim().toLowerCase()
-}
-
 function buildIngredientEntryId(seed: string, index: number): string {
   const cleanedSeed = seed
     .replace(/[^a-z0-9]+/g, '_')
@@ -181,18 +242,54 @@ function buildIngredientEntryId(seed: string, index: number): string {
     .slice(2, 7)}`
 }
 
-async function syncIngredientEntriesFromRecipe(recipe: Recipe): Promise<void> {
-  const candidatesByName = new Map<
-    string,
-    { name: string; defaultUnit: string; defaultStoreId: string }
-  >()
+function normalizeStoreNameForLookup(value: string): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+}
 
-  for (const ingredient of recipe.ingredients) {
-    const name = normalizeIngredientEntryName(String(ingredient.name || ''))
+interface IngredientEntryCandidate {
+  name: string
+  defaultUnit: string
+  defaultStoreId: string
+}
+
+interface IngredientStoreSource {
+  name: string
+  unit: string
+  storeId?: string | null
+  store: string
+}
+
+function buildStoreIdByNameMap(stores: Array<{ id: string; name: string }>): Map<string, string> {
+  const byName = new Map<string, string>()
+  for (const store of stores) {
+    const normalizedStoreName = normalizeStoreNameForLookup(store.name)
+    if (!normalizedStoreName || byName.has(normalizedStoreName)) continue
+    byName.set(normalizedStoreName, store.id)
+  }
+  return byName
+}
+
+function buildIngredientEntryCandidatesFromIngredients(
+  ingredients: IngredientStoreSource[],
+  storeIdByName: Map<string, string>
+): Map<string, IngredientEntryCandidate> {
+  const candidatesByName = new Map<string, IngredientEntryCandidate>()
+
+  for (const ingredient of ingredients) {
+    const name = normalizeIngredientNameForLookup(String(ingredient.name || ''))
     if (!name) continue
 
     const defaultUnit = String(ingredient.unit || '').trim()
-    const defaultStoreId = sanitizeStoreId(ingredient.storeId)
+    const explicitStoreId = sanitizeStoreId(
+      typeof ingredient.storeId === 'string' ? ingredient.storeId : undefined
+    )
+    const inferredStoreId =
+      explicitStoreId.length === 0
+        ? storeIdByName.get(normalizeStoreNameForLookup(ingredient.store)) || ''
+        : ''
+    const defaultStoreId = explicitStoreId || inferredStoreId
     const existing = candidatesByName.get(name)
 
     if (!existing) {
@@ -212,39 +309,208 @@ async function syncIngredientEntriesFromRecipe(recipe: Recipe): Promise<void> {
     }
   }
 
+  return candidatesByName
+}
+
+async function upsertIngredientEntriesFromCandidates(
+  candidatesByName: Map<string, IngredientEntryCandidate>
+): Promise<void> {
   const candidates = Array.from(candidatesByName.values())
   if (candidates.length === 0) return
 
-  const existing = await db.ingredientEntry.findMany({
+  const candidateNames = candidates.map((candidate) => candidate.name)
+  const existingEntries =
+    candidateNames.length > 500
+      ? await db.ingredientEntry.findMany({
+          select: {
+            id: true,
+            name: true,
+            defaultUnit: true,
+            defaultStoreId: true,
+          },
+        })
+      : await db.ingredientEntry.findMany({
+          where: {
+            OR: candidateNames.map((name) => ({
+              name: { equals: name, mode: 'insensitive' as const },
+            })),
+          },
+          select: {
+            id: true,
+            name: true,
+            defaultUnit: true,
+            defaultStoreId: true,
+          },
+        })
+
+  const existingByName = new Map<
+    string,
+    { id: string; name: string; defaultUnit: string; defaultStoreId: string | null }
+  >()
+  for (const existing of existingEntries) {
+    const normalized = normalizeIngredientNameForLookup(existing.name)
+    if (!normalized || existingByName.has(normalized)) continue
+    existingByName.set(normalized, existing)
+  }
+
+  const rowsToCreate: IngredientEntryCandidate[] = []
+  const rowsToUpdate: Array<{ id: string; defaultUnit?: string; defaultStoreId?: string | null }> =
+    []
+
+  for (const candidate of candidates) {
+    const existing = existingByName.get(candidate.name)
+    if (!existing) {
+      rowsToCreate.push(candidate)
+      continue
+    }
+
+    const nextDefaultUnit =
+      !existing.defaultUnit && candidate.defaultUnit ? candidate.defaultUnit : undefined
+    const nextDefaultStoreId =
+      !existing.defaultStoreId && candidate.defaultStoreId
+        ? candidate.defaultStoreId
+        : undefined
+
+    if (!nextDefaultUnit && !nextDefaultStoreId) continue
+    rowsToUpdate.push({
+      id: existing.id,
+      ...(nextDefaultUnit ? { defaultUnit: nextDefaultUnit } : {}),
+      ...(nextDefaultStoreId ? { defaultStoreId: nextDefaultStoreId } : {}),
+    })
+  }
+
+  if (rowsToCreate.length > 0) {
+    const now = new Date()
+    await db.ingredientEntry.createMany({
+      data: rowsToCreate.map((candidate, index) => ({
+        id: buildIngredientEntryId(candidate.name, index),
+        name: candidate.name,
+        defaultUnit: candidate.defaultUnit,
+        defaultStoreId: candidate.defaultStoreId || null,
+        category: 'Other',
+        createdAt: now,
+        updatedAt: now,
+      })),
+    })
+  }
+
+  if (rowsToUpdate.length > 0) {
+    const now = new Date()
+    await Promise.all(
+      rowsToUpdate.map((row) =>
+        db.ingredientEntry.update({
+          where: { id: row.id },
+          data: {
+            ...(row.defaultUnit !== undefined ? { defaultUnit: row.defaultUnit } : {}),
+            ...(row.defaultStoreId !== undefined
+              ? { defaultStoreId: row.defaultStoreId }
+              : {}),
+            updatedAt: now,
+          },
+        })
+      )
+    )
+  }
+}
+
+async function resolveIngredientDefaultStoreMaps(
+  ingredientNames: string[]
+): Promise<{
+  defaultStoreIdByName: Map<string, string>
+  storeNameById: Map<string, string>
+}> {
+  const normalizedNames = Array.from(
+    new Set(
+      ingredientNames
+        .map((name) => normalizeIngredientNameForLookup(name))
+        .filter((name) => name.length > 0)
+    )
+  )
+
+  if (normalizedNames.length === 0) {
+    return {
+      defaultStoreIdByName: new Map(),
+      storeNameById: new Map(),
+    }
+  }
+
+  const entries = await db.ingredientEntry.findMany({
     where: {
-      OR: candidates.map((candidate) => ({
-        name: { equals: candidate.name, mode: 'insensitive' as const },
+      OR: normalizedNames.map((name) => ({
+        name: { equals: name, mode: 'insensitive' as const },
       })),
     },
-    select: { name: true },
+    select: {
+      name: true,
+      defaultStoreId: true,
+    },
   })
 
-  const existingNames = new Set(
-    existing.map((entry) => normalizeIngredientEntryName(entry.name))
+  const defaultStoreIdByName = buildDefaultStoreIdByIngredientName(
+    entries.map((entry) => ({
+      name: entry.name,
+      defaultStoreId: entry.defaultStoreId || '',
+    }))
   )
+  if (defaultStoreIdByName.size === 0) {
+    return { defaultStoreIdByName, storeNameById: new Map() }
+  }
 
-  const rowsToCreate = candidates.filter(
-    (candidate) => !existingNames.has(candidate.name)
-  )
-  if (rowsToCreate.length === 0) return
-
-  const now = new Date()
-  await db.ingredientEntry.createMany({
-    data: rowsToCreate.map((candidate, index) => ({
-      id: buildIngredientEntryId(candidate.name, index),
-      name: candidate.name,
-      defaultUnit: candidate.defaultUnit,
-      defaultStoreId: candidate.defaultStoreId || null,
-      category: 'Other',
-      createdAt: now,
-      updatedAt: now,
-    })),
+  const storeIds = Array.from(new Set(defaultStoreIdByName.values()))
+  const stores = await db.groceryStore.findMany({
+    where: { id: { in: storeIds } },
+    select: {
+      id: true,
+      name: true,
+    },
   })
+
+  return {
+    defaultStoreIdByName,
+    storeNameById: buildStoreNameById(stores),
+  }
+}
+
+async function applyIngredientEntryDefaultsToRecipe(recipe: Recipe): Promise<Recipe> {
+  if (recipe.ingredients.length === 0) {
+    return recipe
+  }
+
+  const { defaultStoreIdByName, storeNameById } = await resolveIngredientDefaultStoreMaps(
+    recipe.ingredients.map((ingredient) => ingredient.name)
+  )
+  if (defaultStoreIdByName.size === 0) {
+    return recipe
+  }
+
+  const nextIngredients = applyDefaultStoresToIngredients(
+    recipe.ingredients,
+    defaultStoreIdByName,
+    storeNameById
+  )
+
+  if (nextIngredients === recipe.ingredients) {
+    return recipe
+  }
+
+  return {
+    ...recipe,
+    ingredients: nextIngredients,
+  }
+}
+
+async function syncIngredientEntriesFromRecipe(recipe: Recipe): Promise<void> {
+  const stores = await db.groceryStore.findMany({
+    select: {
+      id: true,
+      name: true,
+    },
+  })
+  const candidatesByName = buildIngredientEntryCandidatesFromIngredients(
+    recipe.ingredients,
+    buildStoreIdByNameMap(stores)
+  )
+  await upsertIngredientEntriesFromCandidates(candidatesByName)
 }
 
 function mapRecipe(row: {
@@ -286,7 +552,7 @@ function mapRecipe(row: {
       .map((item) => ({
         id: item.id,
         name: item.name,
-        qty: item.qty,
+        qty: sanitizeIngredientQty(item.qty),
         unit: item.unit,
         store: item.store,
         storeId: item.storeId || undefined,
@@ -326,6 +592,8 @@ function mapSnapshot(row: {
   createdAt: Date
   label: string
   description: string
+  isActive: boolean
+  activatedAt: Date | null
   meals: Array<{
     dateKey: string
     slot: string
@@ -341,6 +609,8 @@ function mapSnapshot(row: {
     createdAt: toIsoString(row.createdAt),
     label: row.label,
     description: row.description,
+    isActive: row.isActive,
+    activatedAt: row.activatedAt ? toIsoString(row.activatedAt) : undefined,
     meals: row.meals
       .map((meal) => mapSnapshotMeal(meal))
       .filter((meal): meal is MealPlanSnapshotMeal => meal !== null),
@@ -390,7 +660,100 @@ export async function plannerIsEmpty(): Promise<boolean> {
   )
 }
 
+async function syncIngredientEntriesFromAllRecipes(): Promise<void> {
+  const [stores, recipeIngredients] = await Promise.all([
+    db.groceryStore.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+    }),
+    db.recipeIngredient.findMany({
+      select: {
+        name: true,
+        unit: true,
+        storeId: true,
+        store: true,
+      },
+    }),
+  ])
+
+  if (recipeIngredients.length === 0) return
+
+  const candidatesByName = buildIngredientEntryCandidatesFromIngredients(
+    recipeIngredients,
+    buildStoreIdByNameMap(stores)
+  )
+  await upsertIngredientEntriesFromCandidates(candidatesByName)
+}
+
+async function normalizeInvalidRecipeIngredientQuantities(): Promise<void> {
+  await db.recipeIngredient.updateMany({
+    where: {
+      qty: { lte: 0 },
+    },
+    data: {
+      qty: null,
+    },
+  })
+}
+
+async function backfillRecipeIngredientMeasurements(): Promise<void> {
+  const candidates = await db.recipeIngredient.findMany({
+    where: {
+      qty: null,
+      unit: '',
+    },
+    select: {
+      id: true,
+      name: true,
+      qty: true,
+      unit: true,
+    },
+  })
+  if (candidates.length === 0) return
+
+  const updates: Array<{ id: string; name: string; qty: number | null; unit: string }> = []
+  for (const candidate of candidates) {
+    const parsed = parseIngredientMeasurementFromName(candidate.name)
+    if (!parsed) continue
+    if (
+      parsed.name === candidate.name &&
+      parsed.unit === candidate.unit &&
+      parsed.qty === sanitizeIngredientQty(candidate.qty)
+    ) {
+      continue
+    }
+    updates.push({
+      id: candidate.id,
+      name: parsed.name,
+      qty: parsed.qty,
+      unit: parsed.unit,
+    })
+  }
+
+  if (updates.length === 0) return
+
+  await Promise.all(
+    updates.map((update) =>
+      db.recipeIngredient.update({
+        where: { id: update.id },
+        data: {
+          name: update.name,
+          qty: update.qty,
+          unit: update.unit,
+        },
+      })
+    )
+  )
+}
+
 export async function getPlannerBootstrap(): Promise<PlannerBootstrapResponse> {
+  await normalizeInvalidRecipeIngredientQuantities()
+  await backfillRecipeIngredientMeasurements()
+  await syncIngredientEntriesFromAllRecipes()
+  await backfillUnmappedRecipeIngredientStores()
+
   const [recipesRaw, storesRaw, ingredientEntriesRaw, mealSlotsRaw, snapshotsRaw] =
     await Promise.all([
       db.recipe.findMany({
@@ -406,7 +769,7 @@ export async function getPlannerBootstrap(): Promise<PlannerBootstrapResponse> {
         orderBy: [{ dateKey: 'asc' }, { slot: 'asc' }],
       }),
       db.mealPlanSnapshot.findMany({
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
         include: {
           meals: { orderBy: [{ dateKey: 'asc' }, { slot: 'asc' }] },
         },
@@ -446,21 +809,24 @@ export async function getPlannerBootstrap(): Promise<PlannerBootstrapResponse> {
   }
 }
 
-async function upsertRecipe(recipe: Recipe): Promise<void> {
+async function upsertRecipe(recipe: Recipe): Promise<Recipe> {
+  const normalizedRecipe = normalizeRecipeForStorage(recipe)
+  const preparedRecipe = await applyIngredientEntryDefaultsToRecipe(normalizedRecipe)
+
   await db.recipe.upsert({
-    where: { id: recipe.id },
+    where: { id: preparedRecipe.id },
     create: {
-      id: recipe.id,
-      name: recipe.name,
-      description: recipe.description,
-      mealType: recipe.mealType,
-      servings: recipe.servings,
-      sourceUrl: recipe.sourceUrl,
-      imageUrl: recipe.imageUrl || null,
-      createdAt: new Date(recipe.createdAt),
-      updatedAt: new Date(recipe.updatedAt),
+      id: preparedRecipe.id,
+      name: preparedRecipe.name,
+      description: preparedRecipe.description,
+      mealType: preparedRecipe.mealType,
+      servings: preparedRecipe.servings,
+      sourceUrl: preparedRecipe.sourceUrl,
+      imageUrl: preparedRecipe.imageUrl || null,
+      createdAt: new Date(preparedRecipe.createdAt),
+      updatedAt: new Date(preparedRecipe.updatedAt),
       ingredients: {
-        create: recipe.ingredients.map((ingredient, index) => ({
+        create: preparedRecipe.ingredients.map((ingredient, index) => ({
           id: ingredient.id,
           name: ingredient.name,
           qty: ingredient.qty,
@@ -471,31 +837,31 @@ async function upsertRecipe(recipe: Recipe): Promise<void> {
         })),
       },
       steps: {
-        create: recipe.steps.map((text, index) => ({
+        create: preparedRecipe.steps.map((text, index) => ({
           text,
           position: index,
         })),
       },
     },
     update: {
-      name: recipe.name,
-      description: recipe.description,
-      mealType: recipe.mealType,
-      servings: recipe.servings,
-      sourceUrl: recipe.sourceUrl,
-      imageUrl: recipe.imageUrl || null,
-      updatedAt: new Date(recipe.updatedAt),
+      name: preparedRecipe.name,
+      description: preparedRecipe.description,
+      mealType: preparedRecipe.mealType,
+      servings: preparedRecipe.servings,
+      sourceUrl: preparedRecipe.sourceUrl,
+      imageUrl: preparedRecipe.imageUrl || null,
+      updatedAt: new Date(preparedRecipe.updatedAt),
     },
   })
 
-  await db.recipeIngredient.deleteMany({ where: { recipeId: recipe.id } })
-  await db.recipeStep.deleteMany({ where: { recipeId: recipe.id } })
+  await db.recipeIngredient.deleteMany({ where: { recipeId: preparedRecipe.id } })
+  await db.recipeStep.deleteMany({ where: { recipeId: preparedRecipe.id } })
 
-  if (recipe.ingredients.length > 0) {
+  if (preparedRecipe.ingredients.length > 0) {
     await db.recipeIngredient.createMany({
-      data: recipe.ingredients.map((ingredient, index) => ({
+      data: preparedRecipe.ingredients.map((ingredient, index) => ({
         id: ingredient.id,
-        recipeId: recipe.id,
+        recipeId: preparedRecipe.id,
         name: ingredient.name,
         qty: ingredient.qty,
         unit: ingredient.unit,
@@ -506,22 +872,24 @@ async function upsertRecipe(recipe: Recipe): Promise<void> {
     })
   }
 
-  if (recipe.steps.length > 0) {
+  if (preparedRecipe.steps.length > 0) {
     await db.recipeStep.createMany({
-      data: recipe.steps.map((text, index) => ({
-        recipeId: recipe.id,
+      data: preparedRecipe.steps.map((text, index) => ({
+        recipeId: preparedRecipe.id,
         text,
         position: index,
       })),
     })
   }
+
+  return preparedRecipe
 }
 
 export async function createRecipe(recipe: Recipe): Promise<Recipe> {
-  await upsertRecipe(recipe)
-  await syncIngredientEntriesFromRecipe(recipe)
+  const preparedRecipe = await upsertRecipe(recipe)
+  await syncIngredientEntriesFromRecipe(preparedRecipe)
   const next = await db.recipe.findUniqueOrThrow({
-    where: { id: recipe.id },
+    where: { id: preparedRecipe.id },
     include: {
       ingredients: { orderBy: { position: 'asc' } },
       steps: { orderBy: { position: 'asc' } },
@@ -534,10 +902,10 @@ export async function updateRecipe(id: string, recipe: Recipe): Promise<Recipe> 
   if (id !== recipe.id) {
     throw new Error('Recipe ID mismatch.')
   }
-  await upsertRecipe(recipe)
-  await syncIngredientEntriesFromRecipe(recipe)
+  const preparedRecipe = await upsertRecipe(recipe)
+  await syncIngredientEntriesFromRecipe(preparedRecipe)
   const next = await db.recipe.findUniqueOrThrow({
-    where: { id: recipe.id },
+    where: { id: preparedRecipe.id },
     include: {
       ingredients: { orderBy: { position: 'asc' } },
       steps: { orderBy: { position: 'asc' } },
@@ -551,6 +919,11 @@ export async function deleteRecipe(id: string): Promise<void> {
 }
 
 export async function getIngredientEntries(): Promise<IngredientEntry[]> {
+  await normalizeInvalidRecipeIngredientQuantities()
+  await backfillRecipeIngredientMeasurements()
+  await syncIngredientEntriesFromAllRecipes()
+  await backfillUnmappedRecipeIngredientStores()
+
   const rows = await db.ingredientEntry.findMany({
     orderBy: { name: 'asc' },
   })
@@ -717,6 +1090,7 @@ export async function createMealPlanSnapshot(options?: {
   description?: string
   startDate?: string
   days?: number
+  markActive?: boolean
 }): Promise<MealPlanSnapshot | null> {
   const range =
     options?.startDate && options?.days
@@ -789,25 +1163,37 @@ export async function createMealPlanSnapshot(options?: {
           year: 'numeric',
         }).format(now)}`)
   const description = (options?.description || '').trim()
+  const markActive = options?.markActive !== false
 
-  await db.mealPlanSnapshot.create({
-    data: {
-      id: snapshotId,
-      createdAt: now,
-      label,
-      description,
-      meals: {
-        create: meals.map((meal) => ({
-          dateKey: meal.day,
-          slot: meal.slot,
-          selection: meal.selection,
-          recipeId: meal.recipeId,
-          recipeName: meal.recipeName,
-          storeIds: meal.storeIds,
-          storeNames: meal.storeNames,
-        })),
+  await db.$transaction(async (tx) => {
+    if (markActive) {
+      await tx.mealPlanSnapshot.updateMany({
+        where: { isActive: true },
+        data: { isActive: false },
+      })
+    }
+
+    await tx.mealPlanSnapshot.create({
+      data: {
+        id: snapshotId,
+        createdAt: now,
+        label,
+        description,
+        isActive: markActive,
+        activatedAt: markActive ? now : null,
+        meals: {
+          create: meals.map((meal) => ({
+            dateKey: meal.day,
+            slot: meal.slot,
+            selection: meal.selection,
+            recipeId: meal.recipeId,
+            recipeName: meal.recipeName,
+            storeIds: meal.storeIds,
+            storeNames: meal.storeNames,
+          })),
+        },
       },
-    },
+    })
   })
 
   const created = await db.mealPlanSnapshot.findUniqueOrThrow({
@@ -817,8 +1203,72 @@ export async function createMealPlanSnapshot(options?: {
   return mapSnapshot(created)
 }
 
-export async function deleteMealPlanSnapshot(id: string): Promise<void> {
-  await db.mealPlanSnapshot.delete({ where: { id } })
+export async function activateMealPlanSnapshot(id: string): Promise<MealPlanSnapshot> {
+  return db.$transaction(async (tx) => {
+    const existing = await tx.mealPlanSnapshot.findUnique({
+      where: { id },
+      include: { meals: true },
+    })
+    if (!existing) {
+      throw new Error('Meal plan snapshot not found.')
+    }
+
+    const now = new Date()
+    await tx.mealPlanSnapshot.updateMany({
+      where: { isActive: true, NOT: { id } },
+      data: { isActive: false },
+    })
+    const updated = await tx.mealPlanSnapshot.update({
+      where: { id },
+      data: {
+        isActive: true,
+        activatedAt: now,
+      },
+      include: { meals: true },
+    })
+    return mapSnapshot(updated)
+  })
+}
+
+export async function deleteMealPlanSnapshot(id: string): Promise<{
+  nextActiveSnapshotId: string | null
+}> {
+  return db.$transaction(async (tx) => {
+    const existing = await tx.mealPlanSnapshot.findUnique({
+      where: { id },
+      select: { id: true, isActive: true },
+    })
+    if (!existing) {
+      throw new Error('Meal plan snapshot not found.')
+    }
+
+    await tx.mealPlanSnapshot.delete({ where: { id } })
+
+    if (!existing.isActive) {
+      const active = await tx.mealPlanSnapshot.findFirst({
+        where: { isActive: true },
+        select: { id: true },
+      })
+      return { nextActiveSnapshotId: active?.id ?? null }
+    }
+
+    const replacement = await tx.mealPlanSnapshot.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    })
+    if (!replacement) {
+      return { nextActiveSnapshotId: null }
+    }
+
+    await tx.mealPlanSnapshot.update({
+      where: { id: replacement.id },
+      data: {
+        isActive: true,
+        activatedAt: new Date(),
+      },
+    })
+    return { nextActiveSnapshotId: replacement.id }
+  })
 }
 
 export async function createStore(store: GroceryStore): Promise<GroceryStore> {
@@ -910,7 +1360,90 @@ export async function updateIngredientEntry(
       updatedAt: new Date(ingredient.updatedAt),
     },
   })
-  return mapIngredientEntry(updated)
+  const mapped = mapIngredientEntry(updated)
+  await applyDefaultStoresToUnmappedRecipeIngredients([
+    {
+      name: mapped.name,
+      defaultStoreId: mapped.defaultStoreId || null,
+    },
+  ])
+  return mapped
+}
+
+async function applyDefaultStoresToUnmappedRecipeIngredients(
+  entries: Array<{
+    name: string
+    defaultStoreId: string | null
+  }>
+): Promise<void> {
+  const defaultStoreIdByName = buildDefaultStoreIdByIngredientName(
+    entries.map((entry) => ({
+      name: entry.name,
+      defaultStoreId: entry.defaultStoreId || '',
+    }))
+  )
+  if (defaultStoreIdByName.size === 0) return
+
+  const storeIds = Array.from(new Set(defaultStoreIdByName.values()))
+  const stores = await db.groceryStore.findMany({
+    where: { id: { in: storeIds } },
+    select: {
+      id: true,
+      name: true,
+    },
+  })
+  const storeNameById = buildStoreNameById(stores)
+
+  await Promise.all(
+    Array.from(defaultStoreIdByName.entries()).map(([ingredientName, storeId]) =>
+      db.recipeIngredient.updateMany({
+        where: {
+          name: { equals: ingredientName, mode: 'insensitive' as const },
+          storeId: null,
+          store: '',
+        },
+        data: {
+          storeId,
+          store: storeNameById.get(storeId) || '',
+        },
+      })
+    )
+  )
+}
+
+async function backfillUnmappedRecipeIngredientStores(): Promise<void> {
+  const unmappedIngredientNames = await db.recipeIngredient.findMany({
+    where: {
+      storeId: null,
+      store: '',
+    },
+    select: {
+      name: true,
+    },
+    distinct: ['name'],
+  })
+  if (unmappedIngredientNames.length === 0) return
+
+  const entries = await db.ingredientEntry.findMany({
+    where: {
+      defaultStoreId: { not: null },
+      OR: unmappedIngredientNames.map((ingredient) => ({
+        name: { equals: ingredient.name, mode: 'insensitive' as const },
+      })),
+    },
+    select: {
+      name: true,
+      defaultStoreId: true,
+    },
+  })
+  if (entries.length === 0) return
+
+  await applyDefaultStoresToUnmappedRecipeIngredients(
+    entries.map((entry) => ({
+      name: entry.name,
+      defaultStoreId: entry.defaultStoreId,
+    }))
+  )
 }
 
 export async function bulkSetIngredientEntryDefaultStore(
@@ -953,7 +1486,63 @@ export async function bulkSetIngredientEntryDefaultStore(
     where: { id: { in: ids } },
     orderBy: { name: 'asc' },
   })
+  await applyDefaultStoresToUnmappedRecipeIngredients(
+    updated.map((entry) => ({
+      name: entry.name,
+      defaultStoreId: entry.defaultStoreId,
+    }))
+  )
   return updated.map((row) => mapIngredientEntry(row))
+}
+
+export async function bulkSetIngredientEntryCategory(
+  ingredientIds: string[],
+  category: string
+): Promise<IngredientEntry[]> {
+  const ids = Array.from(
+    new Set(
+      ingredientIds
+        .map((id) => String(id || '').trim())
+        .filter((id) => id.length > 0)
+    )
+  )
+  if (ids.length === 0) return []
+
+  const normalizedCategory = String(category || '').trim()
+  if (!normalizedCategory) {
+    throw new Error('Category is required.')
+  }
+
+  const now = new Date()
+  await db.ingredientEntry.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      category: normalizedCategory,
+      updatedAt: now,
+    },
+  })
+
+  const updated = await db.ingredientEntry.findMany({
+    where: { id: { in: ids } },
+    orderBy: { name: 'asc' },
+  })
+  return updated.map((row) => mapIngredientEntry(row))
+}
+
+export async function bulkDeleteIngredientEntries(ingredientIds: string[]): Promise<number> {
+  const ids = Array.from(
+    new Set(
+      ingredientIds
+        .map((id) => String(id || '').trim())
+        .filter((id) => id.length > 0)
+    )
+  )
+  if (ids.length === 0) return 0
+
+  const result = await db.ingredientEntry.deleteMany({
+    where: { id: { in: ids } },
+  })
+  return result.count
 }
 
 export async function deleteIngredientEntry(id: string): Promise<void> {
@@ -1079,36 +1668,37 @@ export async function importLocalMigration(
 
     const recipes = payload.recipes || []
     for (const recipe of recipes) {
+      const normalizedRecipe = normalizeRecipeForStorage(recipe)
       await tx.recipe.upsert({
-        where: { id: recipe.id },
+        where: { id: normalizedRecipe.id },
         create: {
-          id: recipe.id,
-          name: recipe.name,
-          description: recipe.description,
-          mealType: recipe.mealType,
-          servings: recipe.servings,
-          sourceUrl: recipe.sourceUrl,
-          imageUrl: recipe.imageUrl || null,
-          createdAt: new Date(recipe.createdAt),
-          updatedAt: new Date(recipe.updatedAt),
+          id: normalizedRecipe.id,
+          name: normalizedRecipe.name,
+          description: normalizedRecipe.description,
+          mealType: normalizedRecipe.mealType,
+          servings: normalizedRecipe.servings,
+          sourceUrl: normalizedRecipe.sourceUrl,
+          imageUrl: normalizedRecipe.imageUrl || null,
+          createdAt: new Date(normalizedRecipe.createdAt),
+          updatedAt: new Date(normalizedRecipe.updatedAt),
         },
         update: {
-          name: recipe.name,
-          description: recipe.description,
-          mealType: recipe.mealType,
-          servings: recipe.servings,
-          sourceUrl: recipe.sourceUrl,
-          imageUrl: recipe.imageUrl || null,
-          updatedAt: new Date(recipe.updatedAt),
+          name: normalizedRecipe.name,
+          description: normalizedRecipe.description,
+          mealType: normalizedRecipe.mealType,
+          servings: normalizedRecipe.servings,
+          sourceUrl: normalizedRecipe.sourceUrl,
+          imageUrl: normalizedRecipe.imageUrl || null,
+          updatedAt: new Date(normalizedRecipe.updatedAt),
         },
       })
-      await tx.recipeIngredient.deleteMany({ where: { recipeId: recipe.id } })
-      await tx.recipeStep.deleteMany({ where: { recipeId: recipe.id } })
-      if (recipe.ingredients.length > 0) {
+      await tx.recipeIngredient.deleteMany({ where: { recipeId: normalizedRecipe.id } })
+      await tx.recipeStep.deleteMany({ where: { recipeId: normalizedRecipe.id } })
+      if (normalizedRecipe.ingredients.length > 0) {
         await tx.recipeIngredient.createMany({
-          data: recipe.ingredients.map((ingredient, index) => ({
+          data: normalizedRecipe.ingredients.map((ingredient, index) => ({
             id: ingredient.id,
-            recipeId: recipe.id,
+            recipeId: normalizedRecipe.id,
             name: ingredient.name,
             qty: ingredient.qty,
             unit: ingredient.unit,
@@ -1118,10 +1708,10 @@ export async function importLocalMigration(
           })),
         })
       }
-      if (recipe.steps.length > 0) {
+      if (normalizedRecipe.steps.length > 0) {
         await tx.recipeStep.createMany({
-          data: recipe.steps.map((text, index) => ({
-            recipeId: recipe.id,
+          data: normalizedRecipe.steps.map((text, index) => ({
+            recipeId: normalizedRecipe.id,
             text,
             position: index,
           })),
@@ -1211,6 +1801,11 @@ export async function importLocalMigration(
       }
     }
   })
+
+  await normalizeInvalidRecipeIngredientQuantities()
+  await backfillRecipeIngredientMeasurements()
+  await syncIngredientEntriesFromAllRecipes()
+  await backfillUnmappedRecipeIngredientStores()
 
   return { imported: true }
 }

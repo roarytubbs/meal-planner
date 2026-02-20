@@ -52,6 +52,7 @@ Security rules:
 ## Scripts
 
 - `npm run dev`: Start Next.js dev server.
+- `npm run codex:run`: Codex-focused alias to start local dev server.
 - `npm run build`: Build the Next.js app.
 - `npm run start`: Run the production server.
 - `npm run lint`: Run ESLint.
@@ -60,6 +61,7 @@ Security rules:
 - `npm run db:push`: Push Prisma schema changes to Postgres.
 - `npm run db:migrate`: Create/apply local Prisma migrations.
 - `npm run db:migrate:deploy`: Apply committed migrations (used in deploy environments).
+- `npm run codex:verify`: Run the full validation suite (`lint`, `typecheck`, `test`, `build`).
 
 `dev`, `build`, and `test` enforce Node.js 22 via `/Users/rtubbs/Dev/meal-planner/scripts/check-node-version.mjs`.
 

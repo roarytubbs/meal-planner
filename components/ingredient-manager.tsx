@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import {
   Apple,
+  ChevronDown,
   Plus,
   Pencil,
   Trash2,
@@ -34,6 +35,12 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -49,6 +56,8 @@ import {
   addIngredientEntry,
   updateIngredientEntry,
   bulkUpdateIngredientDefaultStore,
+  bulkUpdateIngredientCategory,
+  bulkDeleteIngredientEntries,
   deleteIngredientEntry,
 } from '@/lib/meal-planner-store'
 
@@ -297,9 +306,14 @@ export function IngredientManager() {
   const [selectedIngredientIds, setSelectedIngredientIds] = useState<Set<string>>(
     new Set()
   )
-  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+  const [bulkStoreDialogOpen, setBulkStoreDialogOpen] = useState(false)
+  const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkStoreId, setBulkStoreId] = useState<string>('__none')
+  const [bulkCategory, setBulkCategory] = useState<string>('Pantry')
   const [bulkApplying, setBulkApplying] = useState(false)
+  const [bulkCategoryApplying, setBulkCategoryApplying] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const handleAdd = useCallback(() => {
     setEditingEntry(null)
@@ -365,13 +379,35 @@ export function IngredientManager() {
     () => entries.filter((entry) => selectedIngredientIds.has(entry.id)),
     [entries, selectedIngredientIds]
   )
+  const sharedSelectedStoreId = useMemo(() => {
+    if (selectedEntries.length === 0) return '__none'
+    const [first, ...rest] = selectedEntries
+    const baseline = first.defaultStoreId || '__none'
+    const allSame = rest.every(
+      (entry) => (entry.defaultStoreId || '__none') === baseline
+    )
+    return allSame ? baseline : '__none'
+  }, [selectedEntries])
+  const sharedSelectedCategory = useMemo(() => {
+    if (selectedEntries.length === 0) return 'Other'
+    const [first, ...rest] = selectedEntries
+    const baseline = first.category || 'Other'
+    const allSame = rest.every((entry) => (entry.category || 'Other') === baseline)
+    return allSame ? baseline : 'Other'
+  }, [selectedEntries])
   const selectedCount = selectedEntries.length
   const selectedFilteredCount = useMemo(
     () => filtered.filter((entry) => selectedIngredientIds.has(entry.id)).length,
     [filtered, selectedIngredientIds]
   )
+  const filteredIds = useMemo(
+    () => filtered.map((entry) => entry.id),
+    [filtered]
+  )
   const allFilteredSelected =
     filtered.length > 0 && selectedFilteredCount === filtered.length
+  const someFilteredSelected =
+    selectedFilteredCount > 0 && !allFilteredSelected
 
   useEffect(() => {
     const validIds = new Set(entries.map((entry) => entry.id))
@@ -390,10 +426,12 @@ export function IngredientManager() {
   }, [totalPages])
 
   useEffect(() => {
-    if (selectedIngredientIds.size === 0 && bulkDialogOpen) {
-      setBulkDialogOpen(false)
+    if (selectedIngredientIds.size === 0) {
+      setBulkStoreDialogOpen(false)
+      setBulkCategoryDialogOpen(false)
+      setBulkDeleteOpen(false)
     }
-  }, [selectedIngredientIds, bulkDialogOpen])
+  }, [selectedIngredientIds])
 
   const toggleIngredientSelection = useCallback((id: string, checked: boolean) => {
     setSelectedIngredientIds((prev) => {
@@ -407,19 +445,22 @@ export function IngredientManager() {
     })
   }, [])
 
-  const handleSelectAllFiltered = useCallback(() => {
-    setSelectedIngredientIds((prev) => {
-      const next = new Set(prev)
-      for (const entry of filtered) {
-        next.add(entry.id)
-      }
-      return next
-    })
-  }, [filtered])
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedIngredientIds(new Set())
-  }, [])
+  const handleToggleSelectAllFiltered = useCallback(
+    (checked: boolean) => {
+      setSelectedIngredientIds((prev) => {
+        const next = new Set(prev)
+        for (const id of filteredIds) {
+          if (checked) {
+            next.add(id)
+          } else {
+            next.delete(id)
+          }
+        }
+        return next
+      })
+    },
+    [filteredIds]
+  )
 
   const handleBulkApplyDefaultStore = useCallback(async () => {
     if (selectedEntries.length === 0) {
@@ -455,7 +496,7 @@ export function IngredientManager() {
       toast.success('Default store updated', {
         description: `Updated ${updated.length} ingredient${updated.length === 1 ? '' : 's'} to ${storeName}.`,
       })
-      setBulkDialogOpen(false)
+      setBulkStoreDialogOpen(false)
     } catch (error) {
       const message =
         error instanceof Error
@@ -466,6 +507,68 @@ export function IngredientManager() {
       setBulkApplying(false)
     }
   }, [bulkStoreId, selectedEntries, stores])
+
+  const handleBulkApplyCategory = useCallback(async () => {
+    if (selectedEntries.length === 0) {
+      toast.error('Select one or more ingredients first.')
+      return
+    }
+
+    const normalizedCategory = String(bulkCategory || '').trim()
+    if (!normalizedCategory) {
+      toast.error('Select a category to apply.')
+      return
+    }
+
+    const targetEntries = selectedEntries.filter(
+      (entry) => entry.category !== normalizedCategory
+    )
+    if (targetEntries.length === 0) {
+      toast.info('No changes needed for selected ingredients.')
+      return
+    }
+
+    setBulkCategoryApplying(true)
+    try {
+      const updated = await bulkUpdateIngredientCategory(
+        targetEntries.map((entry) => entry.id),
+        normalizedCategory
+      )
+      toast.success('Ingredient type updated', {
+        description: `Updated ${updated.length} ingredient${updated.length === 1 ? '' : 's'} to ${normalizedCategory}.`,
+      })
+      setBulkCategoryDialogOpen(false)
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to update ingredient type for selected ingredients.'
+      toast.error(message)
+    } finally {
+      setBulkCategoryApplying(false)
+    }
+  }, [bulkCategory, selectedEntries])
+
+  const handleBulkDeleteSelected = useCallback(async () => {
+    if (selectedEntries.length === 0) return
+
+    const ids = selectedEntries.map((entry) => entry.id)
+    setBulkDeleting(true)
+    try {
+      const deletedCount = await bulkDeleteIngredientEntries(ids)
+      setSelectedIngredientIds(new Set())
+      setBulkDeleteOpen(false)
+      toast.success('Ingredients removed', {
+        description: `Deleted ${deletedCount} ingredient${deletedCount === 1 ? '' : 's'}.`,
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to delete selected ingredients.'
+      toast.error(message)
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [selectedEntries])
 
   const getStoreName = useCallback(
     (storeId: string) => {
@@ -600,41 +703,48 @@ export function IngredientManager() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleSelectAllFiltered}
-          disabled={filtered.length === 0 || allFilteredSelected}
-        >
-          Select all filtered ({filtered.length})
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleClearSelection}
-          disabled={selectedCount === 0}
-        >
-          Clear selection
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          {selectedCount} selected
-          {selectedFilteredCount !== selectedCount
-            ? ` (${selectedFilteredCount} in current view)`
-            : ''}
-        </span>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() => setBulkDialogOpen(true)}
-          disabled={selectedCount === 0}
-        >
-          Set Default Store
-        </Button>
-      </div>
+      {selectedCount > 0 ? (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+          <span className="text-sm text-foreground">
+            {selectedCount} selected
+            {selectedFilteredCount !== selectedCount
+              ? ` (${selectedFilteredCount} in current view)`
+              : ''}
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="sm" variant="secondary">
+                Actions
+                <ChevronDown className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => {
+                  setBulkStoreId(sharedSelectedStoreId)
+                  setBulkStoreDialogOpen(true)
+                }}
+              >
+                Set default store
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setBulkCategory(sharedSelectedCategory)
+                  setBulkCategoryDialogOpen(true)
+                }}
+              >
+                Change ingredient type
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={() => setBulkDeleteOpen(true)}
+              >
+                Delete selected
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : null}
 
       {/* Flat list */}
       {sortedFiltered.length === 0 ? (
@@ -668,10 +778,25 @@ export function IngredientManager() {
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="w-10 px-3 py-2 text-left font-medium">
-                      <span className="sr-only">Select</span>
+                    <th className="px-3 py-2 text-left font-medium">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={
+                            allFilteredSelected
+                              ? true
+                              : someFilteredSelected
+                                ? 'indeterminate'
+                                : false
+                          }
+                          onCheckedChange={(checked) =>
+                            handleToggleSelectAllFiltered(checked === true)
+                          }
+                          disabled={filtered.length === 0}
+                          aria-label="Select all filtered ingredients"
+                        />
+                        <span>Ingredient</span>
+                      </div>
                     </th>
-                    <th className="px-3 py-2 text-left font-medium">Ingredient</th>
                     <th className="px-3 py-2 text-left font-medium">Unit</th>
                     <th className="px-3 py-2 text-left font-medium">Type</th>
                     <th className="px-3 py-2 text-left font-medium">Store</th>
@@ -684,16 +809,16 @@ export function IngredientManager() {
                     return (
                       <tr key={entry.id} className="hover:bg-muted/20">
                         <td className="px-3 py-2.5 align-middle">
-                          <Checkbox
-                            checked={selectedIngredientIds.has(entry.id)}
-                            onCheckedChange={(checked) =>
-                              toggleIngredientSelection(entry.id, checked === true)
-                            }
-                            aria-label={`Select ${entry.name}`}
-                          />
-                        </td>
-                        <td className="px-3 py-2.5 align-middle font-medium text-foreground">
-                          {entry.name}
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={selectedIngredientIds.has(entry.id)}
+                              onCheckedChange={(checked) =>
+                                toggleIngredientSelection(entry.id, checked === true)
+                              }
+                              aria-label={`Select ${entry.name}`}
+                            />
+                            <span className="font-medium text-foreground">{entry.name}</span>
+                          </div>
                         </td>
                         <td className="px-3 py-2.5 align-middle text-muted-foreground">
                           {entry.defaultUnit || '—'}
@@ -821,7 +946,7 @@ export function IngredientManager() {
         </div>
       )}
 
-      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+      <Dialog open={bulkStoreDialogOpen} onOpenChange={setBulkStoreDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Set Default Store</DialogTitle>
@@ -848,7 +973,7 @@ export function IngredientManager() {
               </Select>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setBulkStoreDialogOpen(false)}>
                 Cancel
               </Button>
               <Button
@@ -862,6 +987,73 @@ export function IngredientManager() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={bulkCategoryDialogOpen} onOpenChange={setBulkCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Change Ingredient Type</DialogTitle>
+            <DialogDescription>
+              Update type for {selectedCount} selected ingredient
+              {selectedCount === 1 ? '' : 's'}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="bulk-category">Type</Label>
+              <Select value={bulkCategory} onValueChange={setBulkCategory}>
+                <SelectTrigger id="bulk-category" className="h-9">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setBulkCategoryDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleBulkApplyCategory()}
+                disabled={bulkCategoryApplying}
+              >
+                {bulkCategoryApplying ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                Apply
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedCount} selected ingredient{selectedCount === 1 ? '' : 's'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the selected ingredients from your database. Existing recipes
+              using them will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleBulkDeleteSelected()}
+              disabled={bulkDeleting}
+            >
+              {bulkDeleting ? <Loader2 className="size-4 animate-spin" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Add/Edit Dialog */}
       <IngredientDialog

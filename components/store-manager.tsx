@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   MapPin,
   Phone,
@@ -96,10 +97,12 @@ export function StoreDialog({
   open,
   onOpenChange,
   editingStore,
+  onSaved,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   editingStore: GroceryStore | null
+  onSaved?: (store: GroceryStore, mode: 'create' | 'update') => void
 }) {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
@@ -281,14 +284,19 @@ export function StoreDialog({
     }
 
     try {
+      let saved: GroceryStore
+      let mode: 'create' | 'update'
       if (editingStore) {
-        await updateGroceryStore(storeData)
+        saved = await updateGroceryStore(storeData)
+        mode = 'update'
         toast.success('Store updated', { description: storeData.name })
       } else {
-        await addGroceryStore(storeData)
+        saved = await addGroceryStore(storeData)
+        mode = 'create'
         toast.success('Store added', { description: storeData.name })
       }
       onOpenChange(false)
+      onSaved?.(saved, mode)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to save store.'
@@ -308,6 +316,7 @@ export function StoreDialog({
     targetStoreId,
     editingStore,
     onOpenChange,
+    onSaved,
     stores,
   ])
 
@@ -529,11 +538,9 @@ export function StoreDialog({
 // ---- Store Card ----
 function StoreCard({
   store,
-  onEdit,
   onDelete,
 }: {
   store: GroceryStore
-  onEdit: (store: GroceryStore) => void
   onDelete: (id: string) => Promise<void> | void
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -634,9 +641,6 @@ function StoreCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => onEdit(store)}>
-                  Edit
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
                   onSelect={() => setDeleteOpen(true)}
@@ -673,20 +677,23 @@ function StoreCard({
 
 // ---- Main Store Manager ----
 export function StoreManager() {
+  const router = useRouter()
   const stores = useGroceryStores()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingStore, setEditingStore] = useState<GroceryStore | null>(null)
   const [search, setSearch] = useState('')
 
   const handleAdd = useCallback(() => {
-    setEditingStore(null)
     setDialogOpen(true)
   }, [])
 
-  const handleEdit = useCallback((store: GroceryStore) => {
-    setEditingStore(store)
-    setDialogOpen(true)
-  }, [])
+  const handleSaved = useCallback(
+    (store: GroceryStore, mode: 'create' | 'update') => {
+      if (mode === 'create') {
+        router.push(`/stores/${encodeURIComponent(store.id)}`)
+      }
+    },
+    [router]
+  )
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -774,7 +781,6 @@ export function StoreManager() {
             <StoreCard
               key={store.id}
               store={store}
-              onEdit={handleEdit}
               onDelete={handleDelete}
             />
           ))}
@@ -785,7 +791,8 @@ export function StoreManager() {
       <StoreDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        editingStore={editingStore}
+        editingStore={null}
+        onSaved={handleSaved}
       />
     </div>
   )

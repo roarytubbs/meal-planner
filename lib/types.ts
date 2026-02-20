@@ -122,6 +122,8 @@ export interface MealPlanSnapshot {
   createdAt: string
   label: string
   description: string
+  isActive: boolean
+  activatedAt?: string
   meals: MealPlanSnapshotMeal[]
 }
 
