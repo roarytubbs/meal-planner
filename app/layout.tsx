@@ -1,14 +1,23 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Manrope, Sora } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const bodyFont = Manrope({
+  subsets: ['latin'],
+  variable: '--font-body',
+  weight: ['400', '500', '600', '700', '800'],
+})
+
+const displayFont = Sora({
+  subsets: ['latin'],
+  variable: '--font-display',
+  weight: ['500', '600', '700'],
+})
 
 export const viewport: Viewport = {
-  themeColor: '#0a0a0a',
+  themeColor: '#0f1a17',
   width: 'device-width',
   initialScale: 1,
 }
@@ -44,11 +53,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased">
+      <body className={`${bodyFont.variable} ${displayFont.variable} font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           {children}

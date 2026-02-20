@@ -182,7 +182,7 @@ async function createTargetCartSession(
   const endpoint = getServerEnv('TARGET_CART_SESSION_ENDPOINT')
   if (!endpoint) {
     throw new ShoppingCartError(
-      'Target cart integration is not configured.',
+      'Target cart endpoint is not configured on this server.',
       503,
       'PROVIDER_NOT_CONFIGURED'
     )

@@ -1,0 +1,3 @@
+ALTER TABLE "recipes"
+ADD COLUMN "rating" DOUBLE PRECISION,
+ADD COLUMN "total_minutes" INTEGER;

@@ -60,6 +60,8 @@ export const recipeSchema = z.object({
   description: boundedString(1000),
   mealType: mealTypeSchema,
   servings: z.number().int().min(1).max(100),
+  rating: z.number().min(0).max(5).optional(),
+  totalMinutes: z.number().int().min(1).max(1440).optional(),
   ingredients: z.array(ingredientSchema).max(300),
   steps: z.array(boundedString(2000).min(1)).max(200),
   sourceUrl: boundedString(500),
@@ -196,6 +198,7 @@ export const snapshotCreateSchema = z
     description: z.string().trim().max(1000).optional(),
     startDate: dateKeySchema.optional(),
     days: z.number().int().min(1).max(14).optional(),
+    markActive: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
     const hasStart = Boolean(value.startDate)

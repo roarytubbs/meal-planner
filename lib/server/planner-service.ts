@@ -1,4 +1,5 @@
 import { db } from '@/lib/server/db'
+import { getServerEnv } from '@/lib/server/env'
 import { Prisma } from '@prisma/client'
 import { parseIngredients } from '@/lib/ingredient-parser'
 import {
@@ -519,6 +520,8 @@ function mapRecipe(row: {
   description: string
   mealType: string
   servings: number
+  rating: number | null
+  totalMinutes: number | null
   sourceUrl: string
   imageUrl: string | null
   createdAt: Date
@@ -543,6 +546,16 @@ function mapRecipe(row: {
     description: row.description,
     mealType: row.mealType as Recipe['mealType'],
     servings: row.servings,
+    rating:
+      typeof row.rating === 'number' && Number.isFinite(row.rating)
+        ? Math.max(0, Math.min(5, Math.round(row.rating * 10) / 10))
+        : undefined,
+    totalMinutes:
+      typeof row.totalMinutes === 'number' &&
+      Number.isFinite(row.totalMinutes) &&
+      row.totalMinutes > 0
+        ? Math.round(row.totalMinutes)
+        : undefined,
     sourceUrl: row.sourceUrl,
     imageUrl: row.imageUrl || undefined,
     createdAt: toIsoString(row.createdAt),
@@ -798,6 +811,9 @@ export async function getPlannerBootstrap(): Promise<PlannerBootstrapResponse> {
         ingredientEntries.length === 0 &&
         assignmentCount === 0 &&
         mealPlanSnapshots.length === 0,
+      shoppingCartProviderConfigured: Boolean(
+        getServerEnv('TARGET_CART_SESSION_ENDPOINT')
+      ),
       counts: {
         recipes: recipes.length,
         stores: groceryStores.length,
@@ -821,6 +837,16 @@ async function upsertRecipe(recipe: Recipe): Promise<Recipe> {
       description: preparedRecipe.description,
       mealType: preparedRecipe.mealType,
       servings: preparedRecipe.servings,
+      rating:
+        typeof preparedRecipe.rating === 'number' && Number.isFinite(preparedRecipe.rating)
+          ? Math.max(0, Math.min(5, Math.round(preparedRecipe.rating * 10) / 10))
+          : null,
+      totalMinutes:
+        typeof preparedRecipe.totalMinutes === 'number' &&
+        Number.isFinite(preparedRecipe.totalMinutes) &&
+        preparedRecipe.totalMinutes > 0
+          ? Math.round(preparedRecipe.totalMinutes)
+          : null,
       sourceUrl: preparedRecipe.sourceUrl,
       imageUrl: preparedRecipe.imageUrl || null,
       createdAt: new Date(preparedRecipe.createdAt),
@@ -848,6 +874,16 @@ async function upsertRecipe(recipe: Recipe): Promise<Recipe> {
       description: preparedRecipe.description,
       mealType: preparedRecipe.mealType,
       servings: preparedRecipe.servings,
+      rating:
+        typeof preparedRecipe.rating === 'number' && Number.isFinite(preparedRecipe.rating)
+          ? Math.max(0, Math.min(5, Math.round(preparedRecipe.rating * 10) / 10))
+          : null,
+      totalMinutes:
+        typeof preparedRecipe.totalMinutes === 'number' &&
+        Number.isFinite(preparedRecipe.totalMinutes) &&
+        preparedRecipe.totalMinutes > 0
+          ? Math.round(preparedRecipe.totalMinutes)
+          : null,
       sourceUrl: preparedRecipe.sourceUrl,
       imageUrl: preparedRecipe.imageUrl || null,
       updatedAt: new Date(preparedRecipe.updatedAt),
@@ -1227,6 +1263,115 @@ export async function activateMealPlanSnapshot(id: string): Promise<MealPlanSnap
       include: { meals: true },
     })
     return mapSnapshot(updated)
+  })
+}
+
+export async function updateMealPlanSnapshot(
+  id: string,
+  options?: {
+    label?: string
+    description?: string
+    markActive?: boolean
+  }
+): Promise<MealPlanSnapshot> {
+  return db.$transaction(async (tx) => {
+    const existing = await tx.mealPlanSnapshot.findUnique({
+      where: { id },
+      include: { meals: true },
+    })
+    if (!existing) {
+      throw new Error('Meal plan snapshot not found.')
+    }
+
+    const label =
+      typeof options?.label === 'string' ? options.label.trim() : undefined
+    const description =
+      typeof options?.description === 'string'
+        ? options.description.trim()
+        : undefined
+    const markActive = options?.markActive === true
+
+    if (markActive) {
+      await tx.mealPlanSnapshot.updateMany({
+        where: { isActive: true, NOT: { id } },
+        data: { isActive: false },
+      })
+    }
+
+    const updated = await tx.mealPlanSnapshot.update({
+      where: { id },
+      data: {
+        label,
+        description,
+        isActive: markActive ? true : undefined,
+        activatedAt: markActive ? new Date() : undefined,
+      },
+      include: { meals: true },
+    })
+
+    return mapSnapshot(updated)
+  })
+}
+
+export async function duplicateMealPlanSnapshot(
+  id: string,
+  options?: {
+    label?: string
+    description?: string
+    markActive?: boolean
+  }
+): Promise<MealPlanSnapshot> {
+  return db.$transaction(async (tx) => {
+    const existing = await tx.mealPlanSnapshot.findUnique({
+      where: { id },
+      include: { meals: true },
+    })
+    if (!existing) {
+      throw new Error('Meal plan snapshot not found.')
+    }
+
+    const now = new Date()
+    const nextId = `mps_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`
+    const label =
+      (options?.label || '').trim() ||
+      `${existing.label.trim() || 'Meal Plan'} (Copy)`
+    const description = (options?.description ?? existing.description ?? '').trim()
+    const markActive = options?.markActive === true
+
+    if (markActive) {
+      await tx.mealPlanSnapshot.updateMany({
+        where: { isActive: true },
+        data: { isActive: false },
+      })
+    }
+
+    await tx.mealPlanSnapshot.create({
+      data: {
+        id: nextId,
+        createdAt: now,
+        label,
+        description,
+        isActive: markActive,
+        activatedAt: markActive ? now : null,
+        meals: {
+          create: existing.meals.map((meal) => ({
+            dateKey: meal.dateKey,
+            slot: meal.slot,
+            selection: meal.selection,
+            recipeId: meal.recipeId,
+            recipeName: meal.recipeName,
+            storeIds: meal.storeIds,
+            storeNames: meal.storeNames,
+          })),
+        },
+      },
+    })
+
+    const created = await tx.mealPlanSnapshot.findUniqueOrThrow({
+      where: { id: nextId },
+      include: { meals: true },
+    })
+    return mapSnapshot(created)
   })
 }
 

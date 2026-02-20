@@ -12,6 +12,7 @@ export async function POST(request: Request) {
       description: payload.description,
       startDate: payload.startDate,
       days: payload.days,
+      markActive: payload.markActive,
     })
     if (!snapshot) {
       return NextResponse.json({ error: 'No meals to snapshot.' }, { status: 400 })

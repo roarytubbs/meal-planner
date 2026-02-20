@@ -11,7 +11,6 @@ import { MealPlannerView } from '@/components/meal-planner-view'
 import { RecipeImportDialog } from '@/components/recipe-import-dialog'
 import { StoreManager } from '@/components/store-manager'
 import { IngredientManager } from '@/components/ingredient-manager'
-import { MealPlanHistorySection } from '@/components/meal-plan-history-section'
 import { addRecipe, updateRecipe, useRecipes, useStoreStatus } from '@/lib/meal-planner-store'
 import { toast } from 'sonner'
 import type { Recipe, RecipeMode } from '@/lib/types'
@@ -114,6 +113,16 @@ export default function MealPlannerPage() {
       description: partial.description || '',
       mealType: partial.mealType ?? '',
       servings: partial.servings || 4,
+      rating:
+        typeof partial.rating === 'number' && Number.isFinite(partial.rating)
+          ? Math.max(0, Math.min(5, Math.round(partial.rating * 10) / 10))
+          : undefined,
+      totalMinutes:
+        typeof partial.totalMinutes === 'number' &&
+        Number.isFinite(partial.totalMinutes) &&
+        partial.totalMinutes > 0
+          ? Math.round(partial.totalMinutes)
+          : undefined,
       ingredients: partial.ingredients || [],
       steps: partial.steps || [''],
       sourceUrl: partial.sourceUrl || '',
@@ -151,7 +160,7 @@ export default function MealPlannerPage() {
       <AppHeader activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Content */}
-      <div className="mx-auto max-w-7xl px-4 py-6">
+      <div className="mx-auto max-w-7xl px-5 py-10 sm:py-12">
         {loading ? (
           <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
             Loading planner data...
@@ -173,7 +182,6 @@ export default function MealPlannerPage() {
           <>
             <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as AppTab)}>
               <TabsContent value="recipes">
-                <MealPlanHistorySection />
                 <RecipeLibrary
                   onAddRecipe={handleAddRecipe}
                   onEditRecipe={handleEditRecipe}

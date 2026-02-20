@@ -5,8 +5,7 @@ import {
   Apple,
   ChevronDown,
   Plus,
-  Pencil,
-  Trash2,
+  MoreHorizontal,
   Search,
   X,
   Loader2,
@@ -32,14 +31,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -293,15 +298,29 @@ function IngredientDialog({
 }
 
 // ---- Main Ingredient Manager ----
-export function IngredientManager() {
+interface IngredientManagerProps {
+  title?: string
+  subtitle?: string | null
+  initialFilterStoreId?: string
+  showIcon?: boolean
+}
+
+export function IngredientManager({
+  title = 'Ingredients',
+  subtitle,
+  initialFilterStoreId,
+  showIcon = true,
+}: IngredientManagerProps = {}) {
   const entries = useIngredientEntries()
   const stores = useGroceryStores()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<IngredientEntry | null>(null)
   const [search, setSearch] = useState('')
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const [filterCategory, setFilterCategory] = useState<string>('all')
-  const [filterStoreId, setFilterStoreId] = useState<string>('all')
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false)
+  const [filterCategories, setFilterCategories] = useState<string[]>([])
+  const [filterStoreIds, setFilterStoreIds] = useState<string[]>(
+    initialFilterStoreId ? [initialFilterStoreId] : []
+  )
   const [page, setPage] = useState(1)
   const [selectedIngredientIds, setSelectedIngredientIds] = useState<Set<string>>(
     new Set()
@@ -314,6 +333,7 @@ export function IngredientManager() {
   const [bulkApplying, setBulkApplying] = useState(false)
   const [bulkCategoryApplying, setBulkCategoryApplying] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [rowDeleteConfirm, setRowDeleteConfirm] = useState<IngredientEntry | null>(null)
 
   const handleAdd = useCallback(() => {
     setEditingEntry(null)
@@ -330,6 +350,7 @@ export function IngredientManager() {
       const entry = entries.find((e) => e.id === id)
       try {
         await deleteIngredientEntry(id)
+        setRowDeleteConfirm((prev) => (prev?.id === id ? null : prev))
         setSelectedIngredientIds((prev) => {
           if (!prev.has(id)) return prev
           const next = new Set(prev)
@@ -353,16 +374,19 @@ export function IngredientManager() {
       const q = search.toLowerCase()
       list = list.filter((e) => e.name.toLowerCase().includes(q))
     }
-    if (filterCategory !== 'all') {
-      list = list.filter((e) => e.category === filterCategory)
+    if (filterCategories.length > 0) {
+      list = list.filter((e) => filterCategories.includes(e.category))
     }
-    if (filterStoreId === '__none') {
-      list = list.filter((e) => !e.defaultStoreId)
-    } else if (filterStoreId !== 'all') {
-      list = list.filter((e) => e.defaultStoreId === filterStoreId)
+    if (filterStoreIds.length > 0) {
+      list = list.filter((e) => {
+        if (!e.defaultStoreId) {
+          return filterStoreIds.includes('__none')
+        }
+        return filterStoreIds.includes(e.defaultStoreId)
+      })
     }
     return list
-  }, [entries, search, filterCategory, filterStoreId])
+  }, [entries, filterCategories, filterStoreIds, search])
 
   const sortedFiltered = useMemo(
     () => [...filtered].sort((a, b) => a.name.localeCompare(b.name)),
@@ -418,8 +442,16 @@ export function IngredientManager() {
   }, [entries])
 
   useEffect(() => {
+    if (!initialFilterStoreId) {
+      setFilterStoreIds([])
+      return
+    }
+    setFilterStoreIds([initialFilterStoreId])
+  }, [initialFilterStoreId])
+
+  useEffect(() => {
     setPage(1)
-  }, [search, filterCategory, filterStoreId])
+  }, [search, filterCategories, filterStoreIds])
 
   useEffect(() => {
     setPage((prev) => (prev > totalPages ? totalPages : prev))
@@ -462,14 +494,33 @@ export function IngredientManager() {
     [filteredIds]
   )
 
+  const toggleFilterCategory = useCallback((category: string, checked: boolean) => {
+    setFilterCategories((prev) => {
+      if (checked) {
+        if (prev.includes(category)) return prev
+        return [...prev, category]
+      }
+      return prev.filter((item) => item !== category)
+    })
+  }, [])
+
+  const toggleFilterStore = useCallback((storeId: string, checked: boolean) => {
+    setFilterStoreIds((prev) => {
+      if (checked) {
+        if (prev.includes(storeId)) return prev
+        return [...prev, storeId]
+      }
+      return prev.filter((item) => item !== storeId)
+    })
+  }, [])
+
   const handleBulkApplyDefaultStore = useCallback(async () => {
     if (selectedEntries.length === 0) {
       toast.error('Select one or more ingredients first.')
       return
     }
 
-    const normalizedStoreId =
-      bulkStoreId === '__none' ? '' : String(bulkStoreId || '').trim()
+    const normalizedStoreId = bulkStoreId === '__none' ? '' : String(bulkStoreId || '').trim()
     if (normalizedStoreId && !stores.some((store) => store.id === normalizedStoreId)) {
       toast.error('Selected store no longer exists.')
       return
@@ -490,8 +541,7 @@ export function IngredientManager() {
         normalizedStoreId
       )
       const storeName = normalizedStoreId
-        ? (stores.find((store) => store.id === normalizedStoreId)?.name ??
-          'selected store')
+        ? (stores.find((store) => store.id === normalizedStoreId)?.name ?? 'selected store')
         : 'No default store'
       toast.success('Default store updated', {
         description: `Updated ${updated.length} ingredient${updated.length === 1 ? '' : 's'} to ${storeName}.`,
@@ -588,24 +638,38 @@ export function IngredientManager() {
   }, [entries])
 
   const activeFilterCount =
-    Number(filterCategory !== 'all') + Number(filterStoreId !== 'all')
+    Number(filterCategories.length > 0) + Number(filterStoreIds.length > 0)
   const showingStart = sortedFiltered.length === 0 ? 0 : startIndex + 1
   const showingEnd = Math.min(startIndex + PAGE_SIZE, sortedFiltered.length)
+  const selectedStoreLabels = useMemo(
+    () =>
+      filterStoreIds.map((storeId) => {
+        if (storeId === '__none') return { id: storeId, label: 'No default store' }
+        return {
+          id: storeId,
+          label: stores.find((store) => store.id === storeId)?.name || 'Unknown store',
+        }
+      }),
+    [filterStoreIds, stores]
+  )
+  const subtitleText =
+    subtitle === undefined
+      ? `${entries.length} ingredient${entries.length !== 1 ? 's' : ''} in your database`
+      : subtitle
 
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <Apple className="size-5 text-muted-foreground" />
+          {showIcon ? <Apple className="size-5 text-muted-foreground" /> : null}
           <div>
             <h2 className="text-xl font-bold text-foreground leading-tight">
-              Ingredients
+              {title}
             </h2>
-            <p className="text-xs text-muted-foreground">
-              {entries.length} ingredient{entries.length !== 1 ? 's' : ''} in
-              your database
-            </p>
+            {subtitleText ? (
+              <p className="text-xs text-muted-foreground">{subtitleText}</p>
+            ) : null}
           </div>
         </div>
         <Button size="sm" onClick={handleAdd}>
@@ -614,7 +678,7 @@ export function IngredientManager() {
         </Button>
       </div>
 
-      {/* Search and filter toggle */}
+      {/* Search and filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -634,115 +698,145 @@ export function IngredientManager() {
             </button>
           )}
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant={filtersOpen || activeFilterCount > 0 ? 'secondary' : 'outline'}
-          onClick={() => setFiltersOpen((prev) => !prev)}
-          className="w-full sm:w-auto"
-        >
-          <SlidersHorizontal className="size-4" />
-          Filters
-          {activeFilterCount > 0 ? (
-            <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
-              {activeFilterCount}
-            </Badge>
-          ) : null}
-        </Button>
-      </div>
-
-      {filtersOpen ? (
-        <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ingredient-filter-type">Type</Label>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger id="ingredient-filter-type" className="h-9">
-                <SelectValue placeholder="All types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types ({entries.length})</SelectItem>
-                {CATEGORIES.filter((cat) => categoryCounts[cat]).map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat} ({categoryCounts[cat]})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ingredient-filter-store">Store</Label>
-            <Select value={filterStoreId} onValueChange={setFilterStoreId}>
-              <SelectTrigger id="ingredient-filter-store" className="h-9">
-                <SelectValue placeholder="All stores" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stores</SelectItem>
-                <SelectItem value="__none">No Default Store</SelectItem>
-                {stores.map((store) => (
-                  <SelectItem key={store.id} value={store.id}>
-                    {store.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end">
+        <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+          <PopoverTrigger asChild>
             <Button
               type="button"
-              variant="ghost"
-              className="h-9 w-full sm:w-auto"
-              onClick={() => {
-                setFilterCategory('all')
-                setFilterStoreId('all')
-              }}
-              disabled={activeFilterCount === 0}
+              size="sm"
+              variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
+              className="w-full sm:w-auto"
             >
-              Clear filters
+              <SlidersHorizontal className="size-4" />
+              Filters
+              {activeFilterCount > 0 ? (
+                <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px]">
+                  {activeFilterCount}
+                </Badge>
+              ) : null}
             </Button>
-          </div>
-        </div>
-      ) : null}
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[320px] space-y-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Filter Ingredients</p>
+              <p className="text-xs text-muted-foreground">
+                Narrow the list by type and store.
+              </p>
+            </div>
 
-      {selectedCount > 0 ? (
-        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
-          <span className="text-sm text-foreground">
-            {selectedCount} selected
-            {selectedFilteredCount !== selectedCount
-              ? ` (${selectedFilteredCount} in current view)`
-              : ''}
-          </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" size="sm" variant="secondary">
-                Actions
-                <ChevronDown className="size-4" />
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" className="h-9 w-full justify-between">
+                    {filterCategories.length === 0
+                      ? 'All types'
+                      : `${filterCategories.length} type${filterCategories.length === 1 ? '' : 's'} selected`}
+                    <ChevronDown className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-72">
+                  {CATEGORIES.filter((cat) => categoryCounts[cat]).map((cat) => (
+                    <DropdownMenuCheckboxItem
+                      key={cat}
+                      checked={filterCategories.includes(cat)}
+                      onCheckedChange={(checked) => toggleFilterCategory(cat, checked === true)}
+                    >
+                      {cat} ({categoryCounts[cat]})
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Store</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" className="h-9 w-full justify-between">
+                    {filterStoreIds.length === 0
+                      ? 'All stores'
+                      : `${filterStoreIds.length} store${filterStoreIds.length === 1 ? '' : 's'} selected`}
+                    <ChevronDown className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-72">
+                  <DropdownMenuCheckboxItem
+                    checked={filterStoreIds.includes('__none')}
+                    onCheckedChange={(checked) => toggleFilterStore('__none', checked === true)}
+                  >
+                    No default store
+                  </DropdownMenuCheckboxItem>
+                  {stores.map((store) => (
+                    <DropdownMenuCheckboxItem
+                      key={store.id}
+                      checked={filterStoreIds.includes(store.id)}
+                      onCheckedChange={(checked) => toggleFilterStore(store.id, checked === true)}
+                    >
+                      {store.name}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8"
+                onClick={() => {
+                  setFilterCategories([])
+                  setFilterStoreIds([])
+                }}
+                disabled={activeFilterCount === 0}
+              >
+                Clear all filters
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={() => {
-                  setBulkStoreId(sharedSelectedStoreId)
-                  setBulkStoreDialogOpen(true)
-                }}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {activeFilterCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {filterCategories.map((category) => (
+            <Badge key={category} variant="secondary" className="h-7 gap-1 pr-1">
+              Type: {category}
+              <button
+                type="button"
+                onClick={() => toggleFilterCategory(category, false)}
+                className="inline-flex h-5 w-5 items-center justify-center rounded-sm hover:bg-muted-foreground/10"
+                aria-label={`Clear ${category} type filter`}
               >
-                Set default store
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  setBulkCategory(sharedSelectedCategory)
-                  setBulkCategoryDialogOpen(true)
-                }}
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+          {selectedStoreLabels.map(({ id, label }) => (
+            <Badge key={id} variant="secondary" className="h-7 gap-1 pr-1">
+              Store: {label}
+              <button
+                type="button"
+                onClick={() => toggleFilterStore(id, false)}
+                className="inline-flex h-5 w-5 items-center justify-center rounded-sm hover:bg-muted-foreground/10"
+                aria-label={`Clear ${label} store filter`}
               >
-                Change ingredient type
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={() => setBulkDeleteOpen(true)}
-              >
-                Delete selected
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            onClick={() => {
+              setFilterCategories([])
+              setFilterStoreIds([])
+            }}
+          >
+            Clear all
+          </Button>
         </div>
       ) : null}
 
@@ -774,6 +868,56 @@ export function IngredientManager() {
       ) : (
         <div className="flex flex-col gap-3">
           <div className="rounded-xl border border-border overflow-hidden">
+            <div className="sticky top-0 z-20 flex min-h-11 items-center justify-between border-b border-border bg-background px-3 py-2">
+              <span className="text-sm text-foreground">
+                {selectedCount} selected
+                {selectedFilteredCount !== selectedCount
+                  ? ` (${selectedFilteredCount} in current view)`
+                  : ''}
+              </span>
+              {selectedCount > 0 ? (
+                <div className="ml-3 flex flex-wrap items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={bulkApplying || bulkCategoryApplying || bulkDeleting}
+                      >
+                        Actions
+                        <ChevronDown className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setBulkStoreId(sharedSelectedStoreId)
+                          setBulkStoreDialogOpen(true)
+                        }}
+                      >
+                        Set default store
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setBulkCategory(sharedSelectedCategory)
+                          setBulkCategoryDialogOpen(true)
+                        }}
+                      >
+                        Change type
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => setBulkDeleteOpen(true)}
+                      >
+                        Delete selected
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ) : null}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
@@ -800,7 +944,7 @@ export function IngredientManager() {
                     <th className="px-3 py-2 text-left font-medium">Unit</th>
                     <th className="px-3 py-2 text-left font-medium">Type</th>
                     <th className="px-3 py-2 text-left font-medium">Store</th>
-                    <th className="w-24 px-3 py-2 text-right font-medium">Actions</th>
+                    <th className="w-24 px-3 py-2 text-right font-medium"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -835,48 +979,30 @@ export function IngredientManager() {
                           {storeName || '—'}
                         </td>
                         <td className="px-3 py-2.5 align-middle">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => handleEdit(entry)}
-                              aria-label={`Edit ${entry.name}`}
-                            >
-                              <Pencil className="size-3.5" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
+                          <div className="flex items-center justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                                  aria-label={`Delete ${entry.name}`}
+                                  className="h-7 w-7 p-0"
+                                  aria-label={`Actions for ${entry.name}`}
                                 >
-                                  <Trash2 className="size-3.5" />
+                                  <MoreHorizontal className="size-4" />
                                 </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Delete {entry.name}?
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This removes the ingredient from the database.
-                                    Existing recipes using this ingredient will not be
-                                    affected.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDelete(entry.id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => handleEdit(entry)}>
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onSelect={() => setRowDeleteConfirm(entry)}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </td>
                       </tr>
@@ -945,6 +1071,35 @@ export function IngredientManager() {
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={rowDeleteConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setRowDeleteConfirm(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {rowDeleteConfirm?.name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the ingredient from the database. Existing recipes using
+              it will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                rowDeleteConfirm ? handleDelete(rowDeleteConfirm.id) : undefined
+              }
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={bulkStoreDialogOpen} onOpenChange={setBulkStoreDialogOpen}>
         <DialogContent className="sm:max-w-sm">

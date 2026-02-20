@@ -1,15 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import {
   Calendar,
   ChevronDown,
+  Clock3,
   ExternalLink,
   Loader2,
   MoreHorizontal,
   ShoppingCart,
+  Star,
   Store,
+  Users,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,13 +24,14 @@ import {
 } from '@/components/ui/select'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -58,6 +61,7 @@ import {
   MEAL_SLOT_VALUES,
   buildDateRange,
   formatDateLabel,
+  parseDateKey,
   toDateKey,
 } from '@/lib/types'
 import {
@@ -66,6 +70,7 @@ import {
   useMealPlanSlots,
   useMealPlanSnapshots,
   useGroceryStores,
+  useStoreStatus,
   setMealSlot,
   clearMealPlan,
   saveMealPlanSnapshot,
@@ -74,7 +79,6 @@ import {
 } from '@/lib/meal-planner-store'
 import {
   getSnapshotDateRange,
-  partitionSnapshotsByRecency,
   snapshotToSlotUpdates,
 } from '@/lib/meal-plan-snapshot-utils'
 import { RecipeDetailModal } from '@/components/recipe-detail-modal'
@@ -99,6 +103,21 @@ const STATUS_VALUES: Array<Exclude<MealSelection, 'recipe'>> = [
   'eating_out',
   'leftovers',
 ]
+
+function getRecipePreviewRating(recipe: Recipe): number {
+  if (
+    typeof recipe.rating === 'number' &&
+    Number.isFinite(recipe.rating) &&
+    recipe.rating >= 0 &&
+    recipe.rating <= 5
+  ) {
+    return Math.round(recipe.rating * 10) / 10
+  }
+  const stepCount = recipe.steps.filter((step) => step.trim().length > 0).length
+  const ingredientCount = recipe.ingredients.length
+  const raw = ingredientCount * 0.28 + stepCount * 0.46
+  return Math.max(1, Math.min(5, Number((raw / 1.8).toFixed(1))))
+}
 
 interface RecipeSearchFieldProps {
   dateKey: string
@@ -257,7 +276,7 @@ function RecipeSearchField({
             setOpen(false)
           }
         }}
-        className="h-8 pr-7 text-xs"
+        className="h-10 rounded-xl border-border pr-8 text-sm"
         placeholder="Add recipe..."
         aria-label={`${slotLabel} recipe search for ${dateKey}`}
         autoComplete="off"
@@ -277,22 +296,22 @@ function RecipeSearchField({
 
       {open ? (
         <div
-          className={`absolute left-0 z-50 w-full rounded-md border border-border bg-popover shadow-md ${
+          className={`absolute left-0 z-[70] w-full rounded-xl border border-border bg-popover/98 shadow-lg ${
             menuPlacement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
           }`}
           role="listbox"
         >
-          <p className="border-b border-border px-2 py-1.5 text-[11px] text-muted-foreground">
+          <p className="border-b border-border px-3 py-2 text-[11px] font-medium text-muted-foreground">
             Showing {slotLabel.toLowerCase()} and uncategorized recipes
           </p>
           {suggestions.length > 0 ? (
-            <div className="max-h-52 overflow-y-auto p-1">
+            <div className="max-h-52 overflow-y-auto p-1.5">
               {suggestions.map((recipe, index) => (
                 <div
                   key={recipe.id}
                   role="option"
                   aria-selected={index === highlightIndex}
-                  className={`flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs ${
+                  className={`flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-xs ${
                     index === highlightIndex
                       ? 'bg-accent text-accent-foreground'
                       : 'text-popover-foreground hover:bg-accent/50'
@@ -364,31 +383,27 @@ function buildDefaultPlanLabel(dateKeys: string[]): string {
   return dateKeys.length === 1 ? `Plan ${start}` : `Plan ${start} - ${end}`
 }
 
-function formatSnapshotRangeSummary(snapshot: MealPlanSnapshot | null): string {
-  if (!snapshot) return ''
-  const range = getSnapshotDateRange(snapshot)
-  if (!range) return ''
-  return `${formatDateLabel(range.startDateKey, { month: 'short', day: 'numeric' })} - ${formatDateLabel(range.endDateKey, { month: 'short', day: 'numeric' })}`
-}
-
 export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
   const recipes = useRecipes()
   const snapshots = useMealPlanSnapshots()
   const stores = useGroceryStores()
   const mealPlanSlots = useMealPlanSlots()
+  const { shoppingCartProviderConfigured } = useStoreStatus()
   const [viewRecipe, setViewRecipe] = useState<Recipe | null>(null)
   const [startDate, setStartDate] = useState<string>(() => toDateKey(new Date()))
   const [dayCount, setDayCount] = useState<number>(7)
   const [buildingStoreId, setBuildingStoreId] = useState<string | null>(null)
   const [buildingAllCarts, setBuildingAllCarts] = useState(false)
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveLabel, setSaveLabel] = useState('')
   const [saveDescription, setSaveDescription] = useState('')
+  const [saveMarkActive, setSaveMarkActive] = useState(true)
   const [savingSnapshot, setSavingSnapshot] = useState(false)
   const [createdCarts, setCreatedCarts] = useState<CreatedCartSession[]>([])
   const [cartBuildFailures, setCartBuildFailures] = useState<CartBuildFailure[]>([])
   const [cartResultsDialogOpen, setCartResultsDialogOpen] = useState(false)
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string>('')
+  const [querySnapshotId, setQuerySnapshotId] = useState<string>('')
+  const [queryShouldAutoLoad, setQueryShouldAutoLoad] = useState(false)
   const [loadingSnapshotId, setLoadingSnapshotId] = useState<string | null>(null)
   const [cartUnavailableStoreIds, setCartUnavailableStoreIds] = useState<Set<string>>(
     () => new Set()
@@ -399,6 +414,8 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
   )
   const [pendingSlotKeys, setPendingSlotKeys] = useState<Set<string>>(() => new Set())
   const pendingSlotKeysRef = useRef<Set<string>>(new Set())
+  const autoLoadedSnapshotRef = useRef<string | null>(null)
+  const autoLabelRef = useRef<string>('')
 
   const activeDateKeys = useMemo(
     () => buildDateRange(startDate, dayCount),
@@ -406,10 +423,37 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
   )
 
   useEffect(() => {
-    if (saveDialogOpen) return
-    setSaveLabel(buildDefaultPlanLabel(activeDateKeys))
-    setSaveDescription('')
-  }, [activeDateKeys, saveDialogOpen])
+    const nextDefaultLabel = buildDefaultPlanLabel(activeDateKeys)
+    setSaveLabel((previous) => {
+      if (!previous.trim() || previous === autoLabelRef.current) {
+        autoLabelRef.current = nextDefaultLabel
+        return nextDefaultLabel
+      }
+      autoLabelRef.current = nextDefaultLabel
+      return previous
+    })
+  }, [activeDateKeys])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const requestedStartDate = String(params.get('startDate') || '').trim()
+    const requestedDaysRaw = Number.parseInt(String(params.get('days') || ''), 10)
+    const requestedSnapshotId = String(params.get('snapshotId') || '').trim()
+    const requestedAutoLoad = String(params.get('loadSnapshot') || '').trim() === '1'
+
+    if (parseDateKey(requestedStartDate)) {
+      setStartDate(requestedStartDate)
+    }
+    if (Number.isFinite(requestedDaysRaw)) {
+      const safeDays = Math.min(14, Math.max(1, requestedDaysRaw))
+      setDayCount(safeDays)
+    }
+    if (requestedSnapshotId) {
+      setSelectedSnapshotId(requestedSnapshotId)
+      setQuerySnapshotId(requestedSnapshotId)
+      setQueryShouldAutoLoad(requestedAutoLoad)
+    }
+  }, [])
 
   const slotMap = useMemo(() => {
     const map = new Map<string, PlannedSlotState>()
@@ -487,19 +531,18 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
     [snapshots]
   )
 
-  const { current: currentSnapshots, previous: previousSnapshots } = useMemo(
-    () => partitionSnapshotsByRecency(sortedSnapshots),
-    [sortedSnapshots]
-  )
-
   const selectedSnapshot = useMemo(
     () =>
       sortedSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) || null,
     [selectedSnapshotId, sortedSnapshots]
   )
-  const selectedSnapshotRangeSummary = useMemo(
-    () => formatSnapshotRangeSummary(selectedSnapshot),
-    [selectedSnapshot]
+  const undoSnapshot = useMemo(
+    () =>
+      sortedSnapshots.find((snapshot) => snapshot.isActive) ||
+      selectedSnapshot ||
+      sortedSnapshots[0] ||
+      null,
+    [selectedSnapshot, sortedSnapshots]
   )
 
   useEffect(() => {
@@ -517,6 +560,9 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
 
   const getBuildDisabledReason = useCallback(
     (bucket: ShoppingStoreBucket): string | null => {
+      if (!shoppingCartProviderConfigured) {
+        return 'Online cart checkout is not configured. Set TARGET_CART_SESSION_ENDPOINT (and optional TARGET_CART_SESSION_API_KEY) on the server and restart.'
+      }
       if (!bucket.storeId) {
         return 'Items must be assigned to a saved store to build an online cart.'
       }
@@ -536,7 +582,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
       }
       return null
     },
-    [cartUnavailableStoreIds, storesById]
+    [cartUnavailableStoreIds, shoppingCartProviderConfigured, storesById]
   )
 
   const creatableCartBucketCount = useMemo(
@@ -821,29 +867,25 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
     [updateSlot]
   )
 
-  const handleOpenSaveDialog = useCallback(() => {
+  const handleConfirmSavePlan = useCallback(async (options?: { createCarts?: boolean }) => {
     if (pendingSlotKeysRef.current.size > 0) {
       toast.info('Please wait for meal slot updates to finish syncing.')
       return
     }
-    setSaveLabel(buildDefaultPlanLabel(activeDateKeys))
-    setSaveDescription('')
-    setSaveDialogOpen(true)
-  }, [activeDateKeys])
-
-  const handleConfirmSavePlan = useCallback(async (options?: { createCarts?: boolean }) => {
-    if (pendingSlotKeysRef.current.size > 0) {
-      toast.info('Please wait for meal slot updates to finish syncing.')
+    const normalizedLabel = saveLabel.trim()
+    if (!normalizedLabel) {
+      toast.error('Plan name is required.')
       return
     }
     const shouldCreateCarts = options?.createCarts === true
     try {
       setSavingSnapshot(true)
       const snapshot = await saveMealPlanSnapshot({
-        label: saveLabel.trim() || undefined,
+        label: normalizedLabel,
         description: saveDescription.trim() || undefined,
         startDate,
         days: dayCount,
+        markActive: saveMarkActive,
       })
       if (!snapshot) {
         if (totalPlanned > 0) {
@@ -854,7 +896,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
         return
       }
       toast.success('Meal plan snapshot saved', { description: snapshot.label })
-      setSaveDialogOpen(false)
+      setSelectedSnapshotId(snapshot.id)
       if (shouldCreateCarts) {
         void handleBuildAllShoppingCarts()
       }
@@ -868,6 +910,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
   }, [
     dayCount,
     handleBuildAllShoppingCarts,
+    saveMarkActive,
     saveDescription,
     saveLabel,
     startDate,
@@ -888,28 +931,24 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
       })
   }, [dayCount, startDate])
 
-  const handleLoadSnapshot = useCallback(async () => {
-    if (!selectedSnapshot) {
-      toast.error('Select a saved meal plan to load.')
-      return
-    }
+  const loadSnapshotIntoPlanner = useCallback(async (snapshot: MealPlanSnapshot) => {
     if (pendingSlotKeysRef.current.size > 0) {
       toast.info('Please wait for meal slot updates to finish syncing.')
       return
     }
 
-    setLoadingSnapshotId(selectedSnapshot.id)
+    setLoadingSnapshotId(snapshot.id)
     try {
-      const { slots, skippedMeals } = snapshotToSlotUpdates(selectedSnapshot, recipeIdSet)
+      const { slots, skippedMeals } = snapshotToSlotUpdates(snapshot, recipeIdSet)
       if (slots.length === 0) {
         toast.error('No valid meals available to load from this plan.')
         return
       }
 
       await replaceMealPlanSlots(slots)
-      await activateMealPlanSnapshot(selectedSnapshot.id)
+      await activateMealPlanSnapshot(snapshot.id)
 
-      const range = getSnapshotDateRange(selectedSnapshot)
+      const range = getSnapshotDateRange(snapshot)
       if (range) {
         setStartDate(range.startDateKey)
         setDayCount(Math.max(1, Math.min(14, range.days)))
@@ -917,10 +956,10 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
 
       if (skippedMeals > 0) {
         toast.success('Meal plan loaded', {
-          description: `${selectedSnapshot.label} loaded with ${skippedMeals} skipped meal${skippedMeals === 1 ? '' : 's'}.`,
+          description: `${snapshot.label} loaded with ${skippedMeals} skipped meal${skippedMeals === 1 ? '' : 's'}.`,
         })
       } else {
-        toast.success('Meal plan loaded', { description: selectedSnapshot.label })
+        toast.success('Meal plan loaded', { description: snapshot.label })
       }
     } catch (error) {
       const message =
@@ -929,7 +968,46 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
     } finally {
       setLoadingSnapshotId(null)
     }
-  }, [recipeIdSet, selectedSnapshot])
+  }, [recipeIdSet])
+
+  const handleUndoChanges = useCallback(async () => {
+    if (!undoSnapshot) {
+      toast.info('No saved plan available to restore yet.')
+      return
+    }
+    await loadSnapshotIntoPlanner(undoSnapshot)
+  }, [loadSnapshotIntoPlanner, undoSnapshot])
+
+  const handleSetCurrentToggle = useCallback((nextValue: boolean) => {
+    setSaveMarkActive(nextValue)
+    toast.success(
+      nextValue
+        ? 'This plan will be set as current when saved.'
+        : 'Saving will keep the current active plan unchanged.'
+    )
+  }, [])
+
+  useEffect(() => {
+    if (!querySnapshotId) return
+    const snapshot = sortedSnapshots.find((candidate) => candidate.id === querySnapshotId)
+    if (!snapshot) return
+
+    if (selectedSnapshotId !== snapshot.id) {
+      setSelectedSnapshotId(snapshot.id)
+    }
+    if (!queryShouldAutoLoad) return
+    if (autoLoadedSnapshotRef.current === snapshot.id) return
+
+    autoLoadedSnapshotRef.current = snapshot.id
+    setQueryShouldAutoLoad(false)
+    void loadSnapshotIntoPlanner(snapshot)
+  }, [
+    loadSnapshotIntoPlanner,
+    queryShouldAutoLoad,
+    querySnapshotId,
+    selectedSnapshotId,
+    sortedSnapshots,
+  ])
 
   const setStoreSectionOpen = useCallback((bucketKey: string, open: boolean) => {
     setOpenStoreKeys((previous) => {
@@ -941,132 +1019,148 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
   }, [])
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="rounded-xl border border-border/60 bg-card/40 p-4 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-              <Calendar className="size-5 text-primary" />
+    <div className="flex flex-col gap-8">
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 items-center justify-center rounded-2xl border border-accent/45 bg-accent/45">
+              <Calendar className="size-5 text-foreground" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Meal Planner</h2>
-              <p className="text-xs text-muted-foreground">
-                {totalPlanned} slot{totalPlanned !== 1 ? 's' : ''} planned in this range
+              <h2 className="text-2xl font-semibold text-foreground">Meal Planner</h2>
+              <p className="max-w-2xl text-sm text-muted-foreground/90">
+                Edit plan details, then assign breakfast, lunch, and dinner by day.
               </p>
-              {selectedSnapshot ? (
-                <p className="text-xs text-muted-foreground">
-                  Selected plan: {selectedSnapshot.label}
-                  {selectedSnapshotRangeSummary
-                    ? ` (${selectedSnapshotRangeSummary})`
-                    : ''}
-                </p>
-              ) : null}
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-[12rem_7rem_minmax(0,1fr)_auto_auto_auto_auto]">
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(event) => setStartDate(event.target.value || toDateKey(new Date()))}
-              aria-label="Start date"
-            />
-            <Select
-              value={String(dayCount)}
-              onValueChange={(value) => setDayCount(Number.parseInt(value, 10) || 7)}
-            >
-              <SelectTrigger aria-label="Total days">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 14 }, (_, index) => index + 1).map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {value} day{value !== 1 ? 's' : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={selectedSnapshotId}
-              onValueChange={setSelectedSnapshotId}
-            >
-              <SelectTrigger aria-label="Saved meal plans">
-                <SelectValue placeholder="Select saved plan" />
-              </SelectTrigger>
-              <SelectContent>
-                {currentSnapshots.length > 0 ? (
-                  <>
-                    {currentSnapshots.map((snapshot) => (
-                      <SelectItem key={`current-${snapshot.id}`} value={snapshot.id}>
-                        {snapshot.label}
-                        {snapshot.isActive ? ' (Active)' : ''}
-                      </SelectItem>
-                    ))}
-                  </>
-                ) : null}
-                {previousSnapshots.length > 0 ? (
-                  <>
-                    {previousSnapshots.map((snapshot) => (
-                      <SelectItem key={`previous-${snapshot.id}`} value={snapshot.id}>
-                        {snapshot.label}
-                        {snapshot.isActive ? ' (Active)' : ' (Previous)'}
-                      </SelectItem>
-                    ))}
-                  </>
-                ) : null}
-                {sortedSnapshots.length === 0 ? (
-                  <SelectItem value="__none" disabled>
-                    No saved meal plans
-                  </SelectItem>
-                ) : null}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleLoadSnapshot()}
-              disabled={!selectedSnapshot || loadingSnapshotId !== null}
+              onClick={() => void handleConfirmSavePlan()}
+              disabled={totalPlanned === 0 || savingSnapshot}
+              className="h-10 px-5"
             >
-              {loadingSnapshotId ? (
+              {savingSnapshot ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Loading...
+                  Saving...
                 </>
               ) : (
-                'Load Plan'
+                'Save Plan'
               )}
             </Button>
-            <Button type="button" variant="outline" asChild>
-              <Link href="/plans">Saved Plans</Link>
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleClearRange}
-              disabled={totalPlanned === 0}
-            >
-              Reset Plan
-            </Button>
-            <Button
-              onClick={handleOpenSaveDialog}
-              disabled={totalPlanned === 0}
-              className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-            >
-              Save Plan
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="size-10 border-border bg-card"
+                  aria-label="Plan actions"
+                  disabled={savingSnapshot || loadingSnapshotId !== null}
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuCheckboxItem
+                  checked={saveMarkActive}
+                  onCheckedChange={(checked) => handleSetCurrentToggle(Boolean(checked))}
+                >
+                  Set as current on save
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={!undoSnapshot || loadingSnapshotId !== null}
+                  onSelect={() => {
+                    void handleUndoChanges()
+                  }}
+                >
+                  Undo changes
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={totalPlanned === 0}
+                  onSelect={handleClearRange}
+                >
+                  Reset plan
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="grid gap-5">
+          <label className="space-y-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Plan name
+            </span>
+            <Input
+              value={saveLabel}
+              onChange={(event) => setSaveLabel(event.target.value)}
+              placeholder="Weekly Family Plan"
+              maxLength={120}
+              className="h-11 rounded-xl"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Description
+            </span>
+            <Input
+              value={saveDescription}
+              onChange={(event) => setSaveDescription(event.target.value)}
+              placeholder="Optional notes about this plan"
+              maxLength={600}
+              className="h-11 rounded-xl"
+            />
+          </label>
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Start date
+              </span>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value || toDateKey(new Date()))}
+                aria-label="Start date"
+                className="h-11 w-[12.5rem] rounded-xl"
+              />
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Days
+              </span>
+              <Select
+                value={String(dayCount)}
+                onValueChange={(value) => setDayCount(Number.parseInt(value, 10) || 7)}
+              >
+                <SelectTrigger aria-label="Total days" className="h-11 w-[9rem] rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 14 }, (_, index) => index + 1).map((value) => (
+                    <SelectItem key={value} value={String(value)}>
+                      {value} day{value !== 1 ? 's' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-5 xl:flex-row">
+      <div className="flex flex-col gap-7 xl:flex-row">
         <div className="min-w-0 flex-1">
-          <div className="overflow-visible rounded-xl border border-border/60 bg-card/25">
+          <div className="overflow-visible rounded-3xl border border-border bg-card">
             {activeDateKeys.map((dateKey) => (
               <section
                 key={dateKey}
-                className="px-4 py-4 first:pt-4 last:pb-4 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-border/60"
+                className="px-6 py-5 first:pt-6 last:pb-6 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-border"
               >
                 <div className="pb-2">
-                  <h3 className="text-sm font-semibold text-foreground">
+                  <h3 className="text-lg font-semibold text-foreground">
                     {formatDateLabel(dateKey, {
                       weekday: 'short',
                       month: 'short',
@@ -1075,7 +1169,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                   </h3>
                 </div>
                 <div className="pt-0">
-                  <div className="divide-y divide-border/50">
+                  <div className="divide-y divide-border">
                     {SLOTS.map((slot) => {
                       const key = `${dateKey}:${slot}`
                       const entry = effectiveSlotMap.get(key)
@@ -1088,9 +1182,9 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                           : undefined
 
                       return (
-                        <div key={slot} className="space-y-2 py-3 first:pt-0 last:pb-0">
+                        <div key={slot} className="space-y-2.5 py-4 first:pt-1 last:pb-1">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-semibold tracking-tight text-foreground">
+                            <p className="text-sm font-semibold text-foreground">
                               {SLOT_LABELS[slot]}
                             </p>
                             <div className="flex items-center gap-1">
@@ -1105,7 +1199,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="size-6"
+                                    className="size-8 rounded-lg"
                                     disabled={isSlotPending}
                                     aria-label={`${SLOT_LABELS[slot]} status options for ${dateKey}`}
                                   >
@@ -1136,10 +1230,13 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                           </div>
 
                           {statusSelection ? (
-                            <div className="rounded-md border border-border/60 bg-muted/35 px-3 py-2">
-                              <p className="text-xs text-muted-foreground">
+                            <div className="rounded-xl border border-border bg-secondary px-3.5 py-3">
+                              <p className="text-sm font-medium text-foreground">
                                 This meal is marked as{' '}
-                                {STATUS_LABELS[statusSelection].toLowerCase()}.
+                                <span className="text-primary">
+                                  {STATUS_LABELS[statusSelection].toLowerCase()}
+                                </span>
+                                .
                               </p>
                             </div>
                           ) : (
@@ -1157,19 +1254,38 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                               />
 
                               {recipe ? (
-                                <div className="flex items-center justify-between gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewRecipe(recipe)}
-                                    className="line-clamp-1 text-left text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
-                                  >
-                                    {recipe.name}
-                                  </button>
+                                <div className="flex items-start justify-between gap-2 rounded-xl border border-border bg-secondary/55 p-3">
+                                  <div className="min-w-0 space-y-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewRecipe(recipe)}
+                                      className="line-clamp-1 text-left text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
+                                    >
+                                      {recipe.name}
+                                    </button>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                                      <span className="inline-flex items-center gap-1">
+                                        <Users className="size-3 text-sky-500" />
+                                        {recipe.servings}
+                                      </span>
+                                      {typeof recipe.totalMinutes === 'number' &&
+                                      recipe.totalMinutes > 0 ? (
+                                        <span className="inline-flex items-center gap-1">
+                                          <Clock3 className="size-3 text-violet-500" />
+                                          {Math.round(recipe.totalMinutes)}m
+                                        </span>
+                                      ) : null}
+                                      <span className="inline-flex items-center gap-1">
+                                        <Star className="size-3 fill-amber-500 text-amber-500" />
+                                        {getRecipePreviewRating(recipe).toFixed(1)}
+                                      </span>
+                                    </div>
+                                  </div>
                                   <Button
                                     type="button"
                                     size="icon"
                                     variant="ghost"
-                                    className="size-7"
+                                    className="size-7 rounded-md"
                                     disabled={isSlotPending}
                                     onClick={() => handleClearSelection(dateKey, slot)}
                                     aria-label={`Remove ${recipe.name} from ${SLOT_LABELS[slot]}`}
@@ -1190,9 +1306,9 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
           </div>
         </div>
 
-        <div className="xl:w-80 xl:shrink-0">
-          <section className="overflow-hidden rounded-xl border border-border/60 bg-card/25">
-            <div className="flex items-center gap-2.5 border-b border-border/60 bg-muted/20 px-4 py-3">
+        <div className="xl:w-[23rem] xl:shrink-0">
+          <section className="overflow-hidden rounded-3xl border border-border bg-card">
+            <div className="flex items-center gap-2.5 border-b border-border bg-secondary/65 px-5 py-4">
               <ShoppingCart className="size-4 text-foreground" />
               <h3 className="text-sm font-semibold text-foreground">Shopping List</h3>
               <div className="ml-auto flex items-center gap-2">
@@ -1201,7 +1317,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                     type="button"
                     size="sm"
                     variant="secondary"
-                    className="h-7 px-2 text-[11px]"
+                    className="h-8 px-3 text-[11px]"
                     disabled={buildingAllCarts}
                     onClick={() => {
                       void handleBuildAllShoppingCarts()
@@ -1217,12 +1333,17 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                     )}
                   </Button>
                 ) : null}
-                <span className="rounded-md border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
                   {shoppingBuckets.reduce((sum, bucket) => sum + bucket.items.length, 0)} items
                 </span>
               </div>
             </div>
-            <div className="p-3">
+            <div className="p-4">
+              {!shoppingCartProviderConfigured && shoppingBuckets.length > 0 ? (
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Online cart checkout is unavailable. Set `TARGET_CART_SESSION_ENDPOINT` in server env and restart the app.
+                </p>
+              ) : null}
               {shoppingBuckets.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-7 text-center">
                   <div className="flex size-9 items-center justify-center rounded-full bg-muted">
@@ -1247,18 +1368,18 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                           key={bucket.key}
                           open={isOpen}
                           onOpenChange={(open) => setStoreSectionOpen(bucket.key, open)}
-                          className="py-2"
+                          className="py-3"
                         >
                           <CollapsibleTrigger asChild>
                             <button
                               type="button"
-                              className="flex w-full items-center justify-between gap-2 px-1 py-1.5 text-left"
+                              className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-secondary"
                             >
                               <div className="flex min-w-0 items-center gap-2">
                                 <p className="truncate text-xs font-semibold text-foreground">
                                   {bucket.storeName}
                                 </p>
-                                <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                <span className="rounded-full border border-border/65 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                   {bucket.items.length} item{bucket.items.length === 1 ? '' : 's'}
                                 </span>
                               </div>
@@ -1268,7 +1389,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                             </button>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
-                            <div className="border-t border-border/60 px-1 py-2">
+                            <div className="border-t border-border px-2 py-3">
                               {!disabledReason ? (
                                 <div className="mb-2 flex items-center justify-end">
                                   <Button
@@ -1317,71 +1438,6 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
           </section>
         </div>
       </div>
-
-      <Dialog
-        open={saveDialogOpen}
-        onOpenChange={(open) => {
-          if (!savingSnapshot) setSaveDialogOpen(open)
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Save Meal Plan</DialogTitle>
-            <DialogDescription>
-              Give this plan a name and optional description for later reference.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Plan Name</p>
-              <Input
-                value={saveLabel}
-                onChange={(event) => setSaveLabel(event.target.value)}
-                placeholder="Weekly Family Plan"
-                maxLength={120}
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Description</p>
-              <Textarea
-                value={saveDescription}
-                onChange={(event) => setSaveDescription(event.target.value)}
-                placeholder="Optional notes about this plan"
-                rows={3}
-                maxLength={600}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            {creatableCartBucketCount > 0 ? (
-              <Button
-                variant="secondary"
-                onClick={() => void handleConfirmSavePlan({ createCarts: true })}
-                disabled={savingSnapshot || buildingAllCarts}
-              >
-                Save + Create Carts
-              </Button>
-            ) : null}
-            <Button
-              variant="outline"
-              onClick={() => setSaveDialogOpen(false)}
-              disabled={savingSnapshot}
-            >
-              Cancel
-            </Button>
-            <Button onClick={() => void handleConfirmSavePlan()} disabled={savingSnapshot}>
-              {savingSnapshot ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Plan'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={cartResultsDialogOpen} onOpenChange={setCartResultsDialogOpen}>
         <DialogContent className="sm:max-w-lg">
