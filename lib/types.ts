@@ -31,7 +31,7 @@ export const MEAL_SELECTION_VALUES = [
   'leftovers',
 ] as const
 
-export const ONLINE_ORDER_PROVIDER_VALUES = ['target'] as const
+export const ONLINE_ORDER_PROVIDER_VALUES = ['target', 'instacart'] as const
 export const RECIPE_TIME_WINDOW_VALUES = ['under_30', '30_to_60', 'over_60'] as const
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -46,7 +46,8 @@ export type OnlineOrderProvider = (typeof ONLINE_ORDER_PROVIDER_VALUES)[number]
 export type RecipeTimeWindow = (typeof RECIPE_TIME_WINDOW_VALUES)[number]
 
 export interface OnlineOrderingConfig {
-  targetStoreId: string
+  targetStoreId?: string
+  instacartRetailerId?: string
 }
 
 export interface GroceryStore {

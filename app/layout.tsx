@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { Manrope, Sora } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
+import { ShoppingModeGate } from '@/components/shopping-mode-gate'
 import './globals.css'
 
 const bodyFont = Manrope({
@@ -60,7 +61,9 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          {children}
+          <ShoppingModeGate>
+            {children}
+          </ShoppingModeGate>
         </ThemeProvider>
         <Analytics />
       </body>

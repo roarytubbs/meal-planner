@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
+import { logError } from '@/lib/client-logger'
 import type {
   DayOfWeek,
   GroceryStore,
@@ -52,7 +53,7 @@ const LEGACY_SNAPSHOTS_KEY = 'meal_planner_snapshots_v1'
 const MIGRATION_MARKER_KEY = 'meal_planner_backend_migration_v1'
 const MAX_LEGACY_SNAPSHOT_IMPORT = 50
 
-let store: StoreState = {
+const INITIAL_STORE: StoreState = {
   recipes: [],
   mealPlanSlots: [],
   mealPlanSnapshots: [],
@@ -60,12 +61,15 @@ let store: StoreState = {
   ingredientEntries: [],
 }
 
-let status: StoreStatus = {
+const INITIAL_STATUS: StoreStatus = {
   loading: true,
   hydrated: false,
   error: null,
   shoppingCartProviderConfigured: false,
 }
+
+let store: StoreState = INITIAL_STORE
+let status: StoreStatus = INITIAL_STATUS
 
 let hydratePromise: Promise<void> | null = null
 const listeners = new Set<Listener>()
@@ -89,9 +93,17 @@ function getStatusSnapshot(): StoreStatus {
   return status
 }
 
+function getServerStoreSnapshot(): StoreState {
+  return INITIAL_STORE
+}
+
+function getServerStatusSnapshot(): StoreStatus {
+  return INITIAL_STATUS
+}
+
 function normalizeErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message
-  return 'Unexpected error.'
+  logError(error, 'app.load')
+  return 'Unable to load your data. Try refreshing the page.'
 }
 
 function applyIngredientEntryStoreDefaultsToRecipes(
@@ -809,7 +821,9 @@ async function bootstrapFromBackend(): Promise<void> {
   status = { ...status, loading: true, error: null }
   emitChange()
 
-  let bootstrap = await requestJson<PlannerBootstrapResponse>('/api/planner/bootstrap')
+  let bootstrap = await requestJson<PlannerBootstrapResponse>('/api/planner/bootstrap', {
+    signal: AbortSignal.timeout(20000),
+  })
 
   if (!hasCompletedMigration() && bootstrap.meta.isEmpty) {
     const migrationPayload = collectLocalMigrationPayload()
@@ -823,7 +837,9 @@ async function bootstrapFromBackend(): Promise<void> {
           }
         )
         if (migrationResult.imported) {
-          bootstrap = await requestJson<PlannerBootstrapResponse>('/api/planner/bootstrap')
+          bootstrap = await requestJson<PlannerBootstrapResponse>('/api/planner/bootstrap', {
+            signal: AbortSignal.timeout(20000),
+          })
         }
         if (migrationResult.imported || migrationResult.reason === 'not_empty') {
           markMigrationComplete()
@@ -1318,7 +1334,7 @@ export async function deleteIngredientEntry(id: string): Promise<void> {
 }
 
 export function useStore() {
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerStoreSnapshot)
   useEffect(() => {
     ensureHydrated()
   }, [])
@@ -1326,7 +1342,7 @@ export function useStore() {
 }
 
 export function useStoreStatus() {
-  const snapshot = useSyncExternalStore(subscribe, getStatusSnapshot, getStatusSnapshot)
+  const snapshot = useSyncExternalStore(subscribe, getStatusSnapshot, getServerStatusSnapshot)
   useEffect(() => {
     ensureHydrated()
   }, [])

@@ -4,14 +4,17 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import {
   Apple,
   ChevronDown,
+  Pencil,
   Plus,
   MoreHorizontal,
   Search,
+  ShoppingCart,
   X,
   Loader2,
   SlidersHorizontal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -54,10 +57,12 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { handleError } from '@/lib/client-logger'
 import type { IngredientEntry, GroceryStore } from '@/lib/types'
 import {
   useIngredientEntries,
   useGroceryStores,
+  useMealPlanSnapshots,
   addIngredientEntry,
   updateIngredientEntry,
   bulkUpdateIngredientDefaultStore,
@@ -65,6 +70,7 @@ import {
   bulkDeleteIngredientEntries,
   deleteIngredientEntry,
 } from '@/lib/meal-planner-store'
+import { addAdHocShoppingItem } from '@/lib/shopping-list-local'
 
 function generateId() {
   return `ie_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -131,16 +137,18 @@ function buildPageTokens(currentPage: number, totalPages: number): PageToken[] {
 }
 
 // ---- Add/Edit Dialog ----
-function IngredientDialog({
+export function IngredientDialog({
   open,
   onOpenChange,
   editingEntry,
   stores,
+  initialDefaultStoreId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   editingEntry: IngredientEntry | null
   stores: GroceryStore[]
+  initialDefaultStoreId?: string
 }) {
   const [name, setName] = useState('')
   const [defaultUnit, setDefaultUnit] = useState('')
@@ -159,13 +167,13 @@ function IngredientDialog({
       } else {
         setName('')
         setDefaultUnit('')
-        setDefaultStoreId('')
+        setDefaultStoreId(initialDefaultStoreId ?? '')
         setCategory('Pantry')
       }
       // Focus name field after mount
       setTimeout(() => nameRef.current?.focus(), 100)
     }
-  }, [open, editingEntry])
+  }, [open, editingEntry, initialDefaultStoreId])
 
   const handleSave = useCallback(async () => {
     if (!name.trim()) {
@@ -194,9 +202,7 @@ function IngredientDialog({
       }
       onOpenChange(false)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to save ingredient.'
-      toast.error(message)
+      toast.error(handleError(error, 'ingredient.save'))
     }
   }, [name, defaultUnit, defaultStoreId, category, editingEntry, onOpenChange])
 
@@ -302,6 +308,7 @@ interface IngredientManagerProps {
   title?: string
   subtitle?: string | null
   initialFilterStoreId?: string
+  initialDefaultStoreId?: string
   showIcon?: boolean
 }
 
@@ -309,10 +316,16 @@ export function IngredientManager({
   title = 'Ingredients',
   subtitle,
   initialFilterStoreId,
+  initialDefaultStoreId,
   showIcon = true,
 }: IngredientManagerProps = {}) {
   const entries = useIngredientEntries()
   const stores = useGroceryStores()
+  const snapshots = useMealPlanSnapshots()
+  const activePlanId = useMemo(
+    () => snapshots.find((s) => s.isActive)?.id ?? null,
+    [snapshots]
+  )
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<IngredientEntry | null>(null)
   const [search, setSearch] = useState('')
@@ -359,9 +372,7 @@ export function IngredientManager({
         })
         toast.success('Ingredient removed', { description: entry?.name })
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unable to delete ingredient.'
-        toast.error(message)
+        toast.error(handleError(error, 'ingredient.delete'))
       }
     },
     [entries]
@@ -548,11 +559,7 @@ export function IngredientManager({
       })
       setBulkStoreDialogOpen(false)
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Unable to apply default store to selected ingredients.'
-      toast.error(message)
+      toast.error(handleError(error, 'ingredient.update-store'))
     } finally {
       setBulkApplying(false)
     }
@@ -589,11 +596,7 @@ export function IngredientManager({
       })
       setBulkCategoryDialogOpen(false)
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Unable to update ingredient type for selected ingredients.'
-      toast.error(message)
+      toast.error(handleError(error, 'ingredient.update-category'))
     } finally {
       setBulkCategoryApplying(false)
     }
@@ -612,9 +615,7 @@ export function IngredientManager({
         description: `Deleted ${deletedCount} ingredient${deletedCount === 1 ? '' : 's'}.`,
       })
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to delete selected ingredients.'
-      toast.error(message)
+      toast.error(handleError(error, 'ingredient.delete-selected'))
     } finally {
       setBulkDeleting(false)
     }
@@ -951,7 +952,11 @@ export function IngredientManager({
                   {paginatedEntries.map((entry) => {
                     const storeName = getStoreName(entry.defaultStoreId)
                     return (
-                      <tr key={entry.id} className="hover:bg-muted/20">
+                      <tr
+                        key={entry.id}
+                        className="group cursor-pointer hover:bg-muted/40"
+                        onClick={() => handleEdit(entry)}
+                      >
                         <td className="px-3 py-2.5 align-middle">
                           <div className="flex items-center gap-2">
                             <Checkbox
@@ -959,9 +964,13 @@ export function IngredientManager({
                               onCheckedChange={(checked) =>
                                 toggleIngredientSelection(entry.id, checked === true)
                               }
+                              onClick={(e) => e.stopPropagation()}
                               aria-label={`Select ${entry.name}`}
                             />
-                            <span className="font-medium text-foreground">{entry.name}</span>
+                            <span className="flex items-center gap-1.5 font-medium text-foreground">
+                              {entry.name}
+                              <Pencil className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-50" />
+                            </span>
                           </div>
                         </td>
                         <td className="px-3 py-2.5 align-middle text-muted-foreground">
@@ -978,14 +987,44 @@ export function IngredientManager({
                         <td className="px-3 py-2.5 align-middle text-muted-foreground">
                           {storeName || '—'}
                         </td>
-                        <td className="px-3 py-2.5 align-middle">
-                          <div className="flex items-center justify-end">
+                        <td className="px-3 py-2.5 align-middle" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-0.5">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                                  disabled={!activePlanId}
+                                  aria-label="Add to current shopping list"
+                                  onClick={() => {
+                                    if (!activePlanId) return
+                                    addAdHocShoppingItem(
+                                      activePlanId,
+                                      entry.defaultStoreId || null,
+                                      entry.name,
+                                      null,
+                                      entry.defaultUnit
+                                    )
+                                    toast.success('Added to shopping list', { description: entry.name })
+                                  }}
+                                >
+                                  <span className="relative inline-flex items-center justify-center">
+                                    <ShoppingCart className="size-3.5" />
+                                    <Plus className="absolute -right-1 -top-1 size-2 stroke-[3]" />
+                                  </span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                {activePlanId ? 'Add to current shopping list' : 'No active meal plan'}
+                              </TooltipContent>
+                            </Tooltip>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 w-7 p-0"
+                                  className="h-7 w-7 p-0 opacity-0 transition-opacity group-hover:opacity-100"
                                   aria-label={`Actions for ${entry.name}`}
                                 >
                                   <MoreHorizontal className="size-4" />
@@ -995,6 +1034,7 @@ export function IngredientManager({
                                 <DropdownMenuItem onSelect={() => handleEdit(entry)}>
                                   Edit
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"
                                   onSelect={() => setRowDeleteConfirm(entry)}
@@ -1216,6 +1256,7 @@ export function IngredientManager({
         onOpenChange={setDialogOpen}
         editingEntry={editingEntry}
         stores={stores}
+        initialDefaultStoreId={initialDefaultStoreId}
       />
     </div>
   )

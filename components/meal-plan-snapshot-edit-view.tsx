@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Loader2, Trash2 } from 'lucide-react'
+import { ArrowLeft, ClipboardList, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { handleError } from '@/lib/client-logger'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -32,7 +33,7 @@ import {
   useStoreStatus,
 } from '@/lib/meal-planner-store'
 import { getSnapshotDateRange, remapSnapshotToDateRange, type SnapshotSlotUpdate } from '@/lib/meal-plan-snapshot-utils'
-import { buildDateRange, formatDateLabel, toDateKey } from '@/lib/types'
+import { buildDateRange, formatDateLabel, parseDateKey, toDateKey, type MealSelection, type MealSlot } from '@/lib/types'
 
 export function MealPlanSnapshotEditView({ snapshotId }: { snapshotId: string }) {
   const router = useRouter()
@@ -85,9 +86,7 @@ export function MealPlanSnapshotEditView({ snapshotId }: { snapshotId: string })
       toast.success('Meal plan updated', { description: updated.label })
       router.push(`/plans/${encodeURIComponent(updated.id)}`)
     } catch (saveError) {
-      const message =
-        saveError instanceof Error ? saveError.message : 'Unable to update meal plan.'
-      toast.error(message)
+      toast.error(handleError(saveError, 'plan.update-details'))
     } finally {
       setSaving(false)
     }
@@ -103,9 +102,7 @@ export function MealPlanSnapshotEditView({ snapshotId }: { snapshotId: string })
       setDeleteOpen(false)
       router.push('/plans')
     } catch (deleteError) {
-      const message =
-        deleteError instanceof Error ? deleteError.message : 'Unable to delete meal plan.'
-      toast.error(message)
+      toast.error(handleError(deleteError, 'plan.delete'))
     } finally {
       setDeleting(false)
     }
@@ -149,11 +146,7 @@ export function MealPlanSnapshotEditView({ snapshotId }: { snapshotId: string })
       })
       router.push(`/?${params.toString()}`)
     } catch (plannerError) {
-      const message =
-        plannerError instanceof Error
-          ? plannerError.message
-          : 'Unable to load this meal plan into planner.'
-      toast.error(message)
+      toast.error(handleError(plannerError, 'plan.load'))
     } finally {
       setLoadingIntoPlanner(false)
     }
@@ -311,6 +304,96 @@ export function MealPlanSnapshotEditView({ snapshotId }: { snapshotId: string })
               Save Updates
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Meal Selections</CardTitle>
+          <CardDescription>Current meals saved in this plan.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {snapshot.meals.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
+              <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+                <ClipboardList className="size-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">No meals in this plan.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/60">
+              {(() => {
+                const SLOT_ORDER: Record<MealSlot, number> = { breakfast: 0, lunch: 1, dinner: 2 }
+                const SLOT_LABELS: Record<MealSlot, string> = {
+                  breakfast: 'Breakfast',
+                  lunch: 'Lunch',
+                  dinner: 'Dinner',
+                }
+                const STATUS_LABELS: Record<Exclude<MealSelection, 'recipe'>, string> = {
+                  skip: 'Skip',
+                  eating_out: 'Eating Out',
+                  leftovers: 'Leftovers',
+                }
+
+                const grouped = new Map<string, typeof snapshot.meals>()
+                for (const meal of snapshot.meals) {
+                  if (!grouped.has(meal.day)) grouped.set(meal.day, [])
+                  grouped.get(meal.day)?.push(meal)
+                }
+                const sortedDays = Array.from(grouped.entries()).sort(([a], [b]) =>
+                  a.localeCompare(b)
+                )
+
+                return sortedDays.map(([day, meals]) => {
+                  const sortedMeals = meals
+                    .slice()
+                    .sort(
+                      (a, b) =>
+                        SLOT_ORDER[a.slot as MealSlot] - SLOT_ORDER[b.slot as MealSlot]
+                    )
+                  const label = parseDateKey(day)
+                    ? formatDateLabel(day, { weekday: 'short', month: 'short', day: 'numeric' })
+                    : day
+                  return (
+                    <section key={day} className="px-6 py-4">
+                      <h4 className="text-sm font-semibold text-foreground">{label}</h4>
+                      <ul className="mt-2 divide-y divide-border/50 rounded-md border border-border/60">
+                        {sortedMeals.map((meal) => {
+                          const isRecipe = meal.selection === 'recipe'
+                          return (
+                            <li
+                              key={`${day}-${meal.slot}`}
+                              className="flex flex-col gap-1 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                {SLOT_LABELS[meal.slot as MealSlot]}
+                              </span>
+                              {isRecipe ? (
+                                <div className="min-w-0 sm:text-right">
+                                  <p className="truncate font-medium text-foreground">
+                                    {meal.recipeName || 'Recipe removed'}
+                                  </p>
+                                  {meal.storeNames.length > 0 ? (
+                                    <p className="truncate text-xs text-muted-foreground">
+                                      {meal.storeNames.join(', ')}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <Badge variant="secondary" className="w-fit text-xs">
+                                  {STATUS_LABELS[meal.selection as Exclude<MealSelection, 'recipe'>]}
+                                </Badge>
+                              )}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </section>
+                  )
+                })
+              })()}
+            </div>
+          )}
         </CardContent>
       </Card>
 

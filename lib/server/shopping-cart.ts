@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { GroceryStore, OnlineOrderProvider } from '@/lib/types'
 import { getServerEnv } from '@/lib/server/env'
+import { createInstacartCartSession } from '@/lib/server/instacart-cart'
 
 export interface ShoppingCartSessionItem {
   name: string
@@ -293,6 +294,10 @@ export async function createShoppingCartSession(args: {
 
   if (provider === 'target') {
     return createTargetCartSession(args.store, args.items)
+  }
+
+  if (provider === 'instacart') {
+    return createInstacartCartSession(args.store, args.items)
   }
 
   throw new ShoppingCartError(

@@ -34,7 +34,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import type { GroceryStore } from '@/lib/types'
+import { handleError } from '@/lib/client-logger'
+import type { GroceryStore, OnlineOrderProvider } from '@/lib/types'
 import {
   useGroceryStores,
   addGroceryStore,
@@ -102,10 +103,9 @@ export function StoreDialog({
   const [lat, setLat] = useState<number | undefined>()
   const [lng, setLng] = useState<number | undefined>()
   const [supportsOnlineOrdering, setSupportsOnlineOrdering] = useState(false)
-  const [onlineOrderingProvider, setOnlineOrderingProvider] = useState<'target'>(
-    'target'
-  )
+  const [onlineOrderingProvider, setOnlineOrderingProvider] = useState<OnlineOrderProvider>('target')
   const [targetStoreId, setTargetStoreId] = useState('')
+  const [instacartRetailerId, setInstacartRetailerId] = useState('')
 
   const stores = useGroceryStores()
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -125,6 +125,7 @@ export function StoreDialog({
         setSupportsOnlineOrdering(editingStore.supportsOnlineOrdering ?? false)
         setOnlineOrderingProvider(editingStore.onlineOrderingProvider ?? 'target')
         setTargetStoreId(editingStore.onlineOrderingConfig?.targetStoreId ?? '')
+        setInstacartRetailerId(editingStore.onlineOrderingConfig?.instacartRetailerId ?? '')
         setQuery(editingStore.address ?? '')
         setResults([])
         setSelectedPlace(null)
@@ -140,6 +141,7 @@ export function StoreDialog({
         setSupportsOnlineOrdering(false)
         setOnlineOrderingProvider('target')
         setTargetStoreId('')
+        setInstacartRetailerId('')
         setQuery('')
         setResults([])
         setSelectedPlace(null)
@@ -222,6 +224,10 @@ export function StoreDialog({
       toast.error('Target store ID is required when online ordering is enabled')
       return
     }
+    if (supportsOnlineOrdering && onlineOrderingProvider === 'instacart' && !instacartRetailerId.trim()) {
+      toast.error('Instacart retailer key is required when online ordering is enabled')
+      return
+    }
 
     const normalizedLogoUrl = logoUrl.trim()
     const safeLogoUrl =
@@ -260,7 +266,9 @@ export function StoreDialog({
       onlineOrderingConfig:
         supportsOnlineOrdering && onlineOrderingProvider === 'target'
           ? { targetStoreId: targetStoreId.trim() }
-          : undefined,
+          : supportsOnlineOrdering && onlineOrderingProvider === 'instacart'
+            ? { instacartRetailerId: instacartRetailerId.trim() }
+            : undefined,
       createdAt: editingStore?.createdAt ?? now,
       updatedAt: now,
     }
@@ -280,9 +288,7 @@ export function StoreDialog({
       onOpenChange(false)
       onSaved?.(saved, mode)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to save store.'
-      toast.error(message)
+      toast.error(handleError(error, 'store.save'))
     }
   }, [
     name,
@@ -296,6 +302,7 @@ export function StoreDialog({
     supportsOnlineOrdering,
     onlineOrderingProvider,
     targetStoreId,
+    instacartRetailerId,
     editingStore,
     onOpenChange,
     onSaved,
@@ -461,7 +468,7 @@ export function StoreDialog({
                     <Select
                       value={onlineOrderingProvider}
                       onValueChange={(value) =>
-                        setOnlineOrderingProvider(value as 'target')
+                        setOnlineOrderingProvider(value as OnlineOrderProvider)
                       }
                     >
                       <SelectTrigger id="store-order-provider">
@@ -469,19 +476,37 @@ export function StoreDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="target">Target</SelectItem>
+                        <SelectItem value="instacart">Instacart</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="store-target-id">Target store ID</Label>
-                    <Input
-                      id="store-target-id"
-                      value={targetStoreId}
-                      onChange={(event) => setTargetStoreId(event.target.value)}
-                      placeholder="e.g. 3342"
-                    />
-                  </div>
+                  {onlineOrderingProvider === 'target' && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="store-target-id">Target store ID</Label>
+                      <Input
+                        id="store-target-id"
+                        value={targetStoreId}
+                        onChange={(event) => setTargetStoreId(event.target.value)}
+                        placeholder="e.g. 3342"
+                      />
+                    </div>
+                  )}
+
+                  {onlineOrderingProvider === 'instacart' && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="store-instacart-id">Instacart retailer key</Label>
+                      <Input
+                        id="store-instacart-id"
+                        value={instacartRetailerId}
+                        onChange={(event) => setInstacartRetailerId(event.target.value)}
+                        placeholder="e.g. whole_foods"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Find your retailer key at developer.instacart.com
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -558,10 +583,11 @@ function StoreCard({
                 {store.name}
               </Link>
             </h3>
-            {store.supportsOnlineOrdering && store.onlineOrderingProvider === 'target' && (
+            {store.supportsOnlineOrdering && store.onlineOrderingProvider && (
               <div>
                 <Badge variant="secondary" className="h-5 text-[11px]">
-                  Online ordering: Target
+                  Online ordering:{' '}
+                  {store.onlineOrderingProvider === 'instacart' ? 'Instacart' : 'Target'}
                 </Badge>
               </div>
             )}

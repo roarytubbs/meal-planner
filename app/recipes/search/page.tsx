@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { handleError } from '@/lib/client-logger'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -309,9 +310,7 @@ function RecipeSearchContent() {
           router.replace(`/recipes/search?${params.toString()}`, { scroll: false })
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unable to search recipes.'
-        setSearchError(message)
+        setSearchError(handleError(error, 'recipe.search'))
         setResults([])
         setPagination(null)
       } finally {
@@ -414,9 +413,7 @@ function RecipeSearchContent() {
         await loadRecipeDetails(recipeId)
         setExpanded((prev) => new Set(prev).add(recipeId))
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unable to load recipe details.'
-        toast.error(message)
+        toast.error(handleError(error, 'recipe.load-details'))
       }
     },
     [expanded, loadRecipeDetails]
@@ -473,10 +470,9 @@ function RecipeSearchContent() {
                 ? Math.round(result.readyInMinutes)
                 : undefined,
           ingredients: Array.isArray(details.ingredients) ? details.ingredients : [],
-          steps:
-            Array.isArray(details.steps) && details.steps.length > 0
-              ? details.steps
-              : [''],
+          steps: Array.isArray(details.steps)
+            ? details.steps.filter((s) => typeof s === 'string' && s.trim().length > 0)
+            : [],
           sourceUrl: details.sourceUrl || result.sourceUrl || '',
           imageUrl: details.imageUrl || result.image || '',
           createdAt: now,
@@ -494,9 +490,7 @@ function RecipeSearchContent() {
           },
         })
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unable to import recipe.'
-        toast.error(message)
+        toast.error(handleError(error, 'recipe.import'))
       } finally {
         setImportingId(null)
       }

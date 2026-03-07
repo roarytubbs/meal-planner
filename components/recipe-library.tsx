@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
   UtensilsCrossed,
   Plus,
@@ -55,10 +56,10 @@ import {
   getRecipeTimeWindowLabel,
 } from '@/lib/types'
 import { useRecipes, deleteRecipe } from '@/lib/meal-planner-store'
+import { handleError } from '@/lib/client-logger'
 
 interface RecipeLibraryProps {
   onAddRecipe: () => void
-  onEditRecipe: (recipe: Recipe) => void
   onImportRecipe: () => void
   onSearchRecipes: () => void
 }
@@ -123,7 +124,6 @@ function inRange(value: number, filter: string): boolean {
 
 export function RecipeLibrary({
   onAddRecipe,
-  onEditRecipe,
   onImportRecipe,
   onSearchRecipes,
 }: RecipeLibraryProps) {
@@ -201,22 +201,19 @@ export function RecipeLibrary({
         description: recipe.name,
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to delete recipe.'
-      toast.error(message)
+      toast.error(handleError(error, 'recipe.delete'))
     }
   }
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl border border-accent/45 bg-accent/45">
-            <UtensilsCrossed className="size-5 text-foreground" />
-          </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <UtensilsCrossed className="size-5 text-muted-foreground" />
           <div>
-            <h2 className="text-2xl font-semibold text-foreground">Recipe Library</h2>
-            <p className="text-sm text-muted-foreground/90">
-              Browse, search, and manage recipes for your meal plans.
+            <h2 className="text-xl font-bold leading-tight text-foreground">Recipe Library</h2>
+            <p className="text-xs text-muted-foreground">
+              {recipes.length} recipe{recipes.length !== 1 ? 's' : ''} in your library
             </p>
           </div>
         </div>
@@ -225,7 +222,7 @@ export function RecipeLibrary({
           <Button
             size="sm"
             onClick={onAddRecipe}
-            className="h-10 rounded-r-none border-r border-r-primary-foreground/25 px-4"
+            className="h-9 rounded-r-none border-r border-r-primary-foreground/25 px-4"
           >
             <Plus className="size-4" />
             Add Recipe
@@ -234,7 +231,7 @@ export function RecipeLibrary({
             <DropdownMenuTrigger asChild>
               <Button
                 size="sm"
-                className="h-10 rounded-l-none px-3"
+                className="h-9 rounded-l-none px-3"
                 aria-label="Add recipe options"
               >
                 <ChevronDown className="size-4" />
@@ -544,7 +541,7 @@ export function RecipeLibrary({
           ) : null}
         </div>
       ) : (
-        <div className="grid gap-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((recipe) => {
             const stepCount = getStepCount(recipe)
             const rating = getRecipeRating(recipe)
@@ -554,124 +551,117 @@ export function RecipeLibrary({
             return (
               <Card
                 key={recipe.id}
-                className="gap-4 rounded-3xl border-border bg-card py-5 shadow-[0_20px_45px_-40px_rgba(22,20,18,0.35)]"
+                className="overflow-hidden rounded-2xl border-border bg-card shadow-sm transition-shadow hover:shadow-md"
               >
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-4">
-                    {recipe.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={recipe.imageUrl}
-                        alt={recipe.name}
-                        className="h-24 w-24 rounded-2xl border border-border object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-border bg-secondary text-xs text-muted-foreground">
-                        No image
-                      </div>
-                    )}
+                <Link
+                  href={`/recipes/${encodeURIComponent(recipe.id)}`}
+                  className="block w-full text-left"
+                  aria-label={`View ${recipe.name}`}
+                >
+                  {recipe.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={recipe.imageUrl}
+                      alt={recipe.name}
+                      className="h-44 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-44 items-center justify-center bg-secondary">
+                      <UtensilsCrossed className="size-8 text-muted-foreground/25" />
+                    </div>
+                  )}
+                </Link>
 
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 space-y-1">
-                          <button
-                            type="button"
-                            onClick={() => onEditRecipe(recipe)}
-                            className="line-clamp-2 text-left text-xl font-semibold text-foreground hover:underline"
-                          >
-                            {recipe.name}
-                          </button>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          {recipe.sourceUrl ? (
-                            <a
-                              href={recipe.sourceUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground hover:underline"
-                            >
-                              Open Source
-                              <ExternalLink className="size-3.5" />
-                            </a>
-                          ) : null}
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => onEditRecipe(recipe)}
-                          >
-                            Edit
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="size-8 rounded-lg"
-                                aria-label="Recipe actions"
-                              >
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => onEditRecipe(recipe)}>
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onClick={() => setDeleteConfirm(recipe)}
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/recipes/${encodeURIComponent(recipe.id)}`}
+                      className="line-clamp-2 text-left text-base font-semibold leading-snug text-foreground hover:underline"
+                    >
+                      {recipe.name}
+                    </Link>
+                    {recipe.mealType ? (
+                      <Badge
+                        variant="secondary"
+                        className={`shrink-0 text-[11px] ${MEAL_TYPE_COLORS[recipe.mealType] || ''}`}
+                      >
+                        {recipe.mealType}
+                      </Badge>
+                    ) : null}
+                  </div>
 
-                      {recipe.description ? (
-                        <p className="line-clamp-2 text-sm text-muted-foreground">
-                          {recipe.description}
-                        </p>
+                  {recipe.description ? (
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                      {recipe.description}
+                    </p>
+                  ) : null}
+
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <Star className="size-3 fill-amber-500 text-amber-500" />
+                      {rating.toFixed(1)}
+                    </span>
+                    {totalMinutes ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Clock3 className="size-3 text-violet-400" />
+                        {totalMinutes} min
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-1">
+                      <Users className="size-3 text-sky-400" />
+                      {recipe.servings} servings
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <ListChecks className="size-3 text-emerald-400" />
+                      {stepCount} steps
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      {timeWindow ? (
+                        <Badge variant="outline" className="text-[10px]">
+                          {getRecipeTimeWindowLabel(timeWindow)}
+                        </Badge>
                       ) : null}
-
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-foreground/80">
-                          <Users className="size-3.5 text-sky-500" />
-                          {recipe.servings} servings
-                        </span>
-                        {totalMinutes ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-foreground/80">
-                            <Clock3 className="size-3.5 text-violet-500" />
-                            {totalMinutes} min
-                          </span>
-                        ) : null}
-                        <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-accent-foreground">
-                          <Star className="size-3.5 fill-amber-500 text-amber-500" />
-                          {rating.toFixed(1)}
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-foreground/80">
-                          <ListChecks className="size-3.5 text-emerald-500" />
-                          {stepCount} steps
-                        </span>
-                        <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
-                          {recipe.ingredients.length} ingredients
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {recipe.mealType ? (
-                          <Badge
-                            variant="secondary"
-                            className={`text-xs ${MEAL_TYPE_COLORS[recipe.mealType] || ''}`}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {recipe.sourceUrl ? (
+                        <a
+                          href={recipe.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          aria-label="Open source"
+                        >
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                      ) : null}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 rounded-md"
+                            aria-label="Recipe actions"
                           >
-                            {recipe.mealType}
-                          </Badge>
-                        ) : null}
-                        {timeWindow ? (
-                          <Badge variant="outline" className="text-[11px]">
-                            {getRecipeTimeWindowLabel(timeWindow)}
-                          </Badge>
-                        ) : null}
-                      </div>
+                            <MoreHorizontal className="size-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/recipes/${encodeURIComponent(recipe.id)}/edit`}>
+                              Edit
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setDeleteConfirm(recipe)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardContent>

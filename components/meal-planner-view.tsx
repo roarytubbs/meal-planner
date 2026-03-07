@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Calendar,
   ChevronDown,
@@ -15,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -83,6 +85,8 @@ import {
 } from '@/lib/meal-plan-snapshot-utils'
 import { RecipeDetailModal } from '@/components/recipe-detail-modal'
 import { toast } from 'sonner'
+import { handleError, logError } from '@/lib/client-logger'
+import { getExcludedNKs, setExclusionNK, toItemNK } from '@/lib/shopping-list-local'
 
 const SLOTS = [...MEAL_SLOT_VALUES] as MealSlot[]
 
@@ -90,6 +94,12 @@ const SLOT_LABELS: Record<MealSlot, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
   dinner: 'Dinner',
+}
+
+const SLOT_LABEL_COLORS: Record<MealSlot, string> = {
+  breakfast: 'text-amber-600 dark:text-amber-400',
+  lunch: 'text-emerald-600 dark:text-emerald-400',
+  dinner: 'text-indigo-600 dark:text-indigo-500',
 }
 
 const STATUS_LABELS: Record<Exclude<MealSelection, 'recipe'>, string> = {
@@ -127,6 +137,65 @@ interface RecipeSearchFieldProps {
   disabled?: boolean
   onSelectRecipe: (recipeId: string) => void
   onViewRecipe?: (recipe: Recipe) => void
+}
+
+function SlotIngredientPanel({ recipe, activePlanId }: { recipe: Recipe; activePlanId: string | null }) {
+  const [open, setOpen] = useState(false)
+  const [excludedNKs, setExcludedNKsState] = useState<Set<string>>(() =>
+    activePlanId ? getExcludedNKs(activePlanId) : new Set()
+  )
+
+  if (!activePlanId || recipe.ingredients.length === 0) return null
+
+  const excludedCount = recipe.ingredients.filter((ing) =>
+    excludedNKs.has(toItemNK(ing.name, ing.unit))
+  ).length
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/20">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <span className="font-medium">Ingredients ({recipe.ingredients.length})</span>
+        <span className="flex items-center gap-1.5">
+          {excludedCount > 0 ? (
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+              {excludedCount} excluded
+            </span>
+          ) : null}
+          <ChevronDown className={`size-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </span>
+      </button>
+      {open ? (
+        <div className="border-t border-border/60 px-3 pb-2 pt-1">
+          <p className="mb-1.5 text-[10px] text-muted-foreground">Uncheck to exclude from shopping list</p>
+          <ul className="space-y-1">
+            {recipe.ingredients.map((ing) => {
+              const nk = toItemNK(ing.name, ing.unit)
+              const isExcluded = excludedNKs.has(nk)
+              return (
+                <li key={ing.id} className="flex items-center gap-2">
+                  <Checkbox
+                    checked={!isExcluded}
+                    onCheckedChange={(checked) => {
+                      setExclusionNK(activePlanId, nk, checked !== true)
+                      setExcludedNKsState(getExcludedNKs(activePlanId))
+                    }}
+                    className="shrink-0"
+                  />
+                  <span className={`text-xs ${isExcluded ? 'line-through text-muted-foreground/50' : 'text-foreground'}`}>
+                    {ing.qty !== null ? `${ing.qty} ` : ''}{ing.unit ? `${ing.unit} ` : ''}{ing.name}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function RecipeSearchField({
@@ -384,6 +453,7 @@ function buildDefaultPlanLabel(dateKeys: string[]): string {
 }
 
 export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
+  const router = useRouter()
   const recipes = useRecipes()
   const snapshots = useMealPlanSnapshots()
   const stores = useGroceryStores()
@@ -409,6 +479,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
     () => new Set()
   )
   const [openStoreKeys, setOpenStoreKeys] = useState<Set<string>>(() => new Set())
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(() => new Set())
   const [optimisticSlots, setOptimisticSlots] = useState<Map<string, OptimisticSlotState>>(
     () => new Map()
   )
@@ -574,11 +645,14 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
       if (!store.supportsOnlineOrdering) {
         return 'Online ordering is disabled for this store in Store Management.'
       }
-      if (store.onlineOrderingProvider !== 'target') {
-        return 'Only Target online ordering is currently supported.'
+      if (!store.onlineOrderingProvider) {
+        return 'No online ordering provider configured for this store.'
       }
-      if (!store.onlineOrderingConfig?.targetStoreId) {
+      if (store.onlineOrderingProvider === 'target' && !store.onlineOrderingConfig?.targetStoreId) {
         return 'Store is missing Target online ordering configuration.'
+      }
+      if (store.onlineOrderingProvider === 'instacart' && !store.onlineOrderingConfig?.instacartRetailerId) {
+        return 'Store is missing Instacart retailer ID configuration.'
       }
       return null
     },
@@ -684,12 +758,12 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
               : 'Your shopping cart session was created successfully.',
         })
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unable to build shopping cart.'
+        const rawMessage = error instanceof Error ? error.message : ''
+        logError(error, 'cart.build')
         if (
           bucket.storeId &&
           /integration is not configured|provider is not configured|provider unavailable/i.test(
-            message
+            rawMessage
           )
         ) {
           setCartUnavailableStoreIds((previous) => {
@@ -699,7 +773,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
             return next
           })
         }
-        toast.error(message)
+        toast.error('Something went wrong building the shopping cart. Please try again.')
       } finally {
         setBuildingStoreId(null)
       }
@@ -739,16 +813,14 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
             unmatchedItems: session.unmatchedItems,
           })
         } catch (error) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : 'Unable to create shopping cart for this store.'
-          if (
+          const rawMessage = error instanceof Error ? error.message : ''
+          logError(error, 'cart.build')
+          const isConfigError =
             bucket.storeId &&
             /integration is not configured|provider is not configured|provider unavailable/i.test(
-              message
+              rawMessage
             )
-          ) {
+          if (isConfigError) {
             setCartUnavailableStoreIds((previous) => {
               if (previous.has(bucket.storeId as string)) return previous
               const next = new Set(previous)
@@ -759,7 +831,9 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
           failures.push({
             key: bucket.key,
             storeName: bucket.storeName,
-            message,
+            message: isConfigError
+              ? 'Shopping cart not set up for this store.'
+              : 'Something went wrong creating the cart.',
           })
         }
       }
@@ -832,9 +906,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
           }
           return next
         })
-        const message =
-          error instanceof Error ? error.message : 'Unable to update meal slot.'
-        toast.error(message)
+        toast.error(handleError(error, 'plan.update-slot'))
       } finally {
         pendingSlotKeysRef.current.delete(slotKey)
         setPendingSlotKeys(new Set(pendingSlotKeysRef.current))
@@ -895,21 +967,20 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
         }
         return
       }
-      toast.success('Meal plan snapshot saved', { description: snapshot.label })
-      setSelectedSnapshotId(snapshot.id)
+      toast.success('Meal plan saved', { description: snapshot.label })
       if (shouldCreateCarts) {
         void handleBuildAllShoppingCarts()
       }
+      router.push(`/plans/${encodeURIComponent(snapshot.id)}`)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to save meal plan snapshot.'
-      toast.error(message)
+      toast.error(handleError(error, 'plan.save'))
     } finally {
       setSavingSnapshot(false)
     }
   }, [
     dayCount,
     handleBuildAllShoppingCarts,
+    router,
     saveMarkActive,
     saveDescription,
     saveLabel,
@@ -925,9 +996,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
         setOptimisticSlots(new Map())
       })
       .catch((error) => {
-        const message =
-          error instanceof Error ? error.message : 'Unable to clear meal slots.'
-        toast.error(message)
+        toast.error(handleError(error, 'plan.clear-slots'))
       })
   }, [dayCount, startDate])
 
@@ -962,9 +1031,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
         toast.success('Meal plan loaded', { description: snapshot.label })
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to load meal plan.'
-      toast.error(message)
+      toast.error(handleError(error, 'plan.load'))
     } finally {
       setLoadingSnapshotId(null)
     }
@@ -1151,6 +1218,54 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
         </div>
       </div>
 
+      {(() => {
+        const todayKey = toDateKey(new Date())
+        if (!activeDateKeys.includes(todayKey)) return null
+        return (
+          <div className="overflow-hidden rounded-3xl border border-border bg-card">
+            <div className="flex items-center gap-2.5 border-b border-border bg-secondary/65 px-5 py-4">
+              <Calendar className="size-4 text-foreground" />
+              <h3 className="text-sm font-semibold text-foreground">Today</h3>
+              <span className="text-xs text-muted-foreground">
+                {formatDateLabel(todayKey, { weekday: 'long', month: 'short', day: 'numeric' })}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-border">
+              {SLOTS.map((slot) => {
+                const entry = effectiveSlotMap.get(`${todayKey}:${slot}`)
+                const statusSelection = entry && entry.selection !== 'recipe' ? entry.selection : null
+                const todayRecipe =
+                  entry?.selection === 'recipe' && entry.recipeId
+                    ? getRecipeById(recipes, entry.recipeId)
+                    : undefined
+                return (
+                  <div key={slot} className="flex flex-col gap-1.5 px-5 py-4">
+                    <span className={`text-[11px] font-semibold uppercase tracking-wide ${SLOT_LABEL_COLORS[slot]}`}>
+                      {SLOT_LABELS[slot]}
+                    </span>
+                    {todayRecipe ? (
+                      <button
+                        type="button"
+                        onClick={() => setViewRecipe(todayRecipe)}
+                        className="line-clamp-2 text-left text-sm font-medium text-primary hover:underline"
+                      >
+                        {todayRecipe.name}
+                      </button>
+                    ) : statusSelection ? (
+                      <span className="text-sm text-muted-foreground">
+                        {STATUS_LABELS[statusSelection]}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground/50">Not planned</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="flex flex-col gap-7 xl:flex-row">
         <div className="min-w-0 flex-1">
           <div className="overflow-visible rounded-3xl border border-border bg-card">
@@ -1184,7 +1299,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                       return (
                         <div key={slot} className="space-y-2.5 py-4 first:pt-1 last:pb-1">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-foreground">
+                            <p className={`text-sm font-semibold ${SLOT_LABEL_COLORS[slot]}`}>
                               {SLOT_LABELS[slot]}
                             </p>
                             <div className="flex items-center gap-1">
@@ -1254,8 +1369,16 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                               />
 
                               {recipe ? (
+                                <>
                                 <div className="flex items-start justify-between gap-2 rounded-xl border border-border bg-secondary/55 p-3">
-                                  <div className="min-w-0 space-y-1">
+                                  {recipe.imageUrl ? (
+                                    <img
+                                      src={recipe.imageUrl}
+                                      alt=""
+                                      className="size-10 shrink-0 rounded-lg object-cover"
+                                    />
+                                  ) : null}
+                                  <div className="min-w-0 flex-1 space-y-1">
                                     <button
                                       type="button"
                                       onClick={() => setViewRecipe(recipe)}
@@ -1293,6 +1416,11 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                                     <X className="size-3.5" />
                                   </Button>
                                 </div>
+                                <SlotIngredientPanel
+                                  recipe={recipe}
+                                  activePlanId={sortedSnapshots.find((s) => s.isActive)?.id ?? null}
+                                />
+                                </>
                               ) : null}
                             </>
                           )}
@@ -1341,7 +1469,10 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
             <div className="p-4">
               {!shoppingCartProviderConfigured && shoppingBuckets.length > 0 ? (
                 <p className="mb-2 text-xs text-muted-foreground">
-                  Online cart checkout is unavailable. Set `TARGET_CART_SESSION_ENDPOINT` in server env and restart the app.
+                  Online cart checkout is unavailable. Set{' '}
+                  <code className="rounded bg-muted px-1">INSTACART_CONNECT_API_KEY</code> or{' '}
+                  <code className="rounded bg-muted px-1">TARGET_CART_SESSION_ENDPOINT</code> in
+                  server env and restart the app.
                 </p>
               ) : null}
               {shoppingBuckets.length === 0 ? (
@@ -1410,21 +1541,41 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
                                   </Button>
                                 </div>
                               ) : null}
-                              <ul className="list-disc space-y-1 pl-4">
-                                {bucket.items.map((item, index) => (
-                                  <li
-                                    key={`${bucket.key}-${index}`}
-                                    className="text-xs text-muted-foreground"
-                                  >
-                                    {item.qty !== null
-                                      ? `${Number.isInteger(item.qty)
-                                          ? item.qty
-                                          : item.qty.toFixed(2).replace(/\.?0+$/, '')} `
-                                      : ''}
-                                    {item.unit ? `${item.unit} ` : ''}
-                                    {item.name}
-                                  </li>
-                                ))}
+                              <ul className="space-y-1.5">
+                                {bucket.items.map((item, index) => {
+                                  const itemKey = `${bucket.key}-${index}`
+                                  const isChecked = checkedItems.has(itemKey)
+                                  return (
+                                    <li
+                                      key={itemKey}
+                                      className="flex items-start gap-2 text-xs text-muted-foreground"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => {
+                                          setCheckedItems((previous) => {
+                                            const next = new Set(previous)
+                                            if (isChecked) next.delete(itemKey)
+                                            else next.add(itemKey)
+                                            return next
+                                          })
+                                        }}
+                                        className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-primary"
+                                        aria-label={item.name}
+                                      />
+                                      <span className={isChecked ? 'line-through opacity-40' : ''}>
+                                        {item.qty !== null
+                                          ? `${Number.isInteger(item.qty)
+                                              ? item.qty
+                                              : item.qty.toFixed(2).replace(/\.?0+$/, '')} `
+                                          : ''}
+                                        {item.unit ? `${item.unit} ` : ''}
+                                        {item.name}
+                                      </span>
+                                    </li>
+                                  )
+                                })}
                               </ul>
                             </div>
                           </CollapsibleContent>
@@ -1518,6 +1669,7 @@ export function MealPlannerView({ onEditRecipe }: MealPlannerViewProps) {
           onEditRecipe?.(recipe)
           setViewRecipe(null)
         }}
+        activePlanId={sortedSnapshots.find((s) => s.isActive)?.id ?? null}
       />
     </div>
   )

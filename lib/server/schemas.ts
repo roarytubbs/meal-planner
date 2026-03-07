@@ -74,7 +74,8 @@ const onlineOrderingProviderSchema = z.enum(ONLINE_ORDER_PROVIDER_VALUES)
 
 const onlineOrderingConfigSchema = z
   .object({
-    targetStoreId: boundedString(128).min(1),
+    targetStoreId: boundedString(128).min(1).optional(),
+    instacartRetailerId: boundedString(100).min(1).optional(),
   })
   .strict()
 
@@ -119,6 +120,16 @@ export const groceryStoreSchema = z
         code: z.ZodIssueCode.custom,
         path: ['onlineOrderingConfig', 'targetStoreId'],
         message: 'Target store ID is required when online ordering is enabled.',
+      })
+    }
+    if (
+      store.onlineOrderingProvider === 'instacart' &&
+      !store.onlineOrderingConfig?.instacartRetailerId
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['onlineOrderingConfig', 'instacartRetailerId'],
+        message: 'Instacart retailer key is required when online ordering is enabled.',
       })
     }
   })

@@ -16,6 +16,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import type { Recipe } from '@/lib/types'
 import { toast } from 'sonner'
+import { handleError } from '@/lib/client-logger'
 
 interface RecipeImportDialogProps {
   open: boolean
@@ -110,12 +111,9 @@ export function RecipeImportDialog({
       setUrl('')
       onOpenChange(false)
     } catch (importError) {
-      const message =
-        importError instanceof Error
-          ? importError.message
-          : 'Could not import this URL automatically.'
+      handleError(importError, 'recipe.import')
       toast.warning('Import needs manual review', {
-        description: message,
+        description: 'We could not auto-import this URL. You can fill in the details manually.',
       })
       onImport({
         id: generateId(),

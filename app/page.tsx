@@ -12,6 +12,7 @@ import { RecipeImportDialog } from '@/components/recipe-import-dialog'
 import { StoreManager } from '@/components/store-manager'
 import { IngredientManager } from '@/components/ingredient-manager'
 import { addRecipe, updateRecipe, useRecipes, useStoreStatus } from '@/lib/meal-planner-store'
+import { handleError } from '@/lib/client-logger'
 import { toast } from 'sonner'
 import type { Recipe, RecipeMode } from '@/lib/types'
 
@@ -22,9 +23,7 @@ export default function MealPlannerPage() {
   const [view, setView] = useState<View>('library')
   const [activeTab, setActiveTab] = useState<AppTab>('recipes')
   const [formMode, setFormMode] = useState<RecipeMode>('add')
-  const [editingRecipe, setEditingRecipe] = useState<Recipe | undefined>(
-    undefined
-  )
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | undefined>(undefined)
   const [importOpen, setImportOpen] = useState(false)
   const [pendingRecipeId, setPendingRecipeId] = useState<string | null>(null)
   const { loading, error } = useStoreStatus()
@@ -55,12 +54,8 @@ export default function MealPlannerPage() {
     const matchingRecipe = recipes.find((recipe) => recipe.id === pendingRecipeId)
     if (!matchingRecipe) return
 
-    setActiveTab('recipes')
-    setFormMode('edit')
-    setEditingRecipe(matchingRecipe)
-    setView('form')
     setPendingRecipeId(null)
-    router.replace('/?tab=recipes')
+    router.push(`/recipes/${encodeURIComponent(matchingRecipe.id)}`)
   }, [pendingRecipeId, recipes, router])
 
   const handleAddRecipe = useCallback(() => {
@@ -82,18 +77,18 @@ export default function MealPlannerPage() {
         if (formMode === 'add') {
           await addRecipe(recipe)
           toast.success('Recipe added', { description: recipe.name })
+          setActiveTab('recipes')
+          router.replace('/?tab=recipes')
+          setView('library')
+          setEditingRecipe(undefined)
         } else {
           await updateRecipe(recipe)
           toast.success('Recipe updated', { description: recipe.name })
+          router.push(`/recipes/${encodeURIComponent(recipe.id)}`)
+          setEditingRecipe(undefined)
         }
-        setActiveTab('recipes')
-        router.replace('/?tab=recipes')
-        setView('library')
-        setEditingRecipe(undefined)
       } catch (saveError) {
-        const message =
-          saveError instanceof Error ? saveError.message : 'Unable to save recipe.'
-        toast.error(message)
+        toast.error(handleError(saveError, 'recipe.save'))
       }
     },
     [formMode, router]
@@ -184,7 +179,6 @@ export default function MealPlannerPage() {
               <TabsContent value="recipes">
                 <RecipeLibrary
                   onAddRecipe={handleAddRecipe}
-                  onEditRecipe={handleEditRecipe}
                   onImportRecipe={() => setImportOpen(true)}
                   onSearchRecipes={() => router.push('/recipes/search')}
                 />

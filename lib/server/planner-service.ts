@@ -812,7 +812,8 @@ export async function getPlannerBootstrap(): Promise<PlannerBootstrapResponse> {
         assignmentCount === 0 &&
         mealPlanSnapshots.length === 0,
       shoppingCartProviderConfigured: Boolean(
-        getServerEnv('TARGET_CART_SESSION_ENDPOINT')
+        getServerEnv('TARGET_CART_SESSION_ENDPOINT') ||
+        getServerEnv('INSTACART_CONNECT_API_KEY')
       ),
       counts: {
         recipes: recipes.length,

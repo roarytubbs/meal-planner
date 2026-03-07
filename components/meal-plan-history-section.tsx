@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Copy, Loader2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { handleError } from '@/lib/client-logger'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -185,9 +186,7 @@ export function MealPlanHistorySection() {
       toast.success('Meal plan saved', { description: snapshot.label })
       setSaveDialogOpen(false)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to save meal plan.'
-      toast.error(message)
+      toast.error(handleError(error, 'plan.save'))
     } finally {
       setPendingAction(null)
     }
@@ -217,9 +216,7 @@ export function MealPlanHistorySection() {
           description: snapshot.label,
         })
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unable to duplicate meal plan.'
-        toast.error(message)
+        toast.error(handleError(error, 'plan.duplicate'))
       } finally {
         setPendingAction(null)
       }
@@ -235,9 +232,7 @@ export function MealPlanHistorySection() {
       toast.success('Meal plan deleted', { description: deleteTarget.label })
       setDeleteTarget(null)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to delete meal plan.'
-      toast.error(message)
+      toast.error(handleError(error, 'plan.delete'))
     } finally {
       setPendingAction(null)
     }

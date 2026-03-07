@@ -10,8 +10,8 @@ import {
   MoreVertical,
   Phone,
   Store,
-  UtensilsCrossed,
 } from 'lucide-react'
+import { AppHeader } from '@/components/app-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -40,6 +40,7 @@ import {
 import { StoreDialog } from '@/components/store-manager'
 import { IngredientManager } from '@/components/ingredient-manager'
 import { toast } from 'sonner'
+import { handleError } from '@/lib/client-logger'
 
 function findTodayHours(hours: string[] | undefined): string | null {
   if (!hours || hours.length === 0) return null
@@ -188,32 +189,21 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
       toast.success('Store removed', { description: store.name })
       router.push('/?tab=stores')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to delete store.'
-      toast.error(message)
+      toast.error(handleError(error, 'store.delete'))
     }
   }
 
   if (!store) {
     return (
       <main className="min-h-screen bg-background">
-        <header className="border-b border-border bg-card">
-          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <UtensilsCrossed className="size-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold leading-tight text-foreground">Meal Planner</h1>
-              <p className="text-xs text-muted-foreground">Stores</p>
-            </div>
-          </div>
-        </header>
-        <div className="mx-auto max-w-5xl px-4 py-8">
-          <Button asChild variant="ghost" className="mb-4">
-            <Link href="/?tab=stores">
+        <AppHeader activeTab="stores" />
+        <div className="mx-auto max-w-7xl px-5 py-7 sm:py-8">
+          <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
+            <Link href="/?tab=stores" className="flex items-center gap-1 transition-colors hover:text-foreground">
               <ArrowLeft className="size-4" />
-              Back to Stores
+              Stores
             </Link>
-          </Button>
+          </nav>
           <Card>
             <CardContent className="p-6">
               <p className="text-sm text-muted-foreground">Store not found.</p>
@@ -226,26 +216,16 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
 
   return (
     <main className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <UtensilsCrossed className="size-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold leading-tight text-foreground">Meal Planner</h1>
-            <p className="text-xs text-muted-foreground">Stores</p>
-          </div>
-        </div>
-      </header>
+      <AppHeader activeTab="stores" />
 
-      <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <Button asChild variant="ghost">
-            <Link href="/?tab=stores">
+      <div className="mx-auto max-w-7xl space-y-6 px-5 py-7 sm:py-8">
+        <div className="flex items-center justify-between gap-3">
+          <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Link href="/?tab=stores" className="flex items-center gap-1 transition-colors hover:text-foreground">
               <ArrowLeft className="size-4" />
-              Back to Stores
+              Stores
             </Link>
-          </Button>
+          </nav>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Store actions">
@@ -271,6 +251,7 @@ export function StoreDetailsView({ storeId }: { storeId: string }) {
           subtitle={null}
           showIcon={false}
           initialFilterStoreId={store.id}
+          initialDefaultStoreId={store.id}
         />
 
         <Card>
