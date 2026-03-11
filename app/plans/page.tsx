@@ -360,8 +360,8 @@ export default function MealPlansPage() {
         {!loading && (pastPlans.length > 0 || activePlan) ? (
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
-                Past Meal Plans
+              <h2 className="text-xl font-semibold text-foreground">
+                Previous plans
               </h2>
               {filteredPast.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
@@ -411,10 +411,8 @@ export default function MealPlansPage() {
                 </CardContent>
               </Card>
             ) : (
-              <Card>
-                <CardContent className="px-0 pb-0">
-                  <div className="divide-y divide-border">
-                    {pagedPast.map((snapshot) => {
+              <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+                {pagedPast.map((snapshot) => {
                       const duplicating = pendingAction === `duplicate-${snapshot.id}`
                       const deleting = pendingAction === `delete-${snapshot.id}`
                       const editHref = `/?tab=planner&snapshotId=${encodeURIComponent(snapshot.id)}&loadSnapshot=1`
@@ -502,10 +500,8 @@ export default function MealPlansPage() {
                           </DropdownMenu>
                         </div>
                       )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+                })}
+              </div>
             )}
 
             {totalPages > 1 ? (

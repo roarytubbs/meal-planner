@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import {
   Apple,
+  Check,
   ChevronDown,
   Pencil,
   Plus,
@@ -347,6 +348,7 @@ export function IngredientManager({
   const [bulkCategoryApplying, setBulkCategoryApplying] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [rowDeleteConfirm, setRowDeleteConfirm] = useState<IngredientEntry | null>(null)
+  const [addedToListIds, setAddedToListIds] = useState<Set<string>>(new Set())
 
   const handleAdd = useCallback(() => {
     setEditingEntry(null)
@@ -994,7 +996,7 @@ export function IngredientManager({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 w-7 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                                  className={`h-7 w-7 p-0 opacity-0 transition-opacity group-hover:opacity-100 ${addedToListIds.has(entry.id) ? 'text-green-600 hover:text-green-600' : 'text-muted-foreground hover:text-foreground'}`}
                                   disabled={!activePlanId}
                                   aria-label="Add to current shopping list"
                                   onClick={() => {
@@ -1007,12 +1009,24 @@ export function IngredientManager({
                                       entry.defaultUnit
                                     )
                                     toast.success('Added to shopping list', { description: entry.name })
+                                    setAddedToListIds((prev) => new Set(prev).add(entry.id))
+                                    setTimeout(() => {
+                                      setAddedToListIds((prev) => {
+                                        const next = new Set(prev)
+                                        next.delete(entry.id)
+                                        return next
+                                      })
+                                    }, 1500)
                                   }}
                                 >
-                                  <span className="relative inline-flex items-center justify-center">
-                                    <ShoppingCart className="size-3.5" />
-                                    <Plus className="absolute -right-1 -top-1 size-2 stroke-[3]" />
-                                  </span>
+                                  {addedToListIds.has(entry.id) ? (
+                                    <Check className="size-3.5" />
+                                  ) : (
+                                    <span className="relative inline-flex items-center justify-center">
+                                      <ShoppingCart className="size-3.5" />
+                                      <Plus className="absolute -right-1 -top-1 size-2 stroke-[3]" />
+                                    </span>
+                                  )}
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="top">

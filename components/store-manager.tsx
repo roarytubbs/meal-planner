@@ -554,87 +554,81 @@ function StoreCard({
   const logoSrc = getStoreLogoSrc(store)
 
   return (
-    <Card className="overflow-hidden transition-shadow hover:shadow-md">
-      <CardContent className="p-0">
-        <div className="flex gap-4 p-4">
-          {/* Logo / placeholder */}
-          <div className="shrink-0">
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                alt={store.name}
-                className="size-14 rounded-lg object-cover bg-muted"
-                crossOrigin="anonymous"
-              />
-            ) : (
-              <div className="size-14 rounded-lg bg-muted flex items-center justify-center">
-                <Store className="size-6 text-muted-foreground" />
-              </div>
-            )}
-          </div>
-
-          {/* Details */}
-          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-            <h3 className="text-sm font-semibold text-foreground truncate">
-              <Link
-                href={`/stores/${store.id}`}
-                className="hover:underline underline-offset-2"
-              >
-                {store.name}
-              </Link>
-            </h3>
-            {store.supportsOnlineOrdering && store.onlineOrderingProvider && (
-              <div>
-                <Badge variant="secondary" className="h-5 text-[11px]">
-                  Online ordering:{' '}
-                  {store.onlineOrderingProvider === 'instacart' ? 'Instacart' : 'Target'}
-                </Badge>
-              </div>
-            )}
-            <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="size-3.5 shrink-0 mt-0.5" />
-              <span className="line-clamp-2">{store.address}</span>
-            </div>
-            {store.phone && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Phone className="size-3.5 shrink-0" />
-                <span>{store.phone}</span>
-              </div>
-            )}
-            {todayHours && (
-              <div className="space-y-1">
-                <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                  <Clock className="size-3.5 shrink-0 mt-0.5" />
-                  <span>
-                    <span className="font-medium text-foreground">Today&apos;s hours:</span>{' '}
-                    {todayHours}
-                  </span>
+    <Link href={`/stores/${store.id}`} className="block group">
+      <Card className="overflow-hidden transition-colors cursor-pointer group-hover:bg-muted/40 group-hover:shadow-md">
+        <CardContent className="p-0">
+          <div className="flex gap-4 p-4">
+            <div className="shrink-0">
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  alt={store.name}
+                  className="size-14 rounded-lg object-cover bg-muted"
+                  crossOrigin="anonymous"
+                />
+              ) : (
+                <div className="size-14 rounded-lg bg-muted flex items-center justify-center">
+                  <Store className="size-6 text-muted-foreground" />
                 </div>
-                {allHours.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setExpandedHours((prev) => !prev)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    {expandedHours ? 'Show less' : 'Show more'}
-                  </button>
-                )}
-                {expandedHours && allHours.length > 1 && (
-                  <div className="rounded-md border border-border bg-muted/20 p-2 space-y-1">
-                    {allHours.map((line) => (
-                      <p key={line} className="text-xs text-muted-foreground">
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-        </div>
-      </CardContent>
-    </Card>
+            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+              <h3 className="text-sm font-semibold text-foreground truncate">
+                {store.name}
+              </h3>
+              {store.supportsOnlineOrdering && store.onlineOrderingProvider && (
+                <div>
+                  <Badge variant="secondary" className="h-5 text-[11px]">
+                    Online ordering:{' '}
+                    {store.onlineOrderingProvider === 'instacart' ? 'Instacart' : 'Target'}
+                  </Badge>
+                </div>
+              )}
+              <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                <MapPin className="size-3.5 shrink-0 mt-0.5" />
+                <span className="line-clamp-2">{store.address}</span>
+              </div>
+              {store.phone && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Phone className="size-3.5 shrink-0" />
+                  <span>{store.phone}</span>
+                </div>
+              )}
+              {todayHours && (
+                <div className="space-y-1">
+                  <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="size-3.5 shrink-0 mt-0.5" />
+                    <span>{todayHours}</span>
+                  </div>
+                  {allHours.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setExpandedHours((prev) => !prev)
+                      }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {expandedHours ? 'Show less' : 'Show more'}
+                    </button>
+                  )}
+                  {expandedHours && allHours.length > 1 && (
+                    <div className="rounded-md border border-border bg-muted/20 p-2 space-y-1">
+                      {allHours.map((line) => (
+                        <p key={line} className="text-xs text-muted-foreground">
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
 
